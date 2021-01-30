@@ -1,0 +1,45 @@
+{
+  "name": "homebridge-daelim-smarthome",
+  "version": "1.0.0",
+  "description": "A third-party homebridge platform plugin for Daelim smarthome",
+  "main": "dist/daelim-smarthome-platform.js",
+  "keywords": [
+    "homebridge-plugin",
+    "homekit",
+    "daelim"
+  ],
+  "scripts": {
+    "clean": "rimraf ./dist",
+    "build": "rimraf ./dist && tsc",
+    "prepublishOnly": "npm run build",
+    "postpublish": "npm run clean"
+  },
+  "author": "OrigamiDream <crystal_vc31@naver.com>",
+  "engines": {
+    "homebridge": ">=1.0.0"
+  },
+  "license": "ISC",
+  "files": [
+    "LICENSE",
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OrigamiDream/homebridge-daelim-smarthome.git"
+  },
+  "bugs": {
+    "url": "https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues"
+  },
+  "devDependencies": {
+    "@types/node": "10.17.19",
+    "@types/node-fetch": "^2.5.8",
+    "@types/readline-sync": "^1.4.3",
+    "homebridge": "^1.1.7",
+    "rimraf": "^3.0.2",
+    "typescript": "^3.8.3"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.1",
+    "readline-sync": "^1.4.10"
+  }
+}

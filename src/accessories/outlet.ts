@@ -1,0 +1,114 @@
+import {Accessories, AccessoryInterface} from "./accessories";
+import {
+    API,
+    CharacteristicEventTypes,
+    CharacteristicGetCallback,
+    CharacteristicSetCallback,
+    CharacteristicValue,
+    Logging,
+    PlatformAccessory,
+    Service
+} from "homebridge";
+import {DeviceSubTypes, LoginSubTypes, Types} from "../components/fields";
+
+interface OutletAccessoryInterface extends AccessoryInterface {
+
+    on: boolean
+
+}
+
+export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
+
+    constructor(log: Logging, api: API) {
+        super(log, api, api.hap.Service.Outlet);
+    }
+
+    configureAccessory(accessory: PlatformAccessory, service: Service) {
+        super.configureAccessory(accessory, service);
+
+        service.getCharacteristic(this.api.hap.Characteristic.On)
+            .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                const response = await this.client?.sendDeferredRequest({
+                    type: 'invoke',
+                    item: [{
+                        device: 'wallsocket',
+                        uid: accessory.context.deviceID,
+                        arg1: value ? "on" : "off"
+                    }]
+                }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
+                    return this.matchesAccessoryDeviceID(accessory, body);
+                }).catch(_ => {
+                    return undefined;
+                });
+                if(response === undefined) {
+                    callback(new Error('TIMED OUT'));
+                    return;
+                }
+                this.refreshOutletState(response['item'] || []);
+                callback(undefined);
+            })
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                callback(undefined, accessory.context.on);
+            });
+    }
+
+    matchesAccessoryDeviceID(accessory: PlatformAccessory, body: any): boolean {
+        const items = body['item'] || [];
+        for(let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const deviceID = item['uid'];
+            if(accessory.context.deviceID === deviceID) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    refreshOutletState(items: any[]) {
+        for(let i = 0; i < items.length; i++) {
+            const item = items[i];
+
+            const deviceID = item['uid'];
+
+            const accessory = this.findAccessoryWithDeviceID(deviceID);
+            if(accessory) {
+                accessory.context.on = item['arg1'] === 'on';
+            }
+        }
+    }
+
+    registerListeners() {
+        this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
+            const controls = body['controlinfo'];
+            const outlets = controls['wallsocket'];
+            for(let i = 0; i < outlets.length; i++) {
+                const outlet = outlets[i];
+
+                const deviceID = outlet['uid'];
+                const displayName = outlet['uname'];
+
+                this.addAccessory({
+                    deviceID: deviceID,
+                    displayName: displayName,
+                    on: false
+                });
+            }
+            this.client?.sendRequest({
+                type: 'query',
+                item: [{
+                    device: 'wallsocket',
+                    uid: 'All'
+                }]
+            }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+        });
+        this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
+            this.refreshOutletState(body['item'] || []);
+        });
+
+        this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.INVOKE_RESPONSE, (body) => {
+            this.refreshOutletState(body['item'] || []);
+        });
+    }
+
+
+}
