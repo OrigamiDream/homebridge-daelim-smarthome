@@ -28,6 +28,11 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
 
         service.getCharacteristic(this.api.hap.Characteristic.On)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                // Old state is same with new state
+                if(accessory.context.on === value) {
+                    callback(undefined);
+                    return;
+                }
                 const response = await this.client?.sendDeferredRequest({
                     type: 'invoke',
                     item: [{

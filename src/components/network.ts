@@ -83,18 +83,25 @@ export class NetworkHandler {
         });
     }
 
-    sendRequest(body: object, pin: string, type: Types, subType: SubTypes) {
+    sendRequest(body: object, pin: string, type: Types, subType: SubTypes): boolean {
         if(!this.isConnected) {
             this.enqueuedRequests.push({
                 body: body,
                 type: type,
                 subType: subType
             });
-            this.log("Connection broken. Reconnect to the server...");
-            this.handle();
-            return;
+            return false;
         }
-        this.socket?.write(Buffer.from(Packet.create(body, pin, type, subType, 1, 3).getBytes()));
+        if(!this.socket?.write(Buffer.from(Packet.create(body, pin, type, subType, 1, 3).getBytes()))) {
+            // NOTE: We can ensure the onDisconnected() callback would be called after this socket sending failed.
+            this.enqueuedRequests.push({
+                body: body,
+                type: type,
+                subType: subType
+            });
+            return false;
+        }
+        return true;
     }
 
     flushAllEnqueuedBuffers(pin: string): boolean {
@@ -147,29 +154,25 @@ export class NetworkHandler {
             } while(this.handleResponse());
         });
         this.socket.on('end', () => {
-            if(this.onDisconnected !== undefined) {
-                this.onDisconnected();
-            }
-            this.isConnected = false;
-            this.socket = undefined;
             this.log('Disconnected from MMF server');
+            this.handleDisconnect();
         });
         this.socket.on('error', (error) => {
-            if(this.onDisconnected !== undefined) {
-                this.onDisconnected();
-            }
-            this.isConnected = false;
-            this.socket = undefined;
             this.log.error(error.message);
+            this.handleDisconnect();
         });
         this.socket.on('timeout', () => {
-            if(this.onDisconnected !== undefined) {
-                this.onDisconnected();
-            }
-            this.isConnected = false;
-            this.socket = undefined;
             this.log.error('Connection timed out');
+            this.handleDisconnect();
         });
+    }
+
+    private handleDisconnect() {
+        this.isConnected = false;
+        this.socket = undefined;
+        if(this.onDisconnected !== undefined) {
+            this.onDisconnected();
+        }
     }
 
     private appendBuffer(bytes: Uint8Array | Buffer, offset = 0, length = bytes.byteLength) {

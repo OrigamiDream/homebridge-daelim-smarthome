@@ -33,12 +33,18 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
 
         service.getCharacteristic(this.api.hap.Characteristic.Active)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                // Old state is same with new state
+                const isActive = value === this.api.hap.Characteristic.Active.ACTIVE;
+                if(accessory.context.active === isActive) {
+                    callback(undefined);
+                    return;
+                }
                 const response = await this.client?.sendDeferredRequest({
                     type: 'invoke',
                     item: [{
                         device: 'heating',
                         uid: accessory.context.deviceID,
-                        arg1: value === this.api.hap.Characteristic.Active.ACTIVE ? "on" : "off"
+                        arg1: isActive ? "on" : "off"
                     }]
                 }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
                     return this.matchesAccessoryDeviceID(accessory, body);

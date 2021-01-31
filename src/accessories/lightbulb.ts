@@ -30,18 +30,14 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
 
         service.getCharacteristic(this.api.hap.Characteristic.On)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                if(accessory.context.brightnessAdjustable && value) {
-                    // Brightness adjustable accessories can only trigger off on ON/OFF characteristic.
+                // Old state is same with new state
+                if(accessory.context.on === value) {
                     callback(undefined);
                     return;
                 }
                 const response = await this.client?.sendDeferredRequest({
                     type: 'invoke',
-                    item: [{
-                        device: 'light',
-                        uid: accessory.context.deviceID,
-                        arg1: value ? "on" : "off"
-                    }]
+                    item: [ this.createItemInterface(accessory, !!value) ]
                 }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
                     return this.matchesAccessoryDeviceID(accessory, body);
                 }).catch(_ => {
@@ -69,35 +65,15 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     if(brightness >= 80) {
                         brightness = 100;
                     }
-                    let response: any;
-                    if(brightness < 10) {
-                        response = await this.client?.sendDeferredRequest({
-                            type: 'invoke',
-                            item: [{
-                                device: 'light',
-                                uid: accessory.context.deviceID,
-                                arg1: 'off'
-                            }]
-                        }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
-                            return this.matchesAccessoryDeviceID(accessory, body);
-                        }).catch(_ => {
-                            return undefined;
-                        });
-                    } else {
-                        response = await this.client?.sendDeferredRequest({
-                            type: 'invoke',
-                            item: [{
-                                device: 'light',
-                                uid: accessory.context.deviceID,
-                                arg1: 'on',
-                                arg2: String(brightness)
-                            }]
-                        }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
-                            return this.matchesAccessoryDeviceID(accessory, body);
-                        }).catch(_ => {
-                            return undefined;
-                        });
-                    }
+                    accessory.context.brightness = brightness;
+                    const response = await this.client?.sendDeferredRequest({
+                        type: 'invoke',
+                        item: [ this.createItemInterface(accessory, brightness >= 10) ]
+                    }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
+                        return this.matchesAccessoryDeviceID(accessory, body);
+                    }).catch(_ => {
+                        return undefined;
+                    });
                     if(response === undefined) {
                         callback(new Error('TIMED OUT'));
                         return;
@@ -109,6 +85,18 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     callback(undefined, accessory.context.brightness);
                 });
         }
+    }
+
+    createItemInterface(accessory: PlatformAccessory, isActive: boolean): any {
+        let item: any = {
+            device: "light",
+            uid: accessory.context.deviceID,
+            arg1: isActive ? "on" : "off"
+        };
+        if(isActive) {
+            item["arg2"] = String(accessory.context.brightness)
+        }
+        return item;
     }
 
     matchesAccessoryDeviceID(accessory: PlatformAccessory, body: any): boolean {
@@ -131,7 +119,8 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
 
-                if(accessory.context.brightnessAdjustable) {
+                if(accessory.context.brightnessAdjustable && accessory.context.on) {
+                    // Update new brightness rate when the accessory is on.
                     accessory.context.brightness = parseInt(item['arg2']);
                 }
             }

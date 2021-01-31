@@ -158,6 +158,8 @@ export class Client {
         };
         this.handler.onDisconnected = () => {
             this.isLoggedIn = false;
+            this.log("Connection broken. Reconnect to the server...");
+            this.handler?.handle();
         };
     }
 
