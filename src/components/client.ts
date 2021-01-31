@@ -60,14 +60,14 @@ export class Client {
 
     sendRequest(body: any, type: Types, subType: SubTypes) {
         if(this.handler !== undefined) {
-            this.log(`===> ${JSON.stringify(body)}`);
+            this.log.debug(`===> ${JSON.stringify(body)}`);
             this.handler.sendRequest(body, this.getAuthorizationPIN(), type, subType);
         }
     }
 
     sendDeferredRequest(body: any, type: Types, fromSubType: SubTypes, toSubType: SubTypes, matches?: (response: any) => boolean): Promise<any> {
         if(this.handler !== undefined) {
-            this.log(`===> ${JSON.stringify(body)}`);
+            this.log.debug(`===> ${JSON.stringify(body)}`);
             return this.handler.sendDeferredRequest(body, this.getAuthorizationPIN(), type, fromSubType, toSubType, matches);
         }
         return new Promise<any>((resolve, reject) => reject('Handler not valid'));

@@ -1,4 +1,15 @@
 import fetch from "node-fetch";
+import {
+    ApplicationLogSubTypes,
+    DeviceSubTypes, ElevatorCallSubTypes,
+    EMSSubTypes, EtceteraSubTypes,
+    GuardSubTypes,
+    HealthcareSubTypes,
+    InfoSubTypes,
+    LoginSubTypes, SettingSubTypes,
+    SystemSubTypes,
+    Types
+} from "./fields";
 
 export class Utils {
 
@@ -50,6 +61,35 @@ export class Utils {
         }
         return {
             areas, regions
+        }
+    }
+
+    static findSubType(type: Types) {
+        switch (type) {
+            case Types.SYSTEM:
+                return SystemSubTypes;
+            case Types.LOGIN:
+                return LoginSubTypes;
+            case Types.GUARD:
+                return GuardSubTypes;
+            case Types.DEVICE:
+                return DeviceSubTypes;
+            case Types.EMS:
+                return EMSSubTypes;
+            case Types.INFO:
+                return InfoSubTypes;
+            case Types.HEALTHCARE:
+                return HealthcareSubTypes;
+            case Types.SETTING:
+                return SettingSubTypes;
+            case Types.ELEVATOR_CELL:
+                return ElevatorCallSubTypes;
+            case Types.ETCETERA:
+                return EtceteraSubTypes;
+            case Types.APPLICATION_LOG:
+                return ApplicationLogSubTypes;
+            default:
+                throw `Invalid SubTypes${type}`;
         }
     }
 

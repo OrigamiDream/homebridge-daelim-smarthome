@@ -84,7 +84,7 @@ export class NetworkHandler {
     }
 
     sendRequest(body: object, pin: string, type: Types, subType: SubTypes): boolean {
-        if(!this.isConnected) {
+        if(!this.isConnected || !this.socket) {
             this.enqueuedRequests.push({
                 body: body,
                 type: type,
@@ -194,9 +194,9 @@ export class NetworkHandler {
         if(rawData.byteLength > chunkSize) {
             this.appendBuffer(rawData, chunkSize, rawData.byteLength - chunkSize);
         }
-        this.log(`<=== ${JSON.stringify(packet?.getJSONBody())}`);
         if(packet !== undefined) {
             const header = packet.getHeader();
+            this.log.debug(`<=== HEAD(${header.toString()}) :: ${JSON.stringify(packet.getJSONBody())}`);
             if(header.getError() === Errors.SUCCESS) {
                 if(this.deferredRequests.length > 0) {
                     let index = 0;

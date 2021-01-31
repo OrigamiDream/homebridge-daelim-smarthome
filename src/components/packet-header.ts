@@ -1,6 +1,7 @@
 import { TextDecoder, TextEncoder } from "util";
 import { ByteBuffer } from "./byte-buffer";
-import { Errors, SubTypes, Types } from "./fields";
+import {Errors, SubTypes, Types} from "./fields";
+import {Utils} from "./utils";
 
 export class PacketHeader {
 
@@ -74,6 +75,10 @@ export class PacketHeader {
 
     getError(): Errors {
         return this.error;
+    }
+
+    toString(): string {
+        return `PIN: ${this.pin}, Type: ${Types[this.type]}, Sub Type: ${Utils.findSubType(this.type)[this.subType]}, Error: ${Errors[this.error]}`;
     }
 
 }

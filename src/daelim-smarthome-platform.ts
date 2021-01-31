@@ -39,8 +39,6 @@ class DaelimSmartHomePlatform {
         this.config = this.setupDaelimConfig(config);
 
         api.on(APIEvent.DID_FINISH_LAUNCHING, async () => {
-            log.info("Daelim Smarthome 'didFinishLaunching'");
-
             await this.createDaelimSmarthomeService();
         });
     }
