@@ -67,18 +67,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 maxValue: this.api.hap.Characteristic.CurrentHeaterCoolerState.HEATING,
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                const context = accessory.context;
-                let value;
-                if(context.active) {
-                    if(context.desiredTemperature > context.currentTemperature) {
-                        value = this.api.hap.Characteristic.CurrentHeaterCoolerState.HEATING;
-                    } else {
-                        value = this.api.hap.Characteristic.CurrentHeaterCoolerState.INACTIVE;
-                    }
-                } else {
-                    value = this.api.hap.Characteristic.CurrentHeaterCoolerState.INACTIVE;
-                }
-                callback(undefined, value);
+                callback(undefined, this.getCurrentHeaterCoolerState(accessory));
             });
 
         service.getCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState)
@@ -91,16 +80,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                const context = accessory.context;
-                if(context.active) {
-                    if(context.desiredTemperature > context.currentTemperature) {
-                        callback(undefined, this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT);
-                    } else {
-                        callback(undefined, this.api.hap.Characteristic.TargetHeaterCoolerState.COOL);
-                    }
-                } else {
-                    callback(undefined, this.api.hap.Characteristic.TargetHeaterCoolerState.AUTO);
-                }
+                callback(undefined, this.getTargetHeaterCoolerState(accessory));
             });
 
         service.getCharacteristic(this.api.hap.Characteristic.HeatingThresholdTemperature)
@@ -110,6 +90,10 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 minStep: 1
             })
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                if(accessory.context.desiredTemperature === value) {
+                    callback(undefined);
+                    return;
+                }
                 const response = await this.client?.sendDeferredRequest({
                     type: 'invoke',
                     item: [{
@@ -155,7 +139,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
         return false;
     }
 
-    refreshHeaterState(items: any[]) {
+    refreshHeaterState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
 
@@ -169,6 +153,14 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 accessory.context.desiredTemperature = desiredTemperature;
                 accessory.context.currentTemperature = currentTemperature;
                 accessory.context.active = active && desiredTemperature >= HeaterAccessories.MINIMUM_TEMPERATURE;
+                if(force) {
+                    this.findService(accessory, (service) => {
+                        service.setCharacteristic(this.api.hap.Characteristic.CurrentTemperature, parseFloat(accessory.context.currentTemperature));
+                        service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
+                        service.setCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState, this.getCurrentHeaterCoolerState(accessory));
+                        service.setCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState, this.getTargetHeaterCoolerState(accessory));
+                    });
+                }
             }
         }
     }
@@ -200,11 +192,37 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
             }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
         });
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
-            this.refreshHeaterState(body['item'] || []);
+            this.refreshHeaterState(body['item'] || [], true);
         });
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.INVOKE_RESPONSE, (body) => {
-            this.refreshHeaterState(body['item'] || []);
+            this.refreshHeaterState(body['item'] || [], true);
         });
+    }
+
+    getCurrentHeaterCoolerState(accessory: PlatformAccessory): CharacteristicValue {
+        const context = accessory.context;
+        if(context.active) {
+            if(context.desiredTemperature > context.currentTemperature) {
+                return this.api.hap.Characteristic.CurrentHeaterCoolerState.HEATING;
+            } else {
+                return this.api.hap.Characteristic.CurrentHeaterCoolerState.INACTIVE;
+            }
+        } else {
+            return this.api.hap.Characteristic.CurrentHeaterCoolerState.INACTIVE;
+        }
+    }
+
+    getTargetHeaterCoolerState(accessory: PlatformAccessory): CharacteristicValue {
+        const context = accessory.context;
+        if(context.active) {
+            if(context.desiredTemperature > context.currentTemperature) {
+                return this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT;
+            } else {
+                return this.api.hap.Characteristic.TargetHeaterCoolerState.COOL;
+            }
+        } else {
+            return this.api.hap.Characteristic.TargetHeaterCoolerState.AUTO;
+        }
     }
 
 }

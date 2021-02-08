@@ -25,6 +25,28 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         super(log, api, api.hap.Service.Lightbulb);
     }
 
+    async identify(accessory: PlatformAccessory) {
+        await super.identify(accessory);
+
+        const alreadyOn = !!accessory.context.on;
+        const procedures = [ !alreadyOn, alreadyOn ];
+        for(let i = 0; i < procedures.length; i++) {
+            const procedure = procedures[i];
+            const response = await this.client?.sendDeferredRequest({
+                type: 'invoke',
+                item: [ this.createItemInterface(accessory, procedure) ]
+            }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
+                return this.matchesAccessoryDeviceID(accessory, body);
+            }).catch(_ => {
+                return undefined;
+            });
+            if(response === undefined) {
+                this.log.warn("The accessory %s does not respond", accessory.displayName);
+                break;
+            }
+        }
+    }
+
     configureAccessory(accessory: PlatformAccessory, service: Service) {
         super.configureAccessory(accessory, service);
 
@@ -111,17 +133,25 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         return false;
     }
 
-    refreshLightbulbState(items: any[]) {
+    refreshLightbulbState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
             const deviceID = item['uid'];
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
+                if(force) {
+                    this.findService(accessory, (service) => {
+                        service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
+                    });
+                }
 
                 if(accessory.context.brightnessAdjustable && accessory.context.on) {
                     // Update new brightness rate when the accessory is on.
                     accessory.context.brightness = parseInt(item['arg2']);
+                    this.findService(accessory, (service) => {
+                        service.setCharacteristic(this.api.hap.Characteristic.Brightness, accessory.context.brightness);
+                    });
                 }
             }
         }
@@ -157,11 +187,11 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         });
 
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
-            this.refreshLightbulbState(body['item'] || []);
+            this.refreshLightbulbState(body['item'] || [], true);
         });
 
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.INVOKE_RESPONSE, (body) => {
-            this.refreshLightbulbState(body['item'] || []);
+            this.refreshLightbulbState(body['item'] || [], true);
         });
     }
 

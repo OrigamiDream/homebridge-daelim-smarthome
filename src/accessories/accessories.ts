@@ -66,7 +66,24 @@ export class Accessories<T extends AccessoryInterface> {
 
     configureAccessory(accessory: PlatformAccessory, service: Service) {
         this.log.info("Configuring accessory %s", accessory.displayName);
+        accessory.on("identify", async () => {
+            await this.identify(accessory);
+            this.log.info("%s identified!", accessory.displayName);
+        });
         this.accessories.push(accessory);
+    }
+
+    async identify(accessory: PlatformAccessory) {
+        this.log.info("Identifying %s", accessory.displayName);
+    }
+
+    findService(accessory: PlatformAccessory, callback: (service: Service) => void): boolean {
+        const service = accessory.getService(this.serviceType);
+        if(service) {
+            callback(service);
+            return true;
+        }
+        return false;
     }
 
     registerListeners() {

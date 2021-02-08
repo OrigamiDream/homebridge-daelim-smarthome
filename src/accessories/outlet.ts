@@ -23,6 +23,32 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
         super(log, api, api.hap.Service.Outlet);
     }
 
+    async identify(accessory: PlatformAccessory): Promise<void> {
+        await super.identify(accessory);
+
+        const alreadyOn = !!accessory.context.on;
+        const procedures = [ !alreadyOn, alreadyOn ];
+        for(let i = 0; i < procedures.length; i++) {
+            const procedure = procedures[i];
+            const response = await this.client?.sendDeferredRequest({
+                type: 'invoke',
+                item: [{
+                    device: 'wallsocket',
+                    uid: accessory.context.deviceID,
+                    arg1: procedure ? "on" : "off"
+                }]
+            }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
+                return this.matchesAccessoryDeviceID(accessory, body);
+            }).catch(_ => {
+                return undefined;
+            });
+            if(response === undefined) {
+                this.log.warn("The accessory %s does not respond", accessory.displayName);
+                break;
+            }
+        }
+    }
+
     configureAccessory(accessory: PlatformAccessory, service: Service) {
         super.configureAccessory(accessory, service);
 
@@ -69,7 +95,7 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
         return false;
     }
 
-    refreshOutletState(items: any[]) {
+    refreshOutletState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
 
@@ -78,6 +104,11 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
+                if(force) {
+                    this.findService(accessory, (service) => {
+                        service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
+                    });
+                }
             }
         }
     }
@@ -107,11 +138,11 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
             }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
         });
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
-            this.refreshOutletState(body['item'] || []);
+            this.refreshOutletState(body['item'] || [], true);
         });
 
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.INVOKE_RESPONSE, (body) => {
-            this.refreshOutletState(body['item'] || []);
+            this.refreshOutletState(body['item'] || [], true);
         });
     }
 
