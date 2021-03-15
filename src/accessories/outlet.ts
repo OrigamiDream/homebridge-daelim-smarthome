@@ -129,7 +129,7 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
                     on: false
                 });
             }
-            this.client?.sendRequest({
+            this.client?.sendUnreliableRequest({
                 type: 'query',
                 item: [{
                     device: 'wallsocket',

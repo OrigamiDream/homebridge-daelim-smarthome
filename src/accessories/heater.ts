@@ -183,7 +183,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                     currentTemperature: 0
                 });
             }
-            this.client?.sendRequest({
+            this.client?.sendUnreliableRequest({
                 type: 'query',
                 item: [{
                     device: 'heating',

@@ -29,10 +29,12 @@ interface DeferredRequest {
     reject: (reason?: any) => void,
 
     type: Types,
+    fromSubTypes: SubTypes,
     toSubTypes: SubTypes,
     matches?: (response: any) => boolean
 
-    timestamp: number
+    timestamp: number,
+    body: any
 }
 
 interface EnqueuedRequest {
@@ -83,25 +85,28 @@ export class NetworkHandler {
         });
     }
 
-    sendRequest(body: object, pin: string, type: Types, subType: SubTypes): boolean {
+    sendUnreliableRequest(body: object, pin: string, type: Types, subType: SubTypes): boolean {
         if(!this.isConnected || !this.socket) {
-            this.enqueuedRequests.push({
-                body: body,
-                type: type,
-                subType: subType
-            });
             return false;
         }
-        if(!this.socket?.write(Buffer.from(Packet.create(body, pin, type, subType, 1, 3).getBytes()))) {
-            // NOTE: We can ensure the onDisconnected() callback would be called after this socket sending failed.
-            this.enqueuedRequests.push({
-                body: body,
+        this.log.debug(`===> ${JSON.stringify(body)}`);
+        return this.socket?.write(Buffer.from(Packet.create(body, pin, type, subType, 1, 3).getBytes()));
+    }
+
+    sendDeferredRequest(body: any, pin: string, type: Types, fromSubType: SubTypes, toSubType: SubTypes, matches?: (response: any) => boolean): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            this.sendUnreliableRequest(body, pin, type, fromSubType);
+            this.deferredRequests.push({
+                resolve: resolve,
+                reject: reject,
                 type: type,
-                subType: subType
+                fromSubTypes: fromSubType,
+                toSubTypes: toSubType,
+                matches: matches,
+                timestamp: Date.now(),
+                body: body
             });
-            return false;
-        }
-        return true;
+        });
     }
 
     flushAllEnqueuedBuffers(pin: string): boolean {
@@ -111,24 +116,10 @@ export class NetworkHandler {
         while(this.enqueuedRequests.length > 0) {
             const requests = this.enqueuedRequests.splice(0, 1);
             for(const request of requests) {
-                this.sendRequest(request.body, pin, request.type, request.subType)
+                this.sendUnreliableRequest(request.body, pin, request.type, request.subType)
             }
         }
         return true;
-    }
-
-    sendDeferredRequest(body: any, pin: string, type: Types, fromSubType: SubTypes, toSubType: SubTypes, matches?: (response: any) => boolean): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            this.sendRequest(body, pin, type, fromSubType);
-            this.deferredRequests.push({
-                resolve: resolve,
-                reject: reject,
-                type: type,
-                toSubTypes: toSubType,
-                matches: matches,
-                timestamp: Date.now(),
-            });
-        });
     }
 
     handle() {
@@ -158,7 +149,7 @@ export class NetworkHandler {
             this.handleDisconnect();
         });
         this.socket.on('error', (error) => {
-            this.log.error(error.message);
+            this.log.error(`Unexpected behavior: ${error.message}`);
             this.handleDisconnect();
         });
         this.socket.on('timeout', () => {
@@ -170,6 +161,17 @@ export class NetworkHandler {
     private handleDisconnect() {
         this.isConnected = false;
         this.socket = undefined;
+
+        // NOTE: move deferred requests into enqueued request array
+        //       but don't empty deferred requests. this will be executed after reconnection
+        for(const request of this.deferredRequests) {
+            this.enqueuedRequests.push({
+                body: request.body,
+                type: request.type,
+                subType: request.fromSubTypes
+            });
+        }
+
         if(this.onDisconnected !== undefined) {
             this.onDisconnected();
         }

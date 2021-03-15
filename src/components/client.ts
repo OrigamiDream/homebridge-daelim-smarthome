@@ -58,16 +58,14 @@ export class Client {
         return pin;
     }
 
-    sendRequest(body: any, type: Types, subType: SubTypes) {
+    sendUnreliableRequest(body: any, type: Types, subType: SubTypes) {
         if(this.handler !== undefined) {
-            this.log.debug(`===> ${JSON.stringify(body)}`);
-            this.handler.sendRequest(body, this.getAuthorizationPIN(), type, subType);
+            this.handler.sendUnreliableRequest(body, this.getAuthorizationPIN(), type, subType);
         }
     }
 
     sendDeferredRequest(body: any, type: Types, fromSubType: SubTypes, toSubType: SubTypes, matches?: (response: any) => boolean): Promise<any> {
         if(this.handler !== undefined) {
-            this.log.debug(`===> ${JSON.stringify(body)}`);
             return this.handler.sendDeferredRequest(body, this.getAuthorizationPIN(), type, fromSubType, toSubType, matches);
         }
         return new Promise<any>((resolve, reject) => reject('Handler not valid'));
@@ -91,7 +89,7 @@ export class Client {
             this.address.complex = body['dong'];
             this.address.room = body['ho'];
 
-            this.sendRequest({
+            this.sendUnreliableRequest({
                 id: this.config.username,
                 pw: this.config.password,
                 certpin: this.authorization.certification
@@ -99,7 +97,7 @@ export class Client {
         });
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.LOGIN_PIN_RESPONSE, (body) => {
             this.authorization.login = body['loginpin'];
-            this.sendRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
+            this.sendUnreliableRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
         });
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
             this.isLoggedIn = true;
@@ -115,14 +113,14 @@ export class Client {
 
     registerErrorListeners() {
         this.registerErrorListener(Errors.UNCERTIFIED_DEVICE, () => {
-            this.sendRequest({
+            this.sendUnreliableRequest({
                 id: this.config.username,
                 pw: this.config.password,
             }, Types.LOGIN, LoginSubTypes.DELETE_CERTIFICATION_REQUEST);
-            this.sendRequest({
+            this.sendUnreliableRequest({
                 id: this.config.username
             }, Types.LOGIN, LoginSubTypes.APPROVAL_DELETE_REQUEST);
-            this.sendRequest({
+            this.sendUnreliableRequest({
                 dong: this.address.complex,
                 ho: this.address.room,
                 id: this.config.username,
@@ -131,7 +129,7 @@ export class Client {
 
             const wallPadNumber = readlineSync.question('Enter wall-pad PIN: ');
 
-            this.sendRequest({
+            this.sendUnreliableRequest({
                 dong: this.address.complex,
                 ho: this.address.room,
                 id: this.config.username,
@@ -141,7 +139,7 @@ export class Client {
     }
 
     sendCertificationRequest() {
-        this.sendRequest({
+        this.sendUnreliableRequest({
             id: this.config.username,
             pw: this.config.password,
             UUID: this.config.uuid

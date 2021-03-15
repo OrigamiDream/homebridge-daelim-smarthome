@@ -177,7 +177,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     on: false
                 });
             }
-            this.client?.sendRequest({
+            this.client?.sendUnreliableRequest({
                 type: 'query',
                 item: [{
                     device: 'light',
