@@ -177,21 +177,22 @@ export enum DeviceSubTypes {
 }
 
 export enum EMSSubTypes {
-    // TODO
+    // TODO: These types are not necessary on HomeBridge
 }
 
 export enum InfoSubTypes {
-    // TODO
+    // TODO: These types are not necessary on HomeBridge
 }
 
 export enum HealthcareSubTypes {
-    // TODO
+    // TODO: These types are not necessary on HomeBridge
 }
 
 export enum SettingSubTypes {
-    // TODO
+    // TODO: These types are not necessary on HomeBridge
 }
 
+// TODO: HomeKit currently does not support one-way requests like calling elevator
 export enum ElevatorCallSubTypes {
 
     CALL_REQUEST = 1,
@@ -201,9 +202,9 @@ export enum ElevatorCallSubTypes {
 }
 
 export enum EtceteraSubTypes {
-    // TODO
+    // TODO: These types are not necessary on HomeBridge
 }
 
 export enum ApplicationLogSubTypes {
-    // TODO
+    // TODO: These types are not necessary on HomeBridge
 }

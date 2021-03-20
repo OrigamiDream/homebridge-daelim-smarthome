@@ -127,6 +127,9 @@ export class Client {
                 auth: 2
             }, Types.LOGIN, LoginSubTypes.APPROVAL_REQUEST);
 
+            // FIXME:
+            //  In HomeBridge service instances, readline does not work properly.
+            //  TBD: Detects readline availability, and recommends running HomeBridge inline mode.
             const wallPadNumber = readlineSync.question('Enter wall-pad PIN: ');
 
             this.sendUnreliableRequest({
