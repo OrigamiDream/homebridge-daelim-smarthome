@@ -79,6 +79,7 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                this.client?.checkKeepAlive();
                 callback(undefined, accessory.context.on);
             });
     }

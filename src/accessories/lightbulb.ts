@@ -73,6 +73,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                this.client?.checkKeepAlive();
                 callback(undefined, accessory.context.on);
             });
         if(accessory.context.brightnessAdjustable) {
@@ -104,6 +105,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     callback(undefined);
                 })
                 .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                    this.client?.checkKeepAlive();
                     callback(undefined, accessory.context.brightness);
                 });
         }

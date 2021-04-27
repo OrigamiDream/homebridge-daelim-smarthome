@@ -59,6 +59,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                this.client?.checkKeepAlive();
                 callback(undefined, accessory.context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
             });
 
@@ -67,6 +68,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 maxValue: this.api.hap.Characteristic.CurrentHeaterCoolerState.HEATING,
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                this.client?.checkKeepAlive();
                 callback(undefined, this.getCurrentHeaterCoolerState(accessory));
             });
 
@@ -80,6 +82,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                this.client?.checkKeepAlive();
                 callback(undefined, this.getTargetHeaterCoolerState(accessory));
             });
 
@@ -115,6 +118,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                this.client?.checkKeepAlive();
                 callback(undefined, Math.max(HeaterAccessories.MINIMUM_TEMPERATURE, Math.min(HeaterAccessories.MAXIMUM_TEMPERATURE, parseFloat(accessory.context.desiredTemperature))));
             });
 
@@ -123,6 +127,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 minStep: 1
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                this.client?.checkKeepAlive();
                 callback(undefined, parseFloat(accessory.context.currentTemperature));
             });
     }

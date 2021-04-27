@@ -3,7 +3,7 @@ import {DaelimConfig} from "./interfaces/daelim-config";
 import {Utils} from "./utils";
 import {Logging} from "homebridge";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
-import {Errors, LoginSubTypes, SubTypes, Types} from "./fields";
+import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "./fields";
 
 interface ClientAuthorization {
     certification: string,
@@ -26,6 +26,7 @@ export class Client {
     private complexInfo?: object;
     private handler?: NetworkHandler;
     private isLoggedIn = false;
+    private lastKeepAliveTimestamp: number;
 
     constructor(log: Logging, config: DaelimConfig) {
         this.log = log;
@@ -38,6 +39,18 @@ export class Client {
             complex: '',
             room: ''
         };
+        this.lastKeepAliveTimestamp = Date.now();
+    }
+
+    checkKeepAlive() {
+        const currentTime = Date.now();
+        if(currentTime - this.lastKeepAliveTimestamp < 10 * 60 * 1000) {
+            // Check keep alive when last keep alive time has passed for 10 minutes
+            return;
+        }
+        this.lastKeepAliveTimestamp = currentTime;
+        this.sendUnreliableRequest({}, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+        this.log('Attempted to check the socket connection is alive');
     }
 
     private async readComplexInfo(): Promise<object> {
