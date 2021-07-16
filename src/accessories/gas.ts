@@ -11,31 +11,28 @@ import {
 } from "homebridge";
 import {DeviceSubTypes, LoginSubTypes, Types} from "../components/fields";
 
-interface OutletAccessoryInterface extends AccessoryInterface {
+interface GasAccessoryInterface extends AccessoryInterface {
 
     on: boolean
 
 }
 
-export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
+export class GasAccessories extends Accessories<GasAccessoryInterface> {
 
     constructor(log: Logging, api: API) {
-        super(log, api, "outlet", api.hap.Service.Outlet);
+        super(log, api, "gas", api.hap.Service.Valve);
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
         await super.identify(accessory);
 
-        const alreadyOn = !!accessory.context.on;
-        const procedures = [ !alreadyOn, alreadyOn ];
-        for(let i = 0; i < procedures.length; i++) {
-            const procedure = procedures[i];
+        if(!!accessory.context.on) {
             const response = await this.client?.sendDeferredRequest({
                 type: 'invoke',
                 item: [{
-                    device: 'wallsocket',
+                    device: 'gas',
                     uid: accessory.context.deviceID,
-                    arg1: procedure ? "on" : "off"
+                    arg1: "off"
                 }]
             }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
                 return this.matchesAccessoryDeviceID(accessory, body);
@@ -44,43 +41,70 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
             });
             if(response === undefined) {
                 this.log.warn("The accessory %s does not respond", accessory.displayName);
-                break;
             }
+        } else {
+            this.log.warn("The accessory %s is currently off, identification is impossible", accessory.displayName);
         }
     }
 
     configureAccessory(accessory: PlatformAccessory, service: Service) {
         super.configureAccessory(accessory, service);
 
-        service.getCharacteristic(this.api.hap.Characteristic.On)
+        service.getCharacteristic(this.api.hap.Characteristic.Active)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                // Old state is same with new state
+                const isActive = value === this.api.hap.Characteristic.Active.ACTIVE
+                // Old state is same with new state and the accessory is already off
                 if(accessory.context.on === value) {
+                    callback(undefined);
+                    return;
+                }
+                if(!accessory.context.on) {
+                    if(isActive) {
+                        this.client?.sendUnreliableRequest({
+                            type: 'query',
+                            item: [{
+                                device: 'gas',
+                                uid: 'All'
+                            }]
+                        }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+                    }
                     callback(undefined);
                     return;
                 }
                 const response = await this.client?.sendDeferredRequest({
                     type: 'invoke',
                     item: [{
-                        device: 'wallsocket',
+                        device: 'gas',
                         uid: accessory.context.deviceID,
-                        arg1: value ? "on" : "off"
+                        arg1: 'off'
                     }]
                 }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
                     return this.matchesAccessoryDeviceID(accessory, body);
                 }).catch(_ => {
                     return undefined;
-                });
-                if(response === undefined) {
+                })
+                if(response == undefined) {
                     callback(new Error('TIMED OUT'));
                     return;
                 }
-                this.refreshOutletState(response['item'] || []);
+                this.refreshGasValveState(response['item'] || []);
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 this.client?.checkKeepAlive();
-                callback(undefined, accessory.context.on);
+                callback(undefined, accessory.context.on ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
+            });
+
+        service.getCharacteristic(this.api.hap.Characteristic.InUse)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                this.client?.checkKeepAlive();
+                callback(undefined, accessory.context.on ? this.api.hap.Characteristic.InUse.IN_USE : this.api.hap.Characteristic.InUse.NOT_IN_USE);
+            });
+
+        service.getCharacteristic(this.api.hap.Characteristic.ValveType)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                this.client?.checkKeepAlive();
+                callback(undefined, this.api.hap.Characteristic.ValveType.GENERIC_VALVE);
             });
     }
 
@@ -96,7 +120,7 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
         return false;
     }
 
-    refreshOutletState(items: any[], force: boolean = false) {
+    refreshGasValveState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
 
@@ -107,7 +131,9 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
                 accessory.context.on = item['arg1'] === 'on';
                 if(force) {
                     this.findService(accessory, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
+                        service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.on ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
+                        service.setCharacteristic(this.api.hap.Characteristic.InUse, accessory.context.on ? this.api.hap.Characteristic.InUse.IN_USE : this.api.hap.Characteristic.InUse.NOT_IN_USE);
+                        service.setCharacteristic(this.api.hap.Characteristic.ValveType, this.api.hap.Characteristic.ValveType.GENERIC_VALVE);
                     });
                 }
             }
@@ -117,12 +143,12 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
     registerListeners() {
         this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
             const controls = body['controlinfo'];
-            const outlets = controls['wallsocket'];
-            for(let i = 0; i < outlets.length; i++) {
-                const outlet = outlets[i];
+            const gases = controls['gas'];
+            for(let i = 0; i < gases.length; i++) {
+                const gas = gases[i];
 
-                const deviceID = outlet['uid'];
-                const displayName = outlet['uname'];
+                const deviceID = gas['uid'];
+                const displayName = gas['uname'];
 
                 this.addAccessory({
                     deviceID: deviceID,
@@ -133,19 +159,17 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
             this.client?.sendUnreliableRequest({
                 type: 'query',
                 item: [{
-                    device: 'wallsocket',
+                    device: 'gas',
                     uid: 'All'
                 }]
             }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
-        });
+        })
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
-            this.refreshOutletState(body['item'] || [], true);
+            this.refreshGasValveState(body['item'] || [], true);
         });
-
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.INVOKE_RESPONSE, (body) => {
-            this.refreshOutletState(body['item'] || [], true);
+            this.refreshGasValveState(body['item'] || [], true);
         });
     }
-
 
 }

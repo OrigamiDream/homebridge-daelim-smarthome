@@ -22,7 +22,7 @@ interface LightbulbAccessoryInterface extends AccessoryInterface {
 export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
 
     constructor(log: Logging, api: API) {
-        super(log, api, api.hap.Service.Lightbulb);
+        super(log, api, "lightbulb", api.hap.Service.Lightbulb);
     }
 
     async identify(accessory: PlatformAccessory) {

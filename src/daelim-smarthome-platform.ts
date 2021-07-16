@@ -12,6 +12,7 @@ import {Utils} from "./components/utils";
 import {Accessories, AccessoryInterface} from "./accessories/accessories";
 import {OutletAccessories} from "./accessories/outlet";
 import {HeaterAccessories} from "./accessories/heater";
+import {GasAccessories} from "./accessories/gas";
 
 export = (api: API) => {
     api.registerPlatform(Utils.PLATFORM_NAME, DaelimSmartHomePlatform);
@@ -33,6 +34,7 @@ class DaelimSmartHomePlatform {
         this.accessories.push(new LightbulbAccessories(this.log, this.api));
         this.accessories.push(new OutletAccessories(this.log, this.api));
         this.accessories.push(new HeaterAccessories(this.log, this.api));
+        this.accessories.push(new GasAccessories(this.log, this.api));
 
         log.info("Daelim Smarthome platform finished initializing!");
 
@@ -62,6 +64,9 @@ class DaelimSmartHomePlatform {
     /* override */
     configureAccessory(accessory: PlatformAccessory): void {
         for(const accessories of this.accessories) {
+            if(accessory.context.accessoryType !== accessories.getAccessoryType()) {
+                continue;
+            }
             const service = accessory.getService(accessories.getServiceType());
             if(service !== undefined) {
                 accessories.configureAccessory(accessory, service);

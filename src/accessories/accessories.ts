@@ -6,7 +6,8 @@ import {WithUUID} from "hap-nodejs";
 export interface AccessoryInterface {
 
     deviceID: string,
-    displayName: string
+    displayName: string,
+    accessoryType?: string,
 
 }
 
@@ -21,15 +22,21 @@ export class Accessories<T extends AccessoryInterface> {
 
     protected readonly accessories: PlatformAccessory[] = [];
     protected readonly serviceType: ServiceType;
+    protected readonly accessoryType: string;
 
-    constructor(log: Logging, api: API, serviceType: ServiceType) {
+    constructor(log: Logging, api: API, accessoryType: string, serviceType: ServiceType) {
         this.log = log;
         this.api = api;
+        this.accessoryType = accessoryType;
         this.serviceType = serviceType;
     }
 
     setClient(client: Client) {
         this.client = client;
+    }
+
+    getAccessoryType(): string {
+        return this.accessoryType;
     }
 
     getServiceType(): ServiceType {
@@ -54,12 +61,14 @@ export class Accessories<T extends AccessoryInterface> {
             const service = accessory.addService(this.serviceType, context.displayName);
 
             accessory.context = context;
+            accessory.context.accessoryType = this.accessoryType;
 
             this.configureAccessory(accessory, service);
             this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ accessory ]);
         } else {
             this.accessories.filter(accessory => accessory.UUID === uuid).forEach(accessory => {
                 accessory.context = context;
+                accessory.context.accessoryType = this.accessoryType;
             });
         }
     }

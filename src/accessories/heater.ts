@@ -25,7 +25,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
     public static MAXIMUM_TEMPERATURE = 40;
 
     constructor(log: Logging, api: API) {
-        super(log, api, api.hap.Service.HeaterCooler);
+        super(log, api, "heater", api.hap.Service.HeaterCooler);
     }
 
     configureAccessory(accessory: PlatformAccessory, service: Service) {
@@ -83,7 +83,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 this.client?.checkKeepAlive();
-                callback(undefined, this.getTargetHeaterCoolerState(accessory));
+                callback(undefined, this.getTargetHeaterCoolerState());
             });
 
         service.getCharacteristic(this.api.hap.Characteristic.HeatingThresholdTemperature)
@@ -163,7 +163,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                         service.setCharacteristic(this.api.hap.Characteristic.CurrentTemperature, parseFloat(accessory.context.currentTemperature));
                         service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
                         service.setCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState, this.getCurrentHeaterCoolerState(accessory));
-                        service.setCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState, this.getTargetHeaterCoolerState(accessory));
+                        service.setCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState, this.getTargetHeaterCoolerState());
                     });
                 }
             }
@@ -217,7 +217,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
         }
     }
 
-    getTargetHeaterCoolerState(accessory: PlatformAccessory): CharacteristicValue {
+    getTargetHeaterCoolerState(): CharacteristicValue {
         return this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT;
     }
 
