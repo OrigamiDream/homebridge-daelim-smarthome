@@ -1,4 +1,5 @@
 import fetch from "node-fetch";
+import https from "https";
 import {
     ApplicationLogSubTypes,
     DeviceSubTypes, ElevatorCallSubTypes,
@@ -31,7 +32,11 @@ export class Utils {
         const areas = [];
         const regions = [];
 
-        const response = await fetch(this.URL).then(response => response.text()).catch(reason => {
+        const response = await fetch(this.URL, {
+            agent: new https.Agent({
+                rejectUnauthorized: false
+            })
+        }).then(response => response.text()).catch(reason => {
             console.error(reason);
             return "";
         });
