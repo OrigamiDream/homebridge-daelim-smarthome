@@ -53,8 +53,8 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
         service.getCharacteristic(this.api.hap.Characteristic.Active)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const isActive = value === this.api.hap.Characteristic.Active.ACTIVE
-                // Old state is same with new state and the accessory is already off
-                if(accessory.context.on === value) {
+                // Old state is same with new state
+                if(accessory.context.on === isActive) {
                     callback(undefined);
                     return;
                 }
@@ -153,7 +153,7 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
                 this.addAccessory({
                     deviceID: deviceID,
                     displayName: displayName,
-                    on: false
+                    on: true // active as a default since this is off-only valve
                 });
             }
             this.client?.sendUnreliableRequest({
