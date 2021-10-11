@@ -2,3 +2,5 @@
 .git*
 .idea
 complexes
+node_modules
+
