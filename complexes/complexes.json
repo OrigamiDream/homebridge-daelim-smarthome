@@ -1,0 +1,969 @@
+{
+    "complexes": [
+        {
+            "region": "서울특별시",
+            "complexes": [
+                {
+                    "index": "1",
+                    "name": "e편한세상 강동에코포레",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "15",
+                    "name": "e편한세상 금호(101~116)",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "16",
+                    "name": "e편한세상 금호(117)",
+                    "status": "DEV"
+                },
+                {
+                    "index": "17",
+                    "name": "녹번역e편한세상캐슬",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "31",
+                    "name": "e편한세상 독산더타워",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "43",
+                    "name": "e편한세상 문래",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "53",
+                    "name": "e편한세상 부천심곡",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "60",
+                    "name": "e편한세상 서울대입구1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "61",
+                    "name": "e편한세상 서울대입구2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "62",
+                    "name": "e편한세상 서울대입구2차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "70",
+                    "name": "e편한세상 송파파크센트럴",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "82",
+                    "name": "e편한세상 신촌 1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "83",
+                    "name": "e편한세상 신촌 2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "84",
+                    "name": "e편한세상 신촌 3단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "85",
+                    "name": "e편한세상 신촌 4단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "94",
+                    "name": "e편한세상 영등포아델포레",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "103",
+                    "name": "e편한세상 염창",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "114",
+                    "name": "e편한세상 옥수파크힐스 1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "115",
+                    "name": "e편한세상 옥수파크힐스 2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "152",
+                    "name": "e편한세상 화랑대",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "153",
+                    "name": "아크로리버파크",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "154",
+                    "name": "아크로타워스퀘어",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "155",
+                    "name": "아크로리버뷰",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "156",
+                    "name": "아크로리버하임1블럭(101~107)",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "157",
+                    "name": "아크로리버하임2블럭(108~120)",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "161",
+                    "name": "e편한세상 반포 테스트",
+                    "status": "DEV"
+                }
+            ]
+        },
+        {
+            "region": "전라남도",
+            "complexes": [
+                {
+                    "index": "2",
+                    "name": "e편한세상 광양",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "86",
+                    "name": "e편한세상 순천(1~10)",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "87",
+                    "name": "e편한세상 순천(11~12)",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "부산광역시",
+            "complexes": [
+                {
+                    "index": "3",
+                    "name": "e편한세상 광안비치",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "14",
+                    "name": "e편한세상 금정산",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "32",
+                    "name": "e편한세상 동래명장1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "33",
+                    "name": "e편한세상 동래명장2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "34",
+                    "name": "e편한세상 동래아시아드",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "42",
+                    "name": "e편한세상 명지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "50",
+                    "name": "e편한세상 부산항",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "54",
+                    "name": "e편한세상 사하",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "55",
+                    "name": "e편한세상 사하2차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "92",
+                    "name": "e편한세상 연산더퍼스트",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "95",
+                    "name": "e편한세상오션테라스1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "96",
+                    "name": "e편한세상오션테라스2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "97",
+                    "name": "e편한세상오션테라스3단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "98",
+                    "name": "e편한세상오션테라스4단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "128",
+                    "name": "e편한세상 일광",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "경기도",
+            "complexes": [
+                {
+                    "index": "4",
+                    "name": "e편한세상 광주역 1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "5",
+                    "name": "e편한세상 광주역 2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "6",
+                    "name": "e편한세상 광주역 3단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "7",
+                    "name": "e편한세상 광주역 4단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "8",
+                    "name": "e편한세상 광주역 5단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "9",
+                    "name": "e편한세상 광주역 6단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "18",
+                    "name": "e편한세상 녹양역",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "20",
+                    "name": "다산자연앤이편한세상",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "21",
+                    "name": "다산신도시자연앤e편한세상2차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "22",
+                    "name": "자연앤이편한세상3차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "23",
+                    "name": "다산e편한세상자이",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "35",
+                    "name": "e편한세상 동탄",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "44",
+                    "name": "e편한세상 미사",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "52",
+                    "name": "e편한세상 반월나노시티역",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "57",
+                    "name": "e편한세상 상록",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "64",
+                    "name": "e편한세상 선부1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "65",
+                    "name": "e편한세상 선부2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "66",
+                    "name": "e편한세상 선부역 어반스퀘어",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "71",
+                    "name": "e편한세상 수지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "72",
+                    "name": "e편한세상수택센트럴파크",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "74",
+                    "name": "e편한세상 시티삼송1차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "75",
+                    "name": "e편한세상 시티삼송2차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "76",
+                    "name": "e편한세상 시티삼송3차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "78",
+                    "name": "e편한세상 시흥 센텀하임",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "79",
+                    "name": "e편한세상 신곡파크비스타",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "80",
+                    "name": "e편한세상 신곡포레스타뷰",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "81",
+                    "name": "e편한세상 신봉담",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "93",
+                    "name": "e편한세상 옥정어반센트럴",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "99",
+                    "name": "e편한세상옥정더퍼스트",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "100",
+                    "name": "e편한세상 옥정메트로포레",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "101",
+                    "name": "e편한세상 옥정에듀써밋",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "102",
+                    "name": "e편한세상 온수역",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "108",
+                    "name": "e편한세상 영통2차 1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "109",
+                    "name": "e편한세상 영통2차 2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "111",
+                    "name": "e편한세상 오산세교",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "112",
+                    "name": "e편한세상 오포3차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "113",
+                    "name": "e편한세상 오포4차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "118",
+                    "name": "e편한세상 용인파크카운티",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "119",
+                    "name": "e편한세상 용인한숲시티2블럭",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "120",
+                    "name": "e편한세상 용인한숲시티3블럭",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "121",
+                    "name": "e편한세상 용인한숲시티4블럭",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "122",
+                    "name": "e편한세상 용인한숲시티5블럭",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "123",
+                    "name": "e편한세상 용인한숲시티6블럭",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "127",
+                    "name": "e편한세상 인창어반포레",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "134",
+                    "name": "e편한세상 초지역센트럴포레",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "137",
+                    "name": "e편한세상 캐널시티",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "138",
+                    "name": "e편한세상 태전2차 1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "139",
+                    "name": "e편한세상 태전2차 2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "140",
+                    "name": "e편한세상 태전2차 3단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "141",
+                    "name": "e편한세상 테라스 광교 3단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "142",
+                    "name": "e편한세상 테라스 광교 4단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "143",
+                    "name": "e편한세상 테라스오포2블록",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "144",
+                    "name": "e편한세상 테라스오포3블록",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "145",
+                    "name": "e편한세상 테라스오포4블록",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "146",
+                    "name": "e편한세상 테라스위례",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "147",
+                    "name": "e편한세상 태재1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "148",
+                    "name": "e편한세상 태재2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "149",
+                    "name": "e편한세상 평택용이 1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "150",
+                    "name": "e편한세상 평택용이 2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "151",
+                    "name": "e편한세상 한강신도시2차",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "경상북도",
+            "complexes": [
+                {
+                    "index": "10",
+                    "name": "e편한세상 구미교리",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "11",
+                    "name": "e편한세상 구미파크밸리",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "13",
+                    "name": "e편한세상 금오파크",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "88",
+                    "name": "e편한세상 안동강변",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "89",
+                    "name": "e편한세상 안동1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "90",
+                    "name": "e편한세상 안동2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "106",
+                    "name": "e편한세상 영천1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "107",
+                    "name": "e편한세상 영천2단지",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "전라북도",
+            "complexes": [
+                {
+                    "index": "12",
+                    "name": "e편한세상 군산디오션시티",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "41",
+                    "name": "e편한세상 디오션시티2차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "124",
+                    "name": "e편한세상 우아",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "대구광역시",
+            "complexes": [
+                {
+                    "index": "19",
+                    "name": "e편한세상 남산",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "24",
+                    "name": "e편한세상 대구 금호",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "25",
+                    "name": "e편한세상 대신",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "대전광역시",
+            "complexes": [
+                {
+                    "index": "26",
+                    "name": "e편한세상 대전법동",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "27",
+                    "name": "e편한세상 대전에코포레",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "39",
+                    "name": "e편한세상 둔산1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "40",
+                    "name": "e편한세상 둔산2단지",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "인천광역시",
+            "complexes": [
+                {
+                    "index": "28",
+                    "name": "e편한세상 도화 5B",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "29",
+                    "name": "e편한세상 도화 6-1B",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "30",
+                    "name": "e편한세상 도화 6-2B",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "63",
+                    "name": "e편한세상 서창",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "69",
+                    "name": "e편한세상 송도",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "77",
+                    "name": "e편한세상 시티인하대역",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "104",
+                    "name": "e편한세상 영종하늘도시",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "105",
+                    "name": "e편한세상 영종국제도시오션하임",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "강원도",
+            "complexes": [
+                {
+                    "index": "36",
+                    "name": "e편한세상 동해",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "47",
+                    "name": "e편한세상 반곡",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "56",
+                    "name": "e편한세상 삼척교동",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "91",
+                    "name": "e편한세상 양양",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "110",
+                    "name": "e편한세상 영랑호",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "126",
+                    "name": "e편한세상 원주태장",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "135",
+                    "name": "e편한세상춘천한숲시티",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "충청남도",
+            "complexes": [
+                {
+                    "index": "37",
+                    "name": "e편한세상 두정3차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "38",
+                    "name": "e편한세상 두정4차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "48",
+                    "name": "e편한세상 보령",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "49",
+                    "name": "e편한세상 봉명아너리움",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "58",
+                    "name": "e편한세상 서산 테크노벨리",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "59",
+                    "name": "e편한세상 서산예천",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "67",
+                    "name": "e편한세상 세종리버파크",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "73",
+                    "name": "e편한세상 스마일시티2차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "133",
+                    "name": "e편한세상 천안부성",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "경상남도",
+            "complexes": [
+                {
+                    "index": "45",
+                    "name": "e편한세상 밀양강",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "46",
+                    "name": "e편한세상 밀양삼문",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "51",
+                    "name": "e편한세상 봉황역",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "116",
+                    "name": "e편한세상 옥포 1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "117",
+                    "name": "e편한세상 옥포 2단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "129",
+                    "name": "e편한세상 장유2차",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "131",
+                    "name": "e편한세상 창원파크센트럴1단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "132",
+                    "name": "e편한세상 창원파크센트럴2단지",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "세종특별자치시",
+            "complexes": [
+                {
+                    "index": "68",
+                    "name": "세종e편한세상푸르지오",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "울산광역시",
+            "complexes": [
+                {
+                    "index": "125",
+                    "name": "e편한세상 울산온양",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "제주특별자치도",
+            "complexes": [
+                {
+                    "index": "130",
+                    "name": "e편한세상 중문",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "충청북도",
+            "complexes": [
+                {
+                    "index": "136",
+                    "name": "e편한세상 충주",
+                    "status": "LIVE"
+                }
+            ]
+        },
+        {
+            "region": "기타",
+            "complexes": [
+                {
+                    "index": "158",
+                    "name": "e편한세상 CVNET모델하우스",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "159",
+                    "name": "e편한세상 계양더프리미어(테스트)",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "160",
+                    "name": "e편한세상 모델하우스",
+                    "status": "DEV"
+                },
+                {
+                    "index": "162",
+                    "name": "e편한세상서울대입구3단지(테스트)",
+                    "status": "DEV"
+                },
+                {
+                    "index": "163",
+                    "name": "e편한세상서울대입구4단지(테스트)",
+                    "status": "DEV"
+                },
+                {
+                    "index": "164",
+                    "name": "계영정보통신테스트단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "165",
+                    "name": "대림 시연용",
+                    "status": "DEV"
+                },
+                {
+                    "index": "166",
+                    "name": "대림코퍼기능테스트단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "167",
+                    "name": "스마트홈 대림코퍼 시연용",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "168",
+                    "name": "신봉담 모델하우스",
+                    "status": "DEV"
+                },
+                {
+                    "index": "169",
+                    "name": "아이엠 삼송(테스트)",
+                    "status": "DEV"
+                },
+                {
+                    "index": "170",
+                    "name": "코콤테스트1",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "171",
+                    "name": "코콤테스트2",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "172",
+                    "name": "코콤테스트3",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "173",
+                    "name": "현대통신 리눅스테스트",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "174",
+                    "name": "현대통신 테스트단지",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "175",
+                    "name": "현대통신 테스트단지2",
+                    "status": "LIVE"
+                },
+                {
+                    "index": "176",
+                    "name": "현대통신 테스트단지3",
+                    "status": "LIVE"
+                }
+            ]
+        }
+    ]
+}
