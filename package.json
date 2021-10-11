@@ -9,6 +9,7 @@
     "daelim"
   ],
   "scripts": {
+    "prepare": "npm run build",
     "clean": "rimraf ./dist",
     "build": "rimraf ./dist && tsc && cp -r ./homebridge-ui/public ./dist/homebridge-ui/public",
     "prepublishOnly": "npm run build",
