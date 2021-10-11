@@ -32,3 +32,28 @@ function createElement(tagName, options) {
     }
     return element;
 }
+
+let timerIntervalId = -1;
+let remainingDuration = 0;
+
+function stopTimer() {
+    if(timerIntervalId > 0) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = -1;
+    }
+}
+
+function startTimer(duration, onTick, onComplete) {
+    stopTimer();
+    remainingDuration = duration;
+    onTick();
+    timerIntervalId = setInterval(() => {
+        if(remainingDuration === 0) {
+            onComplete();
+            stopTimer();
+            return;
+        }
+        onTick();
+        remainingDuration--;
+    }, 1000);
+}
