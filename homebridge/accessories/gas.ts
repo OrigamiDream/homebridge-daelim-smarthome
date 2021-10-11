@@ -9,7 +9,7 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
-import {DeviceSubTypes, LoginSubTypes, Types} from "../components/fields";
+import {DeviceSubTypes, LoginSubTypes, Types} from "../../core/fields";
 
 interface GasAccessoryInterface extends AccessoryInterface {
 

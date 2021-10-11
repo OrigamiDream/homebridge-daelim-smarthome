@@ -1,5 +1,4 @@
 import {Accessories, AccessoryInterface} from "./accessories";
-import {DeviceSubTypes, LoginSubTypes, Types} from "../components/fields";
 import {
     API,
     CharacteristicEventTypes,
@@ -10,22 +9,21 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
+import {DeviceSubTypes, LoginSubTypes, Types} from "../../core/fields";
 
-interface LightbulbAccessoryInterface extends AccessoryInterface {
+interface OutletAccessoryInterface extends AccessoryInterface {
 
-    brightness: number
-    brightnessAdjustable: boolean
     on: boolean
 
 }
 
-export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
+export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
 
     constructor(log: Logging, api: API) {
-        super(log, api, "lightbulb", api.hap.Service.Lightbulb);
+        super(log, api, "outlet", api.hap.Service.Outlet);
     }
 
-    async identify(accessory: PlatformAccessory) {
+    async identify(accessory: PlatformAccessory): Promise<void> {
         await super.identify(accessory);
 
         const alreadyOn = !!accessory.context.on;
@@ -34,7 +32,11 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             const procedure = procedures[i];
             const response = await this.client?.sendDeferredRequest({
                 type: 'invoke',
-                item: [ this.createItemInterface(accessory, procedure) ]
+                item: [{
+                    device: 'wallsocket',
+                    uid: accessory.context.deviceID,
+                    arg1: procedure ? "on" : "off"
+                }]
             }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
                 return this.matchesAccessoryDeviceID(accessory, body);
             }).catch(_ => {
@@ -59,7 +61,11 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                 }
                 const response = await this.client?.sendDeferredRequest({
                     type: 'invoke',
-                    item: [ this.createItemInterface(accessory, !!value) ]
+                    item: [{
+                        device: 'wallsocket',
+                        uid: accessory.context.deviceID,
+                        arg1: value ? "on" : "off"
+                    }]
                 }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
                     return this.matchesAccessoryDeviceID(accessory, body);
                 }).catch(_ => {
@@ -69,58 +75,13 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     callback(new Error('TIMED OUT'));
                     return;
                 }
-                this.refreshLightbulbState(response['item'] || []);
+                this.refreshOutletState(response['item'] || []);
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 this.client?.checkKeepAlive();
                 callback(undefined, accessory.context.on);
             });
-        if(accessory.context.brightnessAdjustable) {
-            service.getCharacteristic(this.api.hap.Characteristic.Brightness)
-                .setProps({
-                    minValue: 0,
-                    maxValue: 80,
-                    minStep: 10
-                })
-                .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                    let brightness = value;
-                    if(brightness >= 80) {
-                        brightness = 100;
-                    }
-                    accessory.context.brightness = brightness;
-                    const response = await this.client?.sendDeferredRequest({
-                        type: 'invoke',
-                        item: [ this.createItemInterface(accessory, brightness >= 10) ]
-                    }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
-                        return this.matchesAccessoryDeviceID(accessory, body);
-                    }).catch(_ => {
-                        return undefined;
-                    });
-                    if(response === undefined) {
-                        callback(new Error('TIMED OUT'));
-                        return;
-                    }
-                    this.refreshLightbulbState(response['item'] || []);
-                    callback(undefined);
-                })
-                .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                    this.client?.checkKeepAlive();
-                    callback(undefined, accessory.context.brightness);
-                });
-        }
-    }
-
-    createItemInterface(accessory: PlatformAccessory, isActive: boolean): any {
-        let item: any = {
-            device: "light",
-            uid: accessory.context.deviceID,
-            arg1: isActive ? "on" : "off"
-        };
-        if(isActive) {
-            item["arg2"] = String(accessory.context.brightness)
-        }
-        return item;
     }
 
     matchesAccessoryDeviceID(accessory: PlatformAccessory, body: any): boolean {
@@ -135,24 +96,18 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         return false;
     }
 
-    refreshLightbulbState(items: any[], force: boolean = false) {
+    refreshOutletState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
+
             const deviceID = item['uid'];
+
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
                 if(force) {
                     this.findService(accessory, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
-                    });
-                }
-
-                if(accessory.context.brightnessAdjustable && accessory.context.on) {
-                    // Update new brightness rate when the accessory is on.
-                    accessory.context.brightness = parseInt(item['arg2']);
-                    this.findService(accessory, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.Brightness, accessory.context.brightness);
                     });
                 }
             }
@@ -162,39 +117,35 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
     registerListeners() {
         this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
             const controls = body['controlinfo'];
-            const lights = controls['light'];
-            for(let i = 0; i < lights.length; i++) {
-                const light = lights[i];
+            const outlets = controls['wallsocket'];
+            for(let i = 0; i < outlets.length; i++) {
+                const outlet = outlets[i];
 
-                const deviceID = light['uid'];
-                const displayName = light['uname'];
-
-                const brightnessAdjustable = light['dimming'] === 'y';
+                const deviceID = outlet['uid'];
+                const displayName = outlet['uname'];
 
                 this.addAccessory({
                     deviceID: deviceID,
                     displayName: displayName,
-                    brightness: 0,
-                    brightnessAdjustable: brightnessAdjustable,
                     on: false
                 });
             }
             this.client?.sendUnreliableRequest({
                 type: 'query',
                 item: [{
-                    device: 'light',
+                    device: 'wallsocket',
                     uid: 'All'
                 }]
             }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
         });
-
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
-            this.refreshLightbulbState(body['item'] || [], true);
+            this.refreshOutletState(body['item'] || [], true);
         });
 
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.INVOKE_RESPONSE, (body) => {
-            this.refreshLightbulbState(body['item'] || [], true);
+            this.refreshOutletState(body['item'] || [], true);
         });
     }
+
 
 }

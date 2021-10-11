@@ -133,25 +133,48 @@ export class Client {
             this.sendUnreliableRequest({
                 id: this.config.username
             }, Types.LOGIN, LoginSubTypes.APPROVAL_DELETE_REQUEST);
-            this.sendUnreliableRequest({
-                dong: this.address.complex,
-                ho: this.address.room,
-                id: this.config.username,
-                auth: 2
-            }, Types.LOGIN, LoginSubTypes.APPROVAL_REQUEST);
-
-            // FIXME:
-            //  In HomeBridge service instances, readline does not work properly.
-            //  TBD: Detects readline availability, and recommends running HomeBridge inline mode.
-            const wallPadNumber = readlineSync.question('Enter wall-pad PIN: ');
-
-            this.sendUnreliableRequest({
-                dong: this.address.complex,
-                ho: this.address.room,
-                id: this.config.username,
-                num: String(wallPadNumber)
-            }, Types.LOGIN, LoginSubTypes.WALL_PAD_REQUEST);
+            this.handleWallPadInput();
         });
+        this.registerErrorListener(Errors.INVALID_CERTIFICATION_NUMBER, () => {
+            this.handleWallPadInput();
+        });
+        this.registerErrorListener(Errors.INVALID_USERNAME_AND_PASSWORD, () => {
+            this.log.error("Username or password is not valid.");
+        });
+        this.registerErrorListener(Errors.REGISTRATION_NOT_COMPLETED, () => {
+            this.handleWallPadInput();
+        });
+    }
+
+    requestForWallPad() {
+        this.sendUnreliableRequest({
+            dong: this.address.complex,
+            ho: this.address.room,
+            id: this.config.username,
+            auth: 2
+        }, Types.LOGIN, LoginSubTypes.APPROVAL_REQUEST);
+    }
+
+    handleWallPadInput() {
+        this.requestForWallPad();
+
+        let wallPadNumber;
+        try {
+            wallPadNumber = readlineSync.question('Enter wall-pad PIN: ');
+        } catch(e) {
+            this.log.error("##");
+            this.log.error("## Reading wall-pad number in terminal is not available.");
+            this.log.error("## Run homebridge in inline mode.");
+            this.log.error("##");
+            return;
+        }
+
+        this.sendUnreliableRequest({
+            dong: this.address.complex,
+            ho: this.address.room,
+            id: this.config.username,
+            num: String(wallPadNumber)
+        }, Types.LOGIN, LoginSubTypes.WALL_PAD_REQUEST);
     }
 
     sendCertificationRequest() {
@@ -166,7 +189,7 @@ export class Client {
         this.log('Looking for complex info...');
         this.complexInfo = await this.readComplexInfo();
         this.log(`Complex info about (${this.config.complex}) has found.`);
-        this.handler = new NetworkHandler(this.log, this.config, this.complexInfo);
+        this.handler = new NetworkHandler(this.log, this.complexInfo);
         this.handler.onConnected = () => {
             this.sendCertificationRequest();
         };

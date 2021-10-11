@@ -1,8 +1,8 @@
 {
   "name": "homebridge-daelim-smarthome",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A third-party homebridge platform plugin for Daelim smarthome",
-  "main": "dist/daelim-smarthome-platform.js",
+  "main": "dist/homebridge/daelim-smarthome-platform.js",
   "keywords": [
     "homebridge-plugin",
     "homekit",
@@ -10,15 +10,17 @@
   ],
   "scripts": {
     "clean": "rimraf ./dist",
-    "build": "rimraf ./dist && tsc",
+    "build": "rimraf ./dist && tsc && cp -r ./homebridge-ui/public ./dist/homebridge-ui/public",
     "prepublishOnly": "npm run build",
-    "postpublish": "npm run clean"
+    "postpublish": "npm run clean",
+    "refresh": "node complexes/index.js",
+    "interface": "node homebridge-ui/server.js"
   },
   "author": "OrigamiDream <crystal_vc31@naver.com>",
   "engines": {
     "homebridge": ">=1.0.0"
   },
-  "license": "ISC",
+  "license": "MIT",
   "files": [
     "LICENSE",
     "dist"
@@ -39,6 +41,8 @@
     "typescript": "^3.8.3"
   },
   "dependencies": {
+    "@homebridge/plugin-ui-utils": "^0.0.19",
+    "axios": "^0.22.0",
     "node-fetch": "^2.6.1",
     "readline-sync": "^1.4.10"
   }

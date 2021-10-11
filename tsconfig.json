@@ -9,13 +9,18 @@
       "ES2018"
     ],
     "sourceMap": true,
-    "rootDir": "src",
+    "rootDirs": ["homebridge", "core", "homebridge-ui"],
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "src"
+    "homebridge",
+    "core",
+    "homebridge-ui"
+  ],
+  "exclude": [
+    "homebridge-ui/public"
   ]
 }

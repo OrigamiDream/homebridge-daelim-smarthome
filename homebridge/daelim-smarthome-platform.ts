@@ -5,10 +5,10 @@ import {
     PlatformAccessory,
     PlatformConfig,
 } from "homebridge";
-import {DaelimConfig} from "./components/interfaces/daelim-config";
-import {Client} from "./components/client";
+import {DaelimConfig} from "../core/interfaces/daelim-config";
+import {Client} from "../core/client";
 import {LightbulbAccessories} from "./accessories/lightbulb";
-import {Utils} from "./components/utils";
+import {Utils} from "../core/utils";
 import {Accessories, AccessoryInterface} from "./accessories/accessories";
 import {OutletAccessories} from "./accessories/outlet";
 import {HeaterAccessories} from "./accessories/heater";
@@ -36,7 +36,7 @@ class DaelimSmartHomePlatform {
         this.accessories.push(new HeaterAccessories(this.log, this.api));
         this.accessories.push(new GasAccessories(this.log, this.api));
 
-        log.info("Daelim Smarthome platform finished initializing!");
+        log.info("Daelim-SmartHome finished initializing!");
 
         this.config = this.setupDaelimConfig(config);
 
@@ -48,7 +48,7 @@ class DaelimSmartHomePlatform {
     setupDaelimConfig(config: PlatformConfig): DaelimConfig | undefined {
         for(const key in config) {
             const value = config[key];
-            if(value === undefined) {
+            if(value === undefined || !value) {
                 return undefined;
             }
         }
@@ -75,7 +75,7 @@ class DaelimSmartHomePlatform {
     }
 
     async createDaelimSmarthomeService() {
-        if(this.config === undefined) {
+        if(!this.config?.uuid) {
             this.log.warn("Config parameters are not set. No accessories.");
             return;
         }

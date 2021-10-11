@@ -1,6 +1,6 @@
-import {Client} from "../components/client";
+import {Client} from "../../core/client";
 import {API, Logging, PlatformAccessory, Service} from "homebridge";
-import {Utils} from "../components/utils";
+import {Utils} from "../../core/utils";
 import {WithUUID} from "hap-nodejs";
 
 export interface AccessoryInterface {

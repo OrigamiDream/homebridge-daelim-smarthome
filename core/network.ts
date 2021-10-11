@@ -1,13 +1,18 @@
 import net from "net";
 import {Client} from "./client";
-import {Logging} from "homebridge";
-import {DaelimConfig} from "./interfaces/daelim-config";
 import {Chunk} from "./chunk";
 import {Packet} from "./packet";
 import {Errors, SubTypes, Types} from "./fields";
 
 export type ResponseCallback = (body: any) => void;
 export type ErrorCallback = () => void;
+
+export interface LoggerBase {
+    info(message: string, ...parameters: any[]): void;
+    warn(message: string, ...parameters: any[]): void;
+    error(message: string, ...parameters: any[]): void;
+    debug(message: string, ...parameters: any[]): void;
+}
 
 interface ResponseListener {
 
@@ -51,8 +56,7 @@ export class NetworkHandler {
     private readBuffers = new ArrayBuffer(0);
     private isConnected = false;
 
-    private readonly log: Logging;
-    private readonly config: DaelimConfig;
+    private readonly log: LoggerBase;
     private readonly complexInfo: any;
 
     private readonly listeners: ResponseListener[] = [];
@@ -64,9 +68,8 @@ export class NetworkHandler {
     public onConnected?: () => void;
     public onDisconnected?: () => void;
 
-    constructor(log: Logging, config: DaelimConfig, complexInfo: any) {
+    constructor(log: LoggerBase, complexInfo: any) {
         this.log = log;
-        this.config = config;
         this.complexInfo = complexInfo;
     }
 
@@ -122,18 +125,22 @@ export class NetworkHandler {
         return true;
     }
 
-    handle() {
+    disconnect() {
         if(this.socket) {
             this.socket.end();
             this.socket = undefined;
         }
+    }
+
+    handle() {
+        this.disconnect();
         this.socket = net.connect({
             host: this.complexInfo["ip"],
             port: Client.MMF_SERVER_PORT
         });
         this.socket.on('connect', () => {
             this.isConnected = true;
-            this.log('Connected to server');
+            this.log.info('Connected to server');
 
             if(this.onConnected !== undefined) {
                 this.onConnected();
@@ -145,7 +152,7 @@ export class NetworkHandler {
             } while(this.handleResponse());
         });
         this.socket.on('end', () => {
-            this.log('Disconnected from MMF server');
+            this.log.info('Disconnected from MMF server');
             this.handleDisconnect();
         });
         this.socket.on('error', (error) => {
@@ -226,10 +233,15 @@ export class NetworkHandler {
                     }
                 }
             } else {
+                let found = false;
                 for(const listener of this.errorListeners) {
                     if(listener.error === header.getError()) {
                         listener.callback();
+                        found = true;
                     }
+                }
+                if(!found) {
+                    this.log.warn("Unexpected error type has been responded:", header.getError());
                 }
             }
         }

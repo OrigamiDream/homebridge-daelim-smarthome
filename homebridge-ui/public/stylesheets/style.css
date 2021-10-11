@@ -1,0 +1,40 @@
+.hidden {
+    display: none;
+}
+
+.transiting {
+    position: relative;
+}
+
+.transiting:after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 99;
+}
+
+.transition-from {
+    -webkit-transition: opacity 0.5s;
+    transition: opacity 0.5s;
+    opacity: 0;
+}
+
+.start-fade-out {
+    -webkit-animation: fade-out 0.5s;
+    -moz-animation: fade-out 0.5s;
+    -o-animation: fade-out 0.5s;
+    animation: fade-out 0.5s;
+}
+
+@keyframes fade-out {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
