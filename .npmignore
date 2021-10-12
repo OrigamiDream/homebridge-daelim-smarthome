@@ -6,6 +6,8 @@ complexes/
 
 # ------------- Defaults ------------- #
 
+.idea/
+
 # gitHub actions
 .github
 

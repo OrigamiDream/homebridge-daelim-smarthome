@@ -22,10 +22,6 @@
     "homebridge": ">=1.0.0"
   },
   "license": "MIT",
-  "files": [
-    "LICENSE",
-    "dist"
-  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OrigamiDream/homebridge-daelim-smarthome.git"
