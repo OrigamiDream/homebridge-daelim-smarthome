@@ -3,6 +3,7 @@ homebridge/
 homebridge-ui/
 core/
 complexes/
+branding/
 
 # ------------- Defaults ------------- #
 
