@@ -225,13 +225,9 @@
             regionNextButton.disabled = true;
 
             pluginConfig.region = regionEl.value;
-            await homebridge.updatePluginConfig([pluginConfig]);
+            await window.homebridge.updatePluginConfig([pluginConfig]);
 
-            await homebridge.request('/choose-region', { region: pluginConfig.region });
-            loadJSON(COMPLEXES_URL, (json) => {
-                complexList = json.complexes;
-                refreshComplexes(pluginConfig['region']);
-            });
+            await window.homebridge.request('/choose-region', { region: pluginConfig.region });
 
             doTransition(document.getElementById("setup-regions"), document.getElementById("setup-complexes"));
             regionNextButton.disabled = false;
@@ -251,9 +247,9 @@
             complexNextButton.disabled = true;
 
             pluginConfig.complex = complexEl.value;
-            await homebridge.updatePluginConfig([pluginConfig]);
+            await window.homebridge.updatePluginConfig([pluginConfig]);
 
-            await homebridge.request('/choose-complex', { complex: pluginConfig.complex });
+            await window.homebridge.request('/choose-complex', { complex: pluginConfig.complex });
 
             doTransition(document.getElementById('setup-complexes'), document.getElementById('setup-authorization'));
             complexNextButton.disabled = false;
@@ -278,10 +274,10 @@
 
             pluginConfig.username = usernameEl.value;
             pluginConfig.password = passwordEl.value;
-            await homebridge.updatePluginConfig([pluginConfig]);
+            await window.homebridge.updatePluginConfig([pluginConfig]);
 
-            await homebridge.request('/sign-in', { username: usernameEl.value, password: passwordEl.value });
-            homebridge.showSpinner();
+            await window.homebridge.request('/sign-in', { username: usernameEl.value, password: passwordEl.value });
+            window.homebridge.showSpinner();
             authorizationNextButton.disabled = false;
         });
 
@@ -291,22 +287,24 @@
             }
             verifyButton.disabled = true;
             stopTimer();
-            homebridge.showSpinner();
-            await homebridge.request('/passcode', { wallpad: wallPadEl.value });
+            window.homebridge.showSpinner();
+            await window.homebridge.request('/passcode', { wallpad: wallPadEl.value });
             verifyButton.disabled = false;
         });
 
         resetConfirmedButton.addEventListener('click', async () => {
-            homebridge.showSpinner();
+            window.homebridge.showSpinner();
             pluginConfig.region = undefined;
             pluginConfig.complex = undefined;
             pluginConfig.username = undefined;
             pluginConfig.password = undefined;
             pluginConfig.uuid = undefined;
-            await homebridge.request('/invalidate', {});
-            await homebridge.updatePluginConfig([pluginConfig]);
-            await homebridge.savePluginConfig();
-            homebridge.hideSpinner();
+            await window.homebridge.request('/invalidate', {});
+            await window.homebridge.updatePluginConfig([pluginConfig]);
+            await window.homebridge.savePluginConfig();
+            window.homebridge.hideSpinner();
+            refreshRegions();
+
             doTransition(document.getElementById('confirmable'), document.getElementById('setup-regions'));
         });
         resetCancelButton.addEventListener('click', async () => {
@@ -317,9 +315,9 @@
             doTransition(document.getElementById('done'), document.getElementById('confirmable'));
         });
         doneButton.addEventListener('click', async () => {
-            await homebridge.updatePluginConfig([pluginConfig]);
-            await homebridge.savePluginConfig();
-            homebridge.closeSettings();
+            await window.homebridge.updatePluginConfig([pluginConfig]);
+            await window.homebridge.savePluginConfig();
+            window.homebridge.closeSettings();
         });
     })();
 
@@ -327,32 +325,25 @@
         regionList = await loadJSON(REGIONS_URL).then(json => json.regions);
         complexList = await loadJSON(COMPLEXES_URL).then(json => json.complexes);
 
-        const pluginConfigBlocks = await homebridge.getPluginConfig();
+        const pluginConfigBlocks = await window.homebridge.getPluginConfig();
         console.log(JSON.stringify(pluginConfigBlocks));
         if(!pluginConfigBlocks.length || !pluginConfigBlocks[0]['region']) {
             refreshRegions();
-
-            document.getElementById('setup-regions').classList.remove('hidden');
-            if(pluginConfigBlocks[0]) {
-                pluginConfig = pluginConfigBlocks[0];
-            }
+            doTransition(null, document.getElementById('setup-regions'));
         } else if(!pluginConfigBlocks[0]['complex']) {
-            pluginConfig = pluginConfigBlocks[0];
             refreshComplexes(pluginConfig['region']);
-
-            document.getElementById('setup-complexes').classList.remove('hidden');
+            doTransition(null, document.getElementById('setup-complexes'));
         } else if(!pluginConfigBlocks[0]['uuid']) {
-            pluginConfig = pluginConfigBlocks[0];
-
-            document.getElementById('setup-authorization').classList.remove('hidden');
+            doTransition(null, document.getElementById('setup-authorization'));
         } else {
+            doTransition(null, document.getElementById('done'));
+        }
+        if(pluginConfigBlocks[0]) {
             pluginConfig = pluginConfigBlocks[0];
-
-            document.getElementById('done').classList.remove('hidden');
         }
 
-        homebridge.addEventListener('require-wall-pad-number', (event) => {
-            homebridge.hideSpinner();
+        window.homebridge.addEventListener('require-wall-pad-number', () => {
+            window.homebridge.hideSpinner();
             wallPadEl.value = '';
             doTransition(document.getElementById('setup-authorization'), document.getElementById('setup-verification'));
             console.log('Wall pad number required');
@@ -365,22 +356,22 @@
             });
         });
 
-        homebridge.addEventListener('invalid-authorization', (event) => {
-            homebridge.hideSpinner();
+        window.homebridge.addEventListener('invalid-authorization', () => {
+            window.homebridge.hideSpinner();
             const element = document.getElementById("invalid-authorization");
             if(element) {
                 element.classList.remove('hidden');
             }
         });
 
-        homebridge.addEventListener('invalid-wall-pad-number', (event) => {
-            homebridge.hideSpinner();
-            homebridge.toast.error('월패드 인증번호가 다릅니다.');
+        window.homebridge.addEventListener('invalid-wall-pad-number', () => {
+            window.homebridge.hideSpinner();
+            window.homebridge.toast.error('월패드 인증번호가 다릅니다.');
             doTransition(document.getElementById('setup-verification'), document.getElementById('setup-authorization'));
         });
 
-        homebridge.addEventListener('complete', (event) => {
-            homebridge.hideSpinner();
+        window.homebridge.addEventListener('complete', (event) => {
+            window.homebridge.hideSpinner();
 
             console.log('Login completed');
             uuidEl.value = event.data.uuid;

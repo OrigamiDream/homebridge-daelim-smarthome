@@ -4,23 +4,37 @@ function loadJSON(url) {
 
 function doTransition(elementFrom, elementTo) {
     const mainElement = document.getElementById("main");
+    if(elementFrom) {
+        transitionFadeIn(elementFrom, elementTo, mainElement);
+    } else {
+        transitionFadeOut(null, elementTo, mainElement);
+    }
+}
+
+function transitionFadeIn(elementFrom, elementTo, mainElement) {
     mainElement.classList.add("transiting");
     elementFrom.classList.add('transition-from');
     setTimeout(() => {
-        if(!elementFrom.classList.contains("hidden")) {
-            elementFrom.classList.add("hidden");
-        }
-        if(elementTo.classList.contains('hidden')) {
-            elementTo.classList.remove('hidden');
-        }
-        elementTo.classList.add("start-fade-out");
-        setTimeout(() => {
-            elementTo.classList.remove('start-fade-out');
-            elementTo.classList.remove('hidden');
-            elementFrom.classList.remove('transition-from');
-            mainElement.classList.remove('transiting');
-        }, 500); // after 500ms again
+        transitionFadeOut(elementFrom, elementTo, mainElement);
     }, 500); // after 500ms
+}
+
+function transitionFadeOut(elementFrom, elementTo, mainElement) {
+    if(elementFrom && !elementFrom.classList.contains("hidden")) {
+        elementFrom.classList.add("hidden");
+    }
+    if(elementTo.classList.contains('hidden')) {
+        elementTo.classList.remove('hidden');
+    }
+    elementTo.classList.add("start-fade-out");
+    setTimeout(() => {
+        elementTo.classList.remove('start-fade-out');
+        elementTo.classList.remove('hidden');
+        if(elementFrom) {
+            elementFrom.classList.remove('transition-from');
+        }
+        mainElement.classList.remove('transiting');
+    }, 500); // after 500ms again
 }
 
 function createElement(tagName, options) {
