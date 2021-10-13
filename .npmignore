@@ -6,6 +6,9 @@ complexes/
 
 # ------------- Defaults ------------- #
 
+# macOS
+.DS_Store
+
 .idea/
 
 # gitHub actions

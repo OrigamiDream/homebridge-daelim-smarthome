@@ -3,6 +3,12 @@ dist
 
 # ------------- Defaults ------------- #
 
+# macOS
+.DS_Store
+
+# IntelliJ
+.idea/
+
 # Logs
 logs
 *.log
