@@ -4,6 +4,9 @@
 
 # homebridge-daelim-smarthome
 
+[![Downloads](https://img.shields.io/npm/dt/homebridge-daelim-smarthome.svg?color=critical)](https://www.npmjs.com/package/homebridge-daelim-smarthome)
+[![Version](https://img.shields.io/npm/v/homebridge-daelim-smarthome)](https://www.npmjs.com/package/homebridge-daelim-smarthome)
+
 e편한세상 아파트 단지를 위한 비공식 [Homebridge](https://github.com/homebridge/homebridge) 플러그인
 
 다음의 액세서리를 지원합니다.
