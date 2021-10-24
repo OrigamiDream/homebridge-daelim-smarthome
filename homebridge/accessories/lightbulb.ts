@@ -21,6 +21,8 @@ interface LightbulbAccessoryInterface extends AccessoryInterface {
 
 export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
 
+    static MAX_BRIGHTNESS = 80
+
     constructor(log: Logging, api: API) {
         super(log, api, "lightbulb", api.hap.Service.Lightbulb);
     }
@@ -80,7 +82,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             service.getCharacteristic(this.api.hap.Characteristic.Brightness)
                 .setProps({
                     minValue: 0,
-                    maxValue: 80,
+                    maxValue: LightbulbAccessories.MAX_BRIGHTNESS,
                     minStep: 10
                 })
                 .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -106,7 +108,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                 })
                 .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                     this.client?.checkKeepAlive();
-                    callback(undefined, accessory.context.brightness);
+                    callback(undefined, Math.min(LightbulbAccessories.MAX_BRIGHTNESS, accessory.context.brightness));
                 });
         }
     }
@@ -150,7 +152,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
 
                 if(accessory.context.brightnessAdjustable && accessory.context.on) {
                     // Update new brightness rate when the accessory is on.
-                    accessory.context.brightness = parseInt(item['arg2']);
+                    accessory.context.brightness = Math.min(LightbulbAccessories.MAX_BRIGHTNESS, parseInt(item['arg2']));
                     this.findService(accessory, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.Brightness, accessory.context.brightness);
                     });
