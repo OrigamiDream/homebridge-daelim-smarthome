@@ -87,7 +87,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                 })
                 .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                     let brightness = value;
-                    if(brightness >= 80) {
+                    if(brightness >= LightbulbAccessories.MAX_BRIGHTNESS) {
                         brightness = 100;
                     }
                     accessory.context.brightness = brightness;
