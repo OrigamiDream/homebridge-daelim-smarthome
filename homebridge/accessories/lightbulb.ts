@@ -165,29 +165,31 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
             const controls = body['controlinfo'];
             const lights = controls['light'];
-            for(let i = 0; i < lights.length; i++) {
-                const light = lights[i];
+            if(lights) {
+                for(let i = 0; i < lights.length; i++) {
+                    const light = lights[i];
 
-                const deviceID = light['uid'];
-                const displayName = light['uname'];
+                    const deviceID = light['uid'];
+                    const displayName = light['uname'];
 
-                const brightnessAdjustable = light['dimming'] === 'y';
+                    const brightnessAdjustable = light['dimming'] === 'y';
 
-                this.addAccessory({
-                    deviceID: deviceID,
-                    displayName: displayName,
-                    brightness: 0,
-                    brightnessAdjustable: brightnessAdjustable,
-                    on: false
-                });
+                    this.addAccessory({
+                        deviceID: deviceID,
+                        displayName: displayName,
+                        brightness: 0,
+                        brightnessAdjustable: brightnessAdjustable,
+                        on: false
+                    });
+                }
+                this.client?.sendUnreliableRequest({
+                    type: 'query',
+                    item: [{
+                        device: 'light',
+                        uid: 'All'
+                    }]
+                }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
             }
-            this.client?.sendUnreliableRequest({
-                type: 'query',
-                item: [{
-                    device: 'light',
-                    uid: 'All'
-                }]
-            }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
         });
 
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {

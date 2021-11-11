@@ -118,25 +118,27 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
         this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
             const controls = body['controlinfo'];
             const outlets = controls['wallsocket'];
-            for(let i = 0; i < outlets.length; i++) {
-                const outlet = outlets[i];
+            if(outlets) {
+                for(let i = 0; i < outlets.length; i++) {
+                    const outlet = outlets[i];
 
-                const deviceID = outlet['uid'];
-                const displayName = outlet['uname'];
+                    const deviceID = outlet['uid'];
+                    const displayName = outlet['uname'];
 
-                this.addAccessory({
-                    deviceID: deviceID,
-                    displayName: displayName,
-                    on: false
-                });
+                    this.addAccessory({
+                        deviceID: deviceID,
+                        displayName: displayName,
+                        on: false
+                    });
+                }
+                this.client?.sendUnreliableRequest({
+                    type: 'query',
+                    item: [{
+                        device: 'wallsocket',
+                        uid: 'All'
+                    }]
+                }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
             }
-            this.client?.sendUnreliableRequest({
-                type: 'query',
-                item: [{
-                    device: 'wallsocket',
-                    uid: 'All'
-                }]
-            }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
         });
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
             this.refreshOutletState(body['item'] || [], true);

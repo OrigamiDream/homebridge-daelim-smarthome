@@ -144,25 +144,27 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
         this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
             const controls = body['controlinfo'];
             const gases = controls['gas'];
-            for(let i = 0; i < gases.length; i++) {
-                const gas = gases[i];
+            if(gases) {
+                for(let i = 0; i < gases.length; i++) {
+                    const gas = gases[i];
 
-                const deviceID = gas['uid'];
-                const displayName = gas['uname'];
+                    const deviceID = gas['uid'];
+                    const displayName = gas['uname'];
 
-                this.addAccessory({
-                    deviceID: deviceID,
-                    displayName: displayName,
-                    on: true // active as a default since this is off-only valve
-                });
+                    this.addAccessory({
+                        deviceID: deviceID,
+                        displayName: displayName,
+                        on: true // active as a default since this is off-only valve
+                    });
+                }
+                this.client?.sendUnreliableRequest({
+                    type: 'query',
+                    item: [{
+                        device: 'gas',
+                        uid: 'All'
+                    }]
+                }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
             }
-            this.client?.sendUnreliableRequest({
-                type: 'query',
-                item: [{
-                    device: 'gas',
-                    uid: 'All'
-                }]
-            }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
         })
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
             this.refreshGasValveState(body['item'] || [], true);

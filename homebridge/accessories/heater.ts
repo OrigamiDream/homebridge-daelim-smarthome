@@ -174,27 +174,29 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
         this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
             const controls = body['controlinfo'];
             const heaters = controls['heating'];
-            for(let i = 0; i < heaters.length; i++) {
-                const heater = heaters[i];
+            if(heaters) {
+                for(let i = 0; i < heaters.length; i++) {
+                    const heater = heaters[i];
 
-                const deviceID = heater['uid'];
-                const displayName = heater['uname'];
+                    const deviceID = heater['uid'];
+                    const displayName = heater['uname'];
 
-                this.addAccessory({
-                    deviceID: deviceID,
-                    displayName: displayName,
-                    active: false,
-                    desiredTemperature: 0,
-                    currentTemperature: 0
-                });
+                    this.addAccessory({
+                        deviceID: deviceID,
+                        displayName: displayName,
+                        active: false,
+                        desiredTemperature: 0,
+                        currentTemperature: 0
+                    });
+                }
+                this.client?.sendUnreliableRequest({
+                    type: 'query',
+                    item: [{
+                        device: 'heating',
+                        uid: 'All'
+                    }]
+                }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
             }
-            this.client?.sendUnreliableRequest({
-                type: 'query',
-                item: [{
-                    device: 'heating',
-                    uid: 'All'
-                }]
-            }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
         });
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
             this.refreshHeaterState(body['item'] || [], true);
