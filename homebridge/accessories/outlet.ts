@@ -10,6 +10,7 @@ import {
     Service
 } from "homebridge";
 import {DeviceSubTypes, LoginSubTypes, Types} from "../../core/fields";
+import {DaelimConfig} from "../../core/interfaces/daelim-config";
 
 interface OutletAccessoryInterface extends AccessoryInterface {
 
@@ -19,8 +20,8 @@ interface OutletAccessoryInterface extends AccessoryInterface {
 
 export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
 
-    constructor(log: Logging, api: API) {
-        super(log, api, "outlet", api.hap.Service.Outlet);
+    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+        super(log, api, config, "outlet", [api.hap.Service.Outlet]);
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
@@ -49,8 +50,9 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
         }
     }
 
-    configureAccessory(accessory: PlatformAccessory, service: Service) {
-        super.configureAccessory(accessory, service);
+    configureAccessory(accessory: PlatformAccessory, services: Service[]) {
+        super.configureAccessory(accessory, services);
+        const service = this.ensureServiceAvailability(this.api.hap.Service.Outlet, services);
 
         service.getCharacteristic(this.api.hap.Characteristic.On)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -106,7 +108,7 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
                 if(force) {
-                    this.findService(accessory, (service) => {
+                    this.findService(accessory, this.api.hap.Service.Outlet, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
                     });
                 }

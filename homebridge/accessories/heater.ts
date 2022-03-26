@@ -10,6 +10,7 @@ import {
     Service
 } from "homebridge";
 import {DeviceSubTypes, LoginSubTypes, Types} from "../../core/fields";
+import {DaelimConfig} from "../../core/interfaces/daelim-config";
 
 interface HeaterAccessoryInterface extends AccessoryInterface {
 
@@ -24,12 +25,13 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
     public static MINIMUM_TEMPERATURE = 5;
     public static MAXIMUM_TEMPERATURE = 40;
 
-    constructor(log: Logging, api: API) {
-        super(log, api, "heater", api.hap.Service.HeaterCooler);
+    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+        super(log, api, config, "heater", [api.hap.Service.HeaterCooler]);
     }
 
-    configureAccessory(accessory: PlatformAccessory, service: Service) {
-        super.configureAccessory(accessory, service);
+    configureAccessory(accessory: PlatformAccessory, services: Service[]) {
+        super.configureAccessory(accessory, services);
+        const service = this.ensureServiceAvailability(this.api.hap.Service.HeaterCooler, services);
 
         service.getCharacteristic(this.api.hap.Characteristic.Active)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -159,7 +161,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 accessory.context.currentTemperature = currentTemperature;
                 accessory.context.active = active && desiredTemperature >= HeaterAccessories.MINIMUM_TEMPERATURE;
                 if(force) {
-                    this.findService(accessory, (service) => {
+                    this.findService(accessory, this.api.hap.Service.HeaterCooler, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.CurrentTemperature, parseFloat(accessory.context.currentTemperature));
                         service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
                         service.setCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState, this.getCurrentHeaterCoolerState(accessory));

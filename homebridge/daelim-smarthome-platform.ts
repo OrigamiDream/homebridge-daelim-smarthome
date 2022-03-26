@@ -31,14 +31,14 @@ class DaelimSmartHomePlatform {
         this.log = log;
         this.api = api;
 
-        this.accessories.push(new LightbulbAccessories(this.log, this.api));
-        this.accessories.push(new OutletAccessories(this.log, this.api));
-        this.accessories.push(new HeaterAccessories(this.log, this.api));
-        this.accessories.push(new GasAccessories(this.log, this.api));
+        this.config = this.setupDaelimConfig(config);
+
+        this.accessories.push(new LightbulbAccessories(this.log, this.api, this.config));
+        this.accessories.push(new OutletAccessories(this.log, this.api, this.config));
+        this.accessories.push(new HeaterAccessories(this.log, this.api, this.config));
+        this.accessories.push(new GasAccessories(this.log, this.api, this.config));
 
         log.info("Daelim-SmartHome finished initializing!");
-
-        this.config = this.setupDaelimConfig(config);
 
         api.on(APIEvent.DID_FINISH_LAUNCHING, async () => {
             await this.createDaelimSmarthomeService();
@@ -67,9 +67,11 @@ class DaelimSmartHomePlatform {
             if(accessory.context.accessoryType !== accessories.getAccessoryType()) {
                 continue;
             }
-            const service = accessory.getService(accessories.getServiceType());
-            if(service !== undefined) {
-                accessories.configureAccessory(accessory, service);
+            const services = accessories.getServiceTypes().map((serviceType) => {
+                return accessory.getService(serviceType) || accessory.addService(serviceType, accessory.displayName);
+            });
+            if(services.length > 0) {
+                accessories.configureAccessory(accessory, services);
             }
         }
     }
