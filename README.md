@@ -1,6 +1,6 @@
-<div style="text-align: center;">
+<p align="center">
   <img alt="logo" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/master/branding/smarthome+homebridge.png?raw=true" height="140px">
-</div>
+</p>
 
 # homebridge-daelim-smarthome
 
