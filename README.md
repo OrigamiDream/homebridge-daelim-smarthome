@@ -1,6 +1,6 @@
-<p align="center">
+<div style="text-align: center;">
   <img alt="logo" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/master/branding/smarthome+homebridge.png?raw=true" height="140px">
-</p>
+</div>
 
 # homebridge-daelim-smarthome
 
@@ -14,6 +14,9 @@ e편한세상 아파트 단지를 위한 비공식 [Homebridge](https://github.c
 2. 난방
 3. 콘센트
 4. 가스 (단방향)
+
+###### DL건설에서 새로 출시한 [스마트 eLife](https://apps.apple.com/kr/app/%EC%8A%A4%EB%A7%88%ED%8A%B8-elife/id1551248421) 앱과의 프로토콜 호환성을 확인할 수 없습니다.<br>해당하는 신축 아파트단지 거주민이 계시다면 해당하는 [이슈(#6)](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/6) 에 관련 정보 공유 부탁드립니다. 
+
 
 ## 설치 요구사항
 
