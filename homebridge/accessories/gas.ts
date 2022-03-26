@@ -10,6 +10,7 @@ import {
     Service
 } from "homebridge";
 import {DeviceSubTypes, LoginSubTypes, Types} from "../../core/fields";
+import {DaelimConfig} from "../../core/interfaces/daelim-config";
 
 interface GasAccessoryInterface extends AccessoryInterface {
 
@@ -19,8 +20,8 @@ interface GasAccessoryInterface extends AccessoryInterface {
 
 export class GasAccessories extends Accessories<GasAccessoryInterface> {
 
-    constructor(log: Logging, api: API) {
-        super(log, api, "gas", api.hap.Service.Valve);
+    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+        super(log, api, config, "gas", [api.hap.Service.Valve]);
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
@@ -47,8 +48,9 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
         }
     }
 
-    configureAccessory(accessory: PlatformAccessory, service: Service) {
-        super.configureAccessory(accessory, service);
+    configureAccessory(accessory: PlatformAccessory, services: Service[]) {
+        super.configureAccessory(accessory, services);
+        const service = this.ensureServiceAvailability(this.api.hap.Service.Valve, services);
 
         service.getCharacteristic(this.api.hap.Characteristic.Active)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -130,7 +132,7 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
                 if(force) {
-                    this.findService(accessory, (service) => {
+                    this.findService(accessory, this.api.hap.Service.Valve, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.on ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
                         service.setCharacteristic(this.api.hap.Characteristic.InUse, accessory.context.on ? this.api.hap.Characteristic.InUse.IN_USE : this.api.hap.Characteristic.InUse.NOT_IN_USE);
                         service.setCharacteristic(this.api.hap.Characteristic.ValveType, this.api.hap.Characteristic.ValveType.GENERIC_VALVE);

@@ -10,6 +10,7 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
+import {DaelimConfig} from "../../core/interfaces/daelim-config";
 
 interface LightbulbAccessoryInterface extends AccessoryInterface {
 
@@ -23,8 +24,8 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
 
     static MAX_BRIGHTNESS = 80
 
-    constructor(log: Logging, api: API) {
-        super(log, api, "lightbulb", api.hap.Service.Lightbulb);
+    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+        super(log, api, config, "lightbulb", [api.hap.Service.Lightbulb]);
     }
 
     async identify(accessory: PlatformAccessory) {
@@ -49,8 +50,9 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         }
     }
 
-    configureAccessory(accessory: PlatformAccessory, service: Service) {
-        super.configureAccessory(accessory, service);
+    configureAccessory(accessory: PlatformAccessory, services: Service[]) {
+        super.configureAccessory(accessory, services);
+        const service = this.ensureServiceAvailability(this.api.hap.Service.Lightbulb, services);
 
         service.getCharacteristic(this.api.hap.Characteristic.On)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -145,7 +147,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
                 if(force) {
-                    this.findService(accessory, (service) => {
+                    this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
                     });
                 }
@@ -153,7 +155,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                 if(accessory.context.brightnessAdjustable && accessory.context.on) {
                     // Update new brightness rate when the accessory is on.
                     accessory.context.brightness = Math.min(LightbulbAccessories.MAX_BRIGHTNESS, parseInt(item['arg2']));
-                    this.findService(accessory, (service) => {
+                    this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.Brightness, accessory.context.brightness);
                     });
                 }

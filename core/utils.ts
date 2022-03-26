@@ -16,6 +16,7 @@ export class Utils {
 
     public static PLUGIN_NAME = "homebridge-daelim-smarthome"
     public static PLATFORM_NAME = "DaelimSmartHomePlatform"
+    public static MANUFACTURER_NAME = "DL E&C Co.,Ltd."
 
     public static URL = "https://smarthome.daelimcorp.co.kr/main/choice_1.do";
 
