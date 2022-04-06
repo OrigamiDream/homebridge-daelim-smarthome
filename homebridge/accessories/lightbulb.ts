@@ -25,7 +25,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
     static MAX_BRIGHTNESS = 80
 
     constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
-        super(log, api, config, "lightbulb", [api.hap.Service.Lightbulb]);
+        super(log, api, config, ["light", "lightbulb"], [api.hap.Service.Lightbulb]);
     }
 
     async identify(accessory: PlatformAccessory) {
@@ -77,7 +77,9 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
                 callback(undefined, accessory.context.on);
             });
         if(accessory.context.brightnessAdjustable) {
@@ -109,7 +111,9 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     callback(undefined);
                 })
                 .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                    this.client?.checkKeepAlive();
+                    if(!this.checkAccessoryAvailability(accessory, callback)) {
+                        return;
+                    }
                     callback(undefined, Math.min(LightbulbAccessories.MAX_BRIGHTNESS, accessory.context.brightness));
                 });
         }
@@ -146,6 +150,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
+                accessory.context.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
@@ -179,6 +184,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     this.addAccessory({
                         deviceID: deviceID,
                         displayName: displayName,
+                        init: false,
                         brightness: 0,
                         brightnessAdjustable: brightnessAdjustable,
                         on: false

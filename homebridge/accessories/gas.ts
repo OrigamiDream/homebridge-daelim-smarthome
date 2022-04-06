@@ -21,7 +21,7 @@ interface GasAccessoryInterface extends AccessoryInterface {
 export class GasAccessories extends Accessories<GasAccessoryInterface> {
 
     constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
-        super(log, api, config, "gas", [api.hap.Service.Valve]);
+        super(log, api, config, ["gas"], [api.hap.Service.Valve]);
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
@@ -94,6 +94,10 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 this.client?.checkKeepAlive();
+                if(!accessory.context.init) {
+                    callback(new Error('Accessory have not initialized'));
+                    return;
+                }
                 callback(undefined, accessory.context.on ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
             });
 
@@ -131,6 +135,7 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
+                accessory.context.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.Valve, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.on ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
@@ -156,6 +161,7 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
                     this.addAccessory({
                         deviceID: deviceID,
                         displayName: displayName,
+                        init: false,
                         on: true // active as a default since this is off-only valve
                     });
                 }

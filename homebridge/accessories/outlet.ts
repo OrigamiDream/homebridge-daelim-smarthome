@@ -21,7 +21,7 @@ interface OutletAccessoryInterface extends AccessoryInterface {
 export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
 
     constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
-        super(log, api, config, "outlet", [api.hap.Service.Outlet]);
+        super(log, api, config, ["wallsocket", "outlet"], [api.hap.Service.Outlet]);
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
@@ -81,7 +81,9 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
                 callback(undefined, accessory.context.on);
             });
     }
@@ -107,6 +109,7 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
                 accessory.context.on = item['arg1'] === 'on';
+                accessory.context.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.Outlet, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
@@ -130,6 +133,7 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
                     this.addAccessory({
                         deviceID: deviceID,
                         displayName: displayName,
+                        init: false,
                         on: false
                     });
                 }

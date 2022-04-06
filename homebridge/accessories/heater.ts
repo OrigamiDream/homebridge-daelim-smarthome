@@ -26,7 +26,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
     public static MAXIMUM_TEMPERATURE = 40;
 
     constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
-        super(log, api, config, "heater", [api.hap.Service.HeaterCooler]);
+        super(log, api, config, ["heating", "heater"], [api.hap.Service.HeaterCooler]);
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
@@ -61,7 +61,9 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
                 callback(undefined, accessory.context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
             });
 
@@ -70,7 +72,9 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 maxValue: this.api.hap.Characteristic.CurrentHeaterCoolerState.HEATING,
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
                 callback(undefined, this.getCurrentHeaterCoolerState(accessory));
             });
 
@@ -84,7 +88,9 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
                 callback(undefined, this.getTargetHeaterCoolerState());
             });
 
@@ -120,7 +126,9 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
                 callback(undefined, Math.max(HeaterAccessories.MINIMUM_TEMPERATURE, Math.min(HeaterAccessories.MAXIMUM_TEMPERATURE, parseFloat(accessory.context.desiredTemperature))));
             });
 
@@ -129,7 +137,9 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 minStep: 1
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
                 callback(undefined, parseFloat(accessory.context.currentTemperature));
             });
     }
@@ -160,6 +170,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 accessory.context.desiredTemperature = desiredTemperature;
                 accessory.context.currentTemperature = currentTemperature;
                 accessory.context.active = active && desiredTemperature >= HeaterAccessories.MINIMUM_TEMPERATURE;
+                accessory.context.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.HeaterCooler, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.CurrentTemperature, parseFloat(accessory.context.currentTemperature));
@@ -186,6 +197,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                     this.addAccessory({
                         deviceID: deviceID,
                         displayName: displayName,
+                        init: false,
                         active: false,
                         desiredTemperature: 0,
                         currentTemperature: 0
