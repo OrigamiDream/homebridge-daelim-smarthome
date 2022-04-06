@@ -1,0 +1,37 @@
+name: Deploy GitHub Releases
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  deploy:
+    name: Deploy GitHub Releases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Parse release info
+        id: parse_all
+        env:
+          LOG_DIR: logs
+        run: |
+          filename="${{ env.LOG_DIR }}/${{ github.ref_name }}.md"
+          echo "RELEASE_NAME=$(head -n 1 $filename)" >> $GITHUB_ENV
+          echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
+          echo "$(tail -n +2 $filename)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - name: Deploy release
+        id: deploy_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ env.RELEASE_NAME }}
+          body: |
+            ${{ env.RELEASE_BODY }}
+          draft: false
+          prerelease: false
