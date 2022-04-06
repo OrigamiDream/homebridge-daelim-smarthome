@@ -1,14 +1,16 @@
 import {Client} from "../../core/client";
-import {API, Logging, PlatformAccessory, Service} from "homebridge";
+import {API, CharacteristicGetCallback, Logging, PlatformAccessory, Service} from "homebridge";
 import {Utils} from "../../core/utils";
 import {WithUUID} from "hap-nodejs";
 import {DaelimConfig} from "../../core/interfaces/daelim-config";
+import {DeviceSubTypes, Types} from "../../core/fields";
 
 export interface AccessoryInterface {
 
     deviceID: string,
     displayName: string,
     accessoryType?: string,
+    init: boolean
 
 }
 
@@ -24,23 +26,41 @@ export class Accessories<T extends AccessoryInterface> {
 
     protected readonly accessories: PlatformAccessory[] = [];
     protected readonly serviceTypes: ServiceType[];
-    protected readonly accessoryType: string;
+    protected readonly accessoryTypes: string[];
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined, accessoryType: string, serviceTypes: ServiceType[]) {
+    private lastInitRequestTimestamp: number;
+
+    /**
+     * Accessories class
+     *
+     * @param log Logging instance from Homebridge
+     * @param api API instance from Homebridge
+     * @param config Config instance parsed from Homebridge UI configuration
+     * @param accessoryTypes Array of accessory types that can be used for requesting accessory initialization.
+     *                       First element must be device type from DL E&C API.
+     *                       TODO: This is anti-pattern. Must be changed in near future.
+     * @param serviceTypes Array of service types that would be used for registering accessory to Homebridge
+     */
+    constructor(log: Logging, api: API, config: DaelimConfig | undefined, accessoryTypes: string[], serviceTypes: ServiceType[]) {
         this.log = log;
         this.api = api;
         this.config = config;
-        this.accessoryType = accessoryType;
+        this.accessoryTypes = accessoryTypes;
         this.serviceTypes = serviceTypes;
         this.serviceTypes.push(api.hap.Service.AccessoryInformation);
+        this.lastInitRequestTimestamp = -1;
     }
 
     setClient(client: Client) {
         this.client = client;
     }
 
-    getAccessoryType(): string {
-        return this.accessoryType;
+    getDeviceType(): string {
+        return this.accessoryTypes[0];
+    }
+
+    getAccessoryTypes(): string[] {
+        return this.accessoryTypes;
     }
 
     getServiceTypes(): ServiceType[] {
@@ -67,14 +87,16 @@ export class Accessories<T extends AccessoryInterface> {
             })
 
             accessory.context = context;
-            accessory.context.accessoryType = this.accessoryType;
+            accessory.context.accessoryType = this.accessoryTypes[0];
+            accessory.context.init = false;
 
             this.configureAccessory(accessory, services);
             this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ accessory ]);
         } else {
             this.accessories.filter(accessory => accessory.UUID === uuid).forEach(accessory => {
                 accessory.context = context;
-                accessory.context.accessoryType = this.accessoryType;
+                accessory.context.accessoryType = this.accessoryTypes[0];
+                accessory.context.init = false;
             });
         }
     }
@@ -98,6 +120,32 @@ export class Accessories<T extends AccessoryInterface> {
 
     async identify(accessory: PlatformAccessory) {
         this.log.info("Identifying %s", accessory.displayName);
+    }
+
+    protected checkAccessoryAvailability(accessory: PlatformAccessory, callback: CharacteristicGetCallback): boolean {
+        this.client?.checkKeepAlive();
+        if(accessory.context.init) {
+            return true;
+        }
+        this.requestAccessoryInit();
+        callback(new Error('Accessory have not initialized'));
+        return false;
+    }
+
+    private requestAccessoryInit() {
+        const currentTime = Date.now();
+        if(this.lastInitRequestTimestamp != -1 && currentTime - this.lastInitRequestTimestamp < 10 * 60) {
+            // Check init request when last init request time has passed for 1 minute
+            return;
+        }
+        this.lastInitRequestTimestamp = currentTime;
+        this.client?.sendUnreliableRequest({
+            type: 'query',
+            item: [{
+                device: this.getDeviceType(),
+                uid: 'All'
+            }]
+        }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
     }
 
     findService(accessory: PlatformAccessory, serviceType: ServiceType, callback: (service: Service) => void): boolean {

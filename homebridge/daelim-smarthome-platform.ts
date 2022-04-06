@@ -64,7 +64,7 @@ class DaelimSmartHomePlatform {
     /* override */
     configureAccessory(accessory: PlatformAccessory): void {
         for(const accessories of this.accessories) {
-            if(accessory.context.accessoryType !== accessories.getAccessoryType()) {
+            if(!accessories.getAccessoryTypes().includes(accessory.context.accessoryType)) {
                 continue;
             }
             const services = accessories.getServiceTypes().map((serviceType) => {
