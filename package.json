@@ -1,7 +1,7 @@
 {
   "name": "homebridge-daelim-smarthome",
   "version": "1.2.0",
-  "description": "A third-party Homebridge platform plugin for Daelim SmartHome",
+  "description": "A third-party Homebridge platform plugin for DL E&C SmartHome",
   "main": "dist/homebridge/daelim-smarthome-platform.js",
   "keywords": [
     "homebridge-plugin",
