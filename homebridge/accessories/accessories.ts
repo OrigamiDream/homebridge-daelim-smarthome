@@ -87,7 +87,7 @@ export class Accessories<T extends AccessoryInterface> {
             })
 
             accessory.context = context;
-            accessory.context.accessoryType = this.accessoryTypes[0];
+            accessory.context.accessoryType = this.getDeviceType();
             accessory.context.init = false;
 
             this.configureAccessory(accessory, services);
@@ -95,7 +95,7 @@ export class Accessories<T extends AccessoryInterface> {
         } else {
             this.accessories.filter(accessory => accessory.UUID === uuid).forEach(accessory => {
                 accessory.context = context;
-                accessory.context.accessoryType = this.accessoryTypes[0];
+                accessory.context.accessoryType = this.getDeviceType();
                 accessory.context.init = false;
             });
         }
