@@ -119,7 +119,13 @@ class ComplexFetcher extends FetcherBase {
                     index: complex['index'],
                     region: complex['danjiArea'],
                     name: complex['name'],
-                    status: complex['status']
+                    status: complex['status'],
+                    serverIp: complex['ip'],
+                    geolocation: {
+                        state: complex['dongStep1'],
+                        city: complex['dongStep2'],
+                        details: complex['dongStep3']
+                    }
                 });
             }
             return filtered;
@@ -139,11 +145,7 @@ class ComplexFetcher extends FetcherBase {
                 }
                 const target = organized.filter(o => o.region === region);
                 if(target.length > 0) {
-                    target[0].complexes.push({
-                        index: complex.index,
-                        name: complex.name,
-                        status: complex.status
-                    });
+                    target[0].complexes.push({ ...complex });
                 }
             }
             return organized;
