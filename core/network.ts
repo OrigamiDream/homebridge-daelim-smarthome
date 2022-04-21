@@ -3,6 +3,7 @@ import {Client} from "./client";
 import {Chunk} from "./chunk";
 import {Packet} from "./packet";
 import {Errors, SubTypes, Types} from "./fields";
+import {Complex} from "./interfaces/complex";
 
 export type ResponseCallback = (body: any) => void;
 export type ErrorCallback = () => void;
@@ -57,7 +58,7 @@ export class NetworkHandler {
     private isConnected = false;
 
     private readonly log: LoggerBase;
-    private readonly complexInfo: any;
+    private readonly complex: Complex;
 
     private readonly listeners: ResponseListener[] = [];
     private readonly errorListeners: ErrorListener[] = [];
@@ -68,9 +69,9 @@ export class NetworkHandler {
     public onConnected?: () => void;
     public onDisconnected?: () => void;
 
-    constructor(log: LoggerBase, complexInfo: any) {
+    constructor(log: LoggerBase, complex: Complex) {
         this.log = log;
-        this.complexInfo = complexInfo;
+        this.complex = complex;
     }
 
     registerResponseListener(type: Types, subType: SubTypes, callback: ResponseCallback) {
@@ -135,7 +136,7 @@ export class NetworkHandler {
     handle() {
         this.disconnect();
         this.socket = net.connect({
-            host: this.complexInfo["ip"],
+            host: this.complex.serverIp,
             port: Client.MMF_SERVER_PORT
         });
         this.socket.on('connect', () => {

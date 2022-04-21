@@ -190,12 +190,8 @@ export class UiServer extends HomebridgePluginUiServer {
     }
 
     async createService() {
-        const {regions} = await Utils.fetchComplexInfo();
-        const complexes = regions.filter(region => {
-            return region['danjiArea'] === this.region && region['name'] === this.complex;
-        });
-        const complexInfo = complexes[0];
-        this.handler = new NetworkHandler(this.log, complexInfo);
+        const complex = await Utils.findMatchedComplex(this.region || "", this.complex || "");
+        this.handler = new NetworkHandler(this.log, complex);
         this.handler.onConnected = () => {
             if(!this.username || !this.password) {
                 this.log.error("Username and password is not valid");
