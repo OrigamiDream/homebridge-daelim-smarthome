@@ -4,6 +4,7 @@ import {Utils} from "./utils";
 import {Logging} from "homebridge";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
 import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "./fields";
+import {Complex} from "./interfaces/complex";
 
 interface ClientAuthorization {
     certification: string,
@@ -23,7 +24,7 @@ export class Client {
     private readonly config: DaelimConfig;
     private readonly authorization: ClientAuthorization;
     private readonly address: ClientAddress;
-    private complexInfo?: object;
+    private complex?: Complex;
     private handler?: NetworkHandler;
     private isLoggedIn = false;
     private lastKeepAliveTimestamp: number;
@@ -51,14 +52,6 @@ export class Client {
         this.lastKeepAliveTimestamp = currentTime;
         this.sendUnreliableRequest({}, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
         this.log('Attempted to check the socket connection is alive');
-    }
-
-    private async readComplexInfo(): Promise<object> {
-        const { regions } = await Utils.fetchComplexInfo();
-        const complexes = regions.filter(region => {
-            return region['danjiArea'] === this.config.region && region['name'] === this.config.complex;
-        });
-        return complexes[0];
     }
 
     private getAuthorizationPIN(): string {
@@ -112,13 +105,13 @@ export class Client {
             this.authorization.login = body['loginpin'];
             this.sendUnreliableRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
         });
-        this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
+        this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (_) => {
             this.isLoggedIn = true;
             if(this.handler?.flushAllEnqueuedBuffers(this.getAuthorizationPIN())) {
                 this.log("Flushed entire enqueued request buffers");
             }
         });
-        this.registerResponseListener(Types.LOGIN, LoginSubTypes.WALL_PAD_RESPONSE, (body) => {
+        this.registerResponseListener(Types.LOGIN, LoginSubTypes.WALL_PAD_RESPONSE, (_) => {
             this.log('Certified Wall pad PIN');
             this.sendCertificationRequest();
         });
@@ -187,9 +180,9 @@ export class Client {
 
     async prepareService() {
         this.log('Looking for complex info...');
-        this.complexInfo = await this.readComplexInfo();
+        this.complex = await Utils.findMatchedComplex(this.config.region, this.config.complex);
         this.log(`Complex info about (${this.config.complex}) has found.`);
-        this.handler = new NetworkHandler(this.log, this.complexInfo);
+        this.handler = new NetworkHandler(this.log, this.complex);
         this.handler.onConnected = () => {
             this.sendCertificationRequest();
         };

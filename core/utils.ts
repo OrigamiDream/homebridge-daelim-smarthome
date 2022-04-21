@@ -1,27 +1,27 @@
 import fetch from "node-fetch";
-import https from "https";
 import {
     ApplicationLogSubTypes,
-    DeviceSubTypes, ElevatorCallSubTypes,
-    EMSSubTypes, EtceteraSubTypes,
+    DeviceSubTypes,
+    ElevatorCallSubTypes,
+    EMSSubTypes,
+    EtceteraSubTypes,
     GuardSubTypes,
     HealthcareSubTypes,
     InfoSubTypes,
-    LoginSubTypes, SettingSubTypes,
+    LoginSubTypes,
+    SettingSubTypes,
     SystemSubTypes,
     Types
 } from "./fields";
+import {Complex, ComplexInfo} from "./interfaces/complex";
 
 export class Utils {
 
-    public static PLUGIN_NAME = "homebridge-daelim-smarthome"
-    public static PLATFORM_NAME = "DaelimSmartHomePlatform"
-    public static MANUFACTURER_NAME = "DL E&C Co.,Ltd."
+    public static PLUGIN_NAME = "homebridge-daelim-smarthome";
+    public static PLATFORM_NAME = "DaelimSmartHomePlatform";
+    public static MANUFACTURER_NAME = "DL E&C Co.,Ltd.";
 
-    public static URL = "https://smarthome.daelimcorp.co.kr/main/choice_1.do";
-
-    public static AREA_REGEX = /{area( |\n|):( |\n|)"(.*)"( |\n|),( |\n|)citys( |\n|):( |\n|)\[(.*)]}/gi;
-    public static REGION_REGEX = /region\.push\({(.*( |\n|))+?}\)/gi;
+    public static COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/complexes.json";
 
     static arraycopy(src: Uint8Array, srcPos: number, dst: Uint8Array, dstPos: number, length: number) {
         for(let i = 0; i < length; i++) {
@@ -29,45 +29,38 @@ export class Utils {
         }
     }
 
-    static async fetchComplexInfo() {
-        const areas = [];
-        const regions = [];
-
-        const response = await fetch(this.URL, {
-            agent: new https.Agent({
-                rejectUnauthorized: false
-            })
-        }).then(response => response.text()).catch(reason => {
-            console.error(reason);
-            return "";
-        });
-        const trimmed = response.split("\n").map(str => str.trim()).join("\n");
-
-        // Interprocess areas raw array
-        const areasRawArray = trimmed.match(this.AREA_REGEX) || [];
-        for(const raw of areasRawArray) {
-            areas.push(JSON.parse(raw.replace('area', '\"area\"').replace('citys', '\"citys\"')));
-        }
-
-        // Interprocess regions raw array
-        const regionsRawArray = trimmed.match(this.REGION_REGEX) || [];
-        for(const raw of regionsRawArray) {
-            let str = raw.substring('region.push('.length);
-            str = str.substring(0, str.length - ')'.length);
-            str = str.split('\n').map(line => {
-                if(line.indexOf(':') !== -1) {
-                    const split = line.split(':');
-                    const key = split[0].trim();
-                    return `"${key}":${split[1]}`
-                } else {
-                    return line;
+    static async fetchComplexInfo(): Promise<ComplexInfo> {
+        return await fetch(this.COMPLEX_URL)
+            .then(response => response.json() as ComplexInfo | any)
+            .catch(reason => {
+                console.error('Failed to parse complex info:');
+                console.error(reason);
+                return {
+                    complexes: []
                 }
-            }).join('\n');
-            regions.push(JSON.parse(str));
+            });
+    }
+
+    static async findMatchedComplex(regionName: string, complexName: string): Promise<Complex> {
+        const info = await Utils.fetchComplexInfo();
+        const regions = info.complexes;
+        if(regions.length == 0) {
+            throw new Error('No regions are available');
         }
-        return {
-            areas, regions
+
+        const complexes = regions
+            .filter(region => region.region == regionName)
+            .flatMap(region => region.complexes);
+        if(complexes.length == 0) {
+            throw new Error('No complexes are available');
         }
+
+        const buildings = complexes
+            .filter(complex => complex.name == complexName);
+        if(buildings.length == 0) {
+            throw new Error('No matched buildings are available');
+        }
+        return buildings[0];
     }
 
     static findSubType(type: Types) {
