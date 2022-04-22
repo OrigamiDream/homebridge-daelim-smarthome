@@ -6,69 +6,9 @@
                 {
                     "index": "1",
                     "region": "서울특별시",
-                    "name": "아크로리버파크",
-                    "status": "LIVE",
-                    "serverIp": "211.240.89.11",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "서초구",
-                        "details": "반포2동"
-                    }
-                },
-                {
-                    "index": "2",
-                    "region": "서울특별시",
-                    "name": "아크로타워스퀘어",
-                    "status": "LIVE",
-                    "serverIp": "211.56.234.180",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "영등포구",
-                        "details": "영등포동"
-                    }
-                },
-                {
-                    "index": "3",
-                    "region": "서울특별시",
-                    "name": "아크로리버뷰",
-                    "status": "LIVE",
-                    "serverIp": "175.209.82.107",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "서초구",
-                        "details": "반포본동"
-                    }
-                },
-                {
-                    "index": "4",
-                    "region": "서울특별시",
-                    "name": "아크로리버하임1블럭(101~107)",
-                    "status": "LIVE",
-                    "serverIp": "210.102.30.67",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "동작구",
-                        "details": "흑석동"
-                    }
-                },
-                {
-                    "index": "5",
-                    "region": "서울특별시",
-                    "name": "아크로리버하임2블럭(108~120)",
-                    "status": "LIVE",
-                    "serverIp": "210.102.30.35",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "동작구",
-                        "details": "흑석동"
-                    }
-                },
-                {
-                    "index": "6",
-                    "region": "서울특별시",
                     "name": "e편한세상 강동에코포레",
                     "status": "LIVE",
-                    "serverIp": "210.219.254.43",
+                    "serverIp": "49.238.210.243",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "강동구",
@@ -76,7 +16,7 @@
                     }
                 },
                 {
-                    "index": "19",
+                    "index": "16",
                     "region": "서울특별시",
                     "name": "e편한세상 금호(101~116)",
                     "status": "LIVE",
@@ -88,7 +28,7 @@
                     }
                 },
                 {
-                    "index": "20",
+                    "index": "17",
                     "region": "서울특별시",
                     "name": "e편한세상 금호(117)",
                     "status": "DEV",
@@ -100,7 +40,7 @@
                     }
                 },
                 {
-                    "index": "21",
+                    "index": "18",
                     "region": "서울특별시",
                     "name": "녹번역e편한세상캐슬",
                     "status": "LIVE",
@@ -112,7 +52,19 @@
                     }
                 },
                 {
-                    "index": "34",
+                    "index": "20",
+                    "region": "서울특별시",
+                    "name": "e편한세상 광진그랜드파크",
+                    "status": "LIVE",
+                    "serverIp": "210.219.229.179",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "광진구",
+                        "details": "화양동"
+                    }
+                },
+                {
+                    "index": "33",
                     "region": "서울특별시",
                     "name": "e편한세상 독산더타워",
                     "status": "LIVE",
@@ -124,7 +76,7 @@
                     }
                 },
                 {
-                    "index": "46",
+                    "index": "45",
                     "region": "서울특별시",
                     "name": "e편한세상 문래",
                     "status": "LIVE",
@@ -136,11 +88,11 @@
                     }
                 },
                 {
-                    "index": "55",
+                    "index": "56",
                     "region": "서울특별시",
                     "name": "e편한세상 부천심곡",
                     "status": "LIVE",
-                    "serverIp": "121.173.101.142",
+                    "serverIp": "49.254.26.123",
                     "geolocation": {
                         "state": "경기도",
                         "city": "부천시소사구",
@@ -148,7 +100,7 @@
                     }
                 },
                 {
-                    "index": "62",
+                    "index": "63",
                     "region": "서울특별시",
                     "name": "e편한세상 서울대입구1단지",
                     "status": "LIVE",
@@ -160,7 +112,7 @@
                     }
                 },
                 {
-                    "index": "63",
+                    "index": "64",
                     "region": "서울특별시",
                     "name": "e편한세상 서울대입구2단지",
                     "status": "LIVE",
@@ -172,7 +124,7 @@
                     }
                 },
                 {
-                    "index": "64",
+                    "index": "65",
                     "region": "서울특별시",
                     "name": "e편한세상 서울대입구2차",
                     "status": "LIVE",
@@ -184,7 +136,7 @@
                     }
                 },
                 {
-                    "index": "72",
+                    "index": "73",
                     "region": "서울특별시",
                     "name": "e편한세상 송파파크센트럴",
                     "status": "LIVE",
@@ -244,7 +196,7 @@
                     }
                 },
                 {
-                    "index": "96",
+                    "index": "97",
                     "region": "서울특별시",
                     "name": "e편한세상 영등포아델포레",
                     "status": "LIVE",
@@ -256,7 +208,7 @@
                     }
                 },
                 {
-                    "index": "105",
+                    "index": "106",
                     "region": "서울특별시",
                     "name": "e편한세상 염창",
                     "status": "LIVE",
@@ -268,7 +220,7 @@
                     }
                 },
                 {
-                    "index": "114",
+                    "index": "117",
                     "region": "서울특별시",
                     "name": "e편한세상 옥수파크힐스 1단지",
                     "status": "LIVE",
@@ -280,7 +232,7 @@
                     }
                 },
                 {
-                    "index": "115",
+                    "index": "118",
                     "region": "서울특별시",
                     "name": "e편한세상 옥수파크힐스 2단지",
                     "status": "LIVE",
@@ -292,7 +244,19 @@
                     }
                 },
                 {
-                    "index": "150",
+                    "index": "137",
+                    "region": "서울특별시",
+                    "name": "e편한세상 청계센트럴포레",
+                    "status": "LIVE",
+                    "serverIp": "203.239.185.227",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "동대문구",
+                        "details": "용신동"
+                    }
+                },
+                {
+                    "index": "156",
                     "region": "서울특별시",
                     "name": "e편한세상 화랑대",
                     "status": "LIVE",
@@ -304,7 +268,67 @@
                     }
                 },
                 {
-                    "index": "154",
+                    "index": "157",
+                    "region": "서울특별시",
+                    "name": "아크로리버파크",
+                    "status": "LIVE",
+                    "serverIp": "211.240.89.11",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "서초구",
+                        "details": "반포2동"
+                    }
+                },
+                {
+                    "index": "158",
+                    "region": "서울특별시",
+                    "name": "아크로타워스퀘어",
+                    "status": "LIVE",
+                    "serverIp": "211.56.234.180",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "영등포구",
+                        "details": "영등포동"
+                    }
+                },
+                {
+                    "index": "159",
+                    "region": "서울특별시",
+                    "name": "아크로리버뷰",
+                    "status": "LIVE",
+                    "serverIp": "175.209.82.107",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "서초구",
+                        "details": "반포본동"
+                    }
+                },
+                {
+                    "index": "160",
+                    "region": "서울특별시",
+                    "name": "아크로리버하임1블럭(101~107)",
+                    "status": "LIVE",
+                    "serverIp": "210.102.30.67",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "동작구",
+                        "details": "흑석동"
+                    }
+                },
+                {
+                    "index": "161",
+                    "region": "서울특별시",
+                    "name": "아크로리버하임2블럭(108~120)",
+                    "status": "LIVE",
+                    "serverIp": "210.102.30.35",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "동작구",
+                        "details": "흑석동"
+                    }
+                },
+                {
+                    "index": "164",
                     "region": "서울특별시",
                     "name": "e편한세상 반포 테스트",
                     "status": "DEV",
@@ -321,7 +345,7 @@
             "region": "전라남도",
             "complexes": [
                 {
-                    "index": "7",
+                    "index": "2",
                     "region": "전라남도",
                     "name": "e편한세상 광양",
                     "status": "LIVE",
@@ -362,7 +386,7 @@
             "region": "부산광역시",
             "complexes": [
                 {
-                    "index": "8",
+                    "index": "3",
                     "region": "부산광역시",
                     "name": "e편한세상 광안비치",
                     "status": "LIVE",
@@ -374,7 +398,19 @@
                     }
                 },
                 {
-                    "index": "35",
+                    "index": "15",
+                    "region": "부산광역시",
+                    "name": "e편한세상 금정산",
+                    "status": "LIVE",
+                    "serverIp": "210.181.237.27",
+                    "geolocation": {
+                        "state": "부산광역시",
+                        "city": "북구",
+                        "details": "만덕제1동"
+                    }
+                },
+                {
+                    "index": "34",
                     "region": "부산광역시",
                     "name": "e편한세상 동래명장1단지",
                     "status": "LIVE",
@@ -386,7 +422,7 @@
                     }
                 },
                 {
-                    "index": "36",
+                    "index": "35",
                     "region": "부산광역시",
                     "name": "e편한세상 동래명장2단지",
                     "status": "LIVE",
@@ -398,7 +434,7 @@
                     }
                 },
                 {
-                    "index": "37",
+                    "index": "36",
                     "region": "부산광역시",
                     "name": "e편한세상 동래아시아드",
                     "status": "LIVE",
@@ -410,7 +446,7 @@
                     }
                 },
                 {
-                    "index": "45",
+                    "index": "44",
                     "region": "부산광역시",
                     "name": "e편한세상 명지",
                     "status": "LIVE",
@@ -434,7 +470,7 @@
                     }
                 },
                 {
-                    "index": "56",
+                    "index": "57",
                     "region": "부산광역시",
                     "name": "e편한세상 사하",
                     "status": "LIVE",
@@ -446,7 +482,7 @@
                     }
                 },
                 {
-                    "index": "57",
+                    "index": "58",
                     "region": "부산광역시",
                     "name": "e편한세상 사하2차",
                     "status": "LIVE",
@@ -458,7 +494,19 @@
                     }
                 },
                 {
-                    "index": "97",
+                    "index": "95",
+                    "region": "부산광역시",
+                    "name": "e편한세상 연산더퍼스트",
+                    "status": "LIVE",
+                    "serverIp": "210.219.229.174",
+                    "geolocation": {
+                        "state": "부산광역시",
+                        "city": "연제구",
+                        "details": "연산제1동"
+                    }
+                },
+                {
+                    "index": "98",
                     "region": "부산광역시",
                     "name": "e편한세상오션테라스1단지",
                     "status": "LIVE",
@@ -470,7 +518,7 @@
                     }
                 },
                 {
-                    "index": "98",
+                    "index": "99",
                     "region": "부산광역시",
                     "name": "e편한세상오션테라스2단지",
                     "status": "LIVE",
@@ -482,7 +530,7 @@
                     }
                 },
                 {
-                    "index": "99",
+                    "index": "100",
                     "region": "부산광역시",
                     "name": "e편한세상오션테라스3단지",
                     "status": "LIVE",
@@ -494,7 +542,7 @@
                     }
                 },
                 {
-                    "index": "100",
+                    "index": "101",
                     "region": "부산광역시",
                     "name": "e편한세상오션테라스4단지",
                     "status": "LIVE",
@@ -506,7 +554,7 @@
                     }
                 },
                 {
-                    "index": "128",
+                    "index": "131",
                     "region": "부산광역시",
                     "name": "e편한세상 일광",
                     "status": "LIVE",
@@ -523,7 +571,7 @@
             "region": "경기도",
             "complexes": [
                 {
-                    "index": "9",
+                    "index": "4",
                     "region": "경기도",
                     "name": "e편한세상 광주역 1단지",
                     "status": "LIVE",
@@ -535,7 +583,7 @@
                     }
                 },
                 {
-                    "index": "10",
+                    "index": "5",
                     "region": "경기도",
                     "name": "e편한세상 광주역 2단지",
                     "status": "LIVE",
@@ -547,7 +595,7 @@
                     }
                 },
                 {
-                    "index": "11",
+                    "index": "6",
                     "region": "경기도",
                     "name": "e편한세상 광주역 3단지",
                     "status": "LIVE",
@@ -559,7 +607,7 @@
                     }
                 },
                 {
-                    "index": "12",
+                    "index": "7",
                     "region": "경기도",
                     "name": "e편한세상 광주역 4단지",
                     "status": "LIVE",
@@ -571,7 +619,7 @@
                     }
                 },
                 {
-                    "index": "13",
+                    "index": "8",
                     "region": "경기도",
                     "name": "e편한세상 광주역 5단지",
                     "status": "LIVE",
@@ -583,7 +631,7 @@
                     }
                 },
                 {
-                    "index": "14",
+                    "index": "9",
                     "region": "경기도",
                     "name": "e편한세상 광주역 6단지",
                     "status": "LIVE",
@@ -595,7 +643,7 @@
                     }
                 },
                 {
-                    "index": "22",
+                    "index": "19",
                     "region": "경기도",
                     "name": "e편한세상 녹양역",
                     "status": "LIVE",
@@ -607,11 +655,11 @@
                     }
                 },
                 {
-                    "index": "24",
+                    "index": "22",
                     "region": "경기도",
                     "name": "다산자연앤이편한세상",
                     "status": "LIVE",
-                    "serverIp": "220.79.251.67",
+                    "serverIp": "49.254.19.70",
                     "geolocation": {
                         "state": "경기도",
                         "city": "남양주시",
@@ -619,7 +667,7 @@
                     }
                 },
                 {
-                    "index": "25",
+                    "index": "23",
                     "region": "경기도",
                     "name": "다산신도시자연앤e편한세상2차",
                     "status": "LIVE",
@@ -631,7 +679,7 @@
                     }
                 },
                 {
-                    "index": "26",
+                    "index": "24",
                     "region": "경기도",
                     "name": "자연앤이편한세상3차",
                     "status": "LIVE",
@@ -643,7 +691,7 @@
                     }
                 },
                 {
-                    "index": "27",
+                    "index": "25",
                     "region": "경기도",
                     "name": "다산e편한세상자이",
                     "status": "LIVE",
@@ -655,7 +703,7 @@
                     }
                 },
                 {
-                    "index": "38",
+                    "index": "37",
                     "region": "경기도",
                     "name": "e편한세상 동탄",
                     "status": "LIVE",
@@ -667,7 +715,7 @@
                     }
                 },
                 {
-                    "index": "47",
+                    "index": "46",
                     "region": "경기도",
                     "name": "e편한세상 미사",
                     "status": "LIVE",
@@ -679,7 +727,19 @@
                     }
                 },
                 {
-                    "index": "59",
+                    "index": "55",
+                    "region": "경기도",
+                    "name": "e편한세상 반월나노시티역",
+                    "status": "LIVE",
+                    "serverIp": "222.98.56.238",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "화성시",
+                        "details": "반월동"
+                    }
+                },
+                {
+                    "index": "60",
                     "region": "경기도",
                     "name": "e편한세상 상록",
                     "status": "LIVE",
@@ -691,7 +751,7 @@
                     }
                 },
                 {
-                    "index": "66",
+                    "index": "67",
                     "region": "경기도",
                     "name": "e편한세상 선부1단지",
                     "status": "LIVE",
@@ -703,7 +763,7 @@
                     }
                 },
                 {
-                    "index": "67",
+                    "index": "68",
                     "region": "경기도",
                     "name": "e편한세상 선부2단지",
                     "status": "LIVE",
@@ -715,7 +775,7 @@
                     }
                 },
                 {
-                    "index": "68",
+                    "index": "69",
                     "region": "경기도",
                     "name": "e편한세상 선부역 어반스퀘어",
                     "status": "LIVE",
@@ -727,7 +787,7 @@
                     }
                 },
                 {
-                    "index": "73",
+                    "index": "74",
                     "region": "경기도",
                     "name": "e편한세상 수지",
                     "status": "LIVE",
@@ -739,7 +799,7 @@
                     }
                 },
                 {
-                    "index": "74",
+                    "index": "75",
                     "region": "경기도",
                     "name": "e편한세상수택센트럴파크",
                     "status": "LIVE",
@@ -751,7 +811,7 @@
                     }
                 },
                 {
-                    "index": "76",
+                    "index": "77",
                     "region": "경기도",
                     "name": "e편한세상 시티삼송1차",
                     "status": "LIVE",
@@ -763,7 +823,7 @@
                     }
                 },
                 {
-                    "index": "77",
+                    "index": "78",
                     "region": "경기도",
                     "name": "e편한세상 시티삼송2차",
                     "status": "LIVE",
@@ -775,7 +835,7 @@
                     }
                 },
                 {
-                    "index": "78",
+                    "index": "79",
                     "region": "경기도",
                     "name": "e편한세상 시티삼송3차",
                     "status": "LIVE",
@@ -787,7 +847,7 @@
                     }
                 },
                 {
-                    "index": "80",
+                    "index": "81",
                     "region": "경기도",
                     "name": "e편한세상 시흥 센텀하임",
                     "status": "LIVE",
@@ -799,7 +859,7 @@
                     }
                 },
                 {
-                    "index": "81",
+                    "index": "82",
                     "region": "경기도",
                     "name": "e편한세상 신곡파크비스타",
                     "status": "LIVE",
@@ -811,7 +871,7 @@
                     }
                 },
                 {
-                    "index": "82",
+                    "index": "83",
                     "region": "경기도",
                     "name": "e편한세상 신곡포레스타뷰",
                     "status": "LIVE",
@@ -823,7 +883,7 @@
                     }
                 },
                 {
-                    "index": "83",
+                    "index": "84",
                     "region": "경기도",
                     "name": "e편한세상 신봉담",
                     "status": "LIVE",
@@ -835,19 +895,7 @@
                     }
                 },
                 {
-                    "index": "84",
-                    "region": "경기도",
-                    "name": "e편한세상 신동탄",
-                    "status": "LIVE",
-                    "serverIp": "222.98.56.238",
-                    "geolocation": {
-                        "state": "경기도",
-                        "city": "화성시",
-                        "details": "반월동"
-                    }
-                },
-                {
-                    "index": "95",
+                    "index": "96",
                     "region": "경기도",
                     "name": "e편한세상 옥정어반센트럴",
                     "status": "LIVE",
@@ -859,7 +907,7 @@
                     }
                 },
                 {
-                    "index": "101",
+                    "index": "102",
                     "region": "경기도",
                     "name": "e편한세상옥정더퍼스트",
                     "status": "LIVE",
@@ -871,7 +919,7 @@
                     }
                 },
                 {
-                    "index": "102",
+                    "index": "103",
                     "region": "경기도",
                     "name": "e편한세상 옥정메트로포레",
                     "status": "LIVE",
@@ -883,7 +931,7 @@
                     }
                 },
                 {
-                    "index": "103",
+                    "index": "104",
                     "region": "경기도",
                     "name": "e편한세상 옥정에듀써밋",
                     "status": "LIVE",
@@ -895,7 +943,7 @@
                     }
                 },
                 {
-                    "index": "104",
+                    "index": "105",
                     "region": "경기도",
                     "name": "e편한세상 온수역",
                     "status": "LIVE",
@@ -907,7 +955,7 @@
                     }
                 },
                 {
-                    "index": "108",
+                    "index": "111",
                     "region": "경기도",
                     "name": "e편한세상 영통2차 1단지",
                     "status": "LIVE",
@@ -919,7 +967,7 @@
                     }
                 },
                 {
-                    "index": "109",
+                    "index": "112",
                     "region": "경기도",
                     "name": "e편한세상 영통2차 2단지",
                     "status": "LIVE",
@@ -931,7 +979,7 @@
                     }
                 },
                 {
-                    "index": "111",
+                    "index": "114",
                     "region": "경기도",
                     "name": "e편한세상 오산세교",
                     "status": "LIVE",
@@ -943,7 +991,7 @@
                     }
                 },
                 {
-                    "index": "112",
+                    "index": "115",
                     "region": "경기도",
                     "name": "e편한세상 오포3차",
                     "status": "LIVE",
@@ -955,7 +1003,7 @@
                     }
                 },
                 {
-                    "index": "113",
+                    "index": "116",
                     "region": "경기도",
                     "name": "e편한세상 오포4차",
                     "status": "LIVE",
@@ -967,7 +1015,7 @@
                     }
                 },
                 {
-                    "index": "118",
+                    "index": "121",
                     "region": "경기도",
                     "name": "e편한세상 용인파크카운티",
                     "status": "LIVE",
@@ -979,7 +1027,7 @@
                     }
                 },
                 {
-                    "index": "119",
+                    "index": "122",
                     "region": "경기도",
                     "name": "e편한세상 용인한숲시티2블럭",
                     "status": "LIVE",
@@ -991,7 +1039,7 @@
                     }
                 },
                 {
-                    "index": "120",
+                    "index": "123",
                     "region": "경기도",
                     "name": "e편한세상 용인한숲시티3블럭",
                     "status": "LIVE",
@@ -1003,7 +1051,7 @@
                     }
                 },
                 {
-                    "index": "121",
+                    "index": "124",
                     "region": "경기도",
                     "name": "e편한세상 용인한숲시티4블럭",
                     "status": "LIVE",
@@ -1015,7 +1063,7 @@
                     }
                 },
                 {
-                    "index": "122",
+                    "index": "125",
                     "region": "경기도",
                     "name": "e편한세상 용인한숲시티5블럭",
                     "status": "LIVE",
@@ -1027,7 +1075,7 @@
                     }
                 },
                 {
-                    "index": "123",
+                    "index": "126",
                     "region": "경기도",
                     "name": "e편한세상 용인한숲시티6블럭",
                     "status": "LIVE",
@@ -1039,7 +1087,7 @@
                     }
                 },
                 {
-                    "index": "127",
+                    "index": "130",
                     "region": "경기도",
                     "name": "e편한세상 인창어반포레",
                     "status": "LIVE",
@@ -1051,7 +1099,19 @@
                     }
                 },
                 {
-                    "index": "135",
+                    "index": "138",
+                    "region": "경기도",
+                    "name": "e편한세상 초지역센트럴포레",
+                    "status": "LIVE",
+                    "serverIp": "211.174.219.195",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "안산시단원구",
+                        "details": "원곡본동"
+                    }
+                },
+                {
+                    "index": "141",
                     "region": "경기도",
                     "name": "e편한세상 캐널시티",
                     "status": "LIVE",
@@ -1063,7 +1123,7 @@
                     }
                 },
                 {
-                    "index": "136",
+                    "index": "142",
                     "region": "경기도",
                     "name": "e편한세상 태전2차 1단지",
                     "status": "LIVE",
@@ -1075,7 +1135,7 @@
                     }
                 },
                 {
-                    "index": "137",
+                    "index": "143",
                     "region": "경기도",
                     "name": "e편한세상 태전2차 2단지",
                     "status": "LIVE",
@@ -1087,7 +1147,7 @@
                     }
                 },
                 {
-                    "index": "138",
+                    "index": "144",
                     "region": "경기도",
                     "name": "e편한세상 태전2차 3단지",
                     "status": "LIVE",
@@ -1099,7 +1159,7 @@
                     }
                 },
                 {
-                    "index": "139",
+                    "index": "145",
                     "region": "경기도",
                     "name": "e편한세상 테라스 광교 3단지",
                     "status": "LIVE",
@@ -1111,7 +1171,7 @@
                     }
                 },
                 {
-                    "index": "140",
+                    "index": "146",
                     "region": "경기도",
                     "name": "e편한세상 테라스 광교 4단지",
                     "status": "LIVE",
@@ -1123,7 +1183,7 @@
                     }
                 },
                 {
-                    "index": "141",
+                    "index": "147",
                     "region": "경기도",
                     "name": "e편한세상 테라스오포2블록",
                     "status": "LIVE",
@@ -1135,7 +1195,7 @@
                     }
                 },
                 {
-                    "index": "142",
+                    "index": "148",
                     "region": "경기도",
                     "name": "e편한세상 테라스오포3블록",
                     "status": "LIVE",
@@ -1147,7 +1207,7 @@
                     }
                 },
                 {
-                    "index": "143",
+                    "index": "149",
                     "region": "경기도",
                     "name": "e편한세상 테라스오포4블록",
                     "status": "LIVE",
@@ -1159,7 +1219,7 @@
                     }
                 },
                 {
-                    "index": "144",
+                    "index": "150",
                     "region": "경기도",
                     "name": "e편한세상 테라스위례",
                     "status": "LIVE",
@@ -1171,7 +1231,7 @@
                     }
                 },
                 {
-                    "index": "145",
+                    "index": "151",
                     "region": "경기도",
                     "name": "e편한세상 태재1단지",
                     "status": "LIVE",
@@ -1183,7 +1243,7 @@
                     }
                 },
                 {
-                    "index": "146",
+                    "index": "152",
                     "region": "경기도",
                     "name": "e편한세상 태재2단지",
                     "status": "LIVE",
@@ -1195,7 +1255,7 @@
                     }
                 },
                 {
-                    "index": "147",
+                    "index": "153",
                     "region": "경기도",
                     "name": "e편한세상 평택용이 1단지",
                     "status": "LIVE",
@@ -1207,7 +1267,7 @@
                     }
                 },
                 {
-                    "index": "148",
+                    "index": "154",
                     "region": "경기도",
                     "name": "e편한세상 평택용이 2단지",
                     "status": "LIVE",
@@ -1219,7 +1279,7 @@
                     }
                 },
                 {
-                    "index": "149",
+                    "index": "155",
                     "region": "경기도",
                     "name": "e편한세상 한강신도시2차",
                     "status": "LIVE",
@@ -1233,10 +1293,123 @@
             ]
         },
         {
+            "region": "인천광역시",
+            "complexes": [
+                {
+                    "index": "10",
+                    "region": "인천광역시",
+                    "name": "e편한세상 계양더프리미어",
+                    "status": "LIVE",
+                    "serverIp": "203.239.187.11",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "계양구",
+                        "details": "계양1동"
+                    }
+                },
+                {
+                    "index": "30",
+                    "region": "인천광역시",
+                    "name": "e편한세상 도화 5B",
+                    "status": "LIVE",
+                    "serverIp": "121.172.163.167",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "남구",
+                        "details": "도화1동"
+                    }
+                },
+                {
+                    "index": "31",
+                    "region": "인천광역시",
+                    "name": "e편한세상 도화 6-1B",
+                    "status": "LIVE",
+                    "serverIp": "220.126.100.147",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "남구",
+                        "details": "도화1동"
+                    }
+                },
+                {
+                    "index": "32",
+                    "region": "인천광역시",
+                    "name": "e편한세상 도화 6-2B",
+                    "status": "LIVE",
+                    "serverIp": "220.126.100.152",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "남구",
+                        "details": "도화1동"
+                    }
+                },
+                {
+                    "index": "66",
+                    "region": "인천광역시",
+                    "name": "e편한세상 서창",
+                    "status": "LIVE",
+                    "serverIp": "58.181.26.212",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "남동구",
+                        "details": "장수서창동"
+                    }
+                },
+                {
+                    "index": "72",
+                    "region": "인천광역시",
+                    "name": "e편한세상 송도",
+                    "status": "LIVE",
+                    "serverIp": "210.112.242.123",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "연수구",
+                        "details": "송도3동"
+                    }
+                },
+                {
+                    "index": "80",
+                    "region": "인천광역시",
+                    "name": "e편한세상 시티인하대역",
+                    "status": "LIVE",
+                    "serverIp": "210.102.29.139",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "남구",
+                        "details": "용현5동"
+                    }
+                },
+                {
+                    "index": "107",
+                    "region": "인천광역시",
+                    "name": "e편한세상 영종하늘도시",
+                    "status": "LIVE",
+                    "serverIp": "59.17.207.132",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "중구",
+                        "details": "영종동"
+                    }
+                },
+                {
+                    "index": "108",
+                    "region": "인천광역시",
+                    "name": "e편한세상 영종국제도시오션하임",
+                    "status": "LIVE",
+                    "serverIp": "211.112.59.91",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "중구",
+                        "details": "영종동"
+                    }
+                }
+            ]
+        },
+        {
             "region": "경상북도",
             "complexes": [
                 {
-                    "index": "15",
+                    "index": "11",
                     "region": "경상북도",
                     "name": "e편한세상 구미교리",
                     "status": "LIVE",
@@ -1248,7 +1421,7 @@
                     }
                 },
                 {
-                    "index": "16",
+                    "index": "12",
                     "region": "경상북도",
                     "name": "e편한세상 구미파크밸리",
                     "status": "LIVE",
@@ -1260,7 +1433,7 @@
                     }
                 },
                 {
-                    "index": "18",
+                    "index": "14",
                     "region": "경상북도",
                     "name": "e편한세상 금오파크",
                     "status": "LIVE",
@@ -1276,7 +1449,7 @@
                     "region": "경상북도",
                     "name": "e편한세상 안동강변",
                     "status": "LIVE",
-                    "serverIp": "118.45.57.122",
+                    "serverIp": "49.254.112.3",
                     "geolocation": {
                         "state": "경상북도",
                         "city": "안동시",
@@ -1306,6 +1479,30 @@
                         "city": "안동시",
                         "details": "태화동"
                     }
+                },
+                {
+                    "index": "109",
+                    "region": "경상북도",
+                    "name": "e편한세상 영천1단지",
+                    "status": "LIVE",
+                    "serverIp": "210.220.231.102",
+                    "geolocation": {
+                        "state": "경상북도",
+                        "city": "영천시",
+                        "details": "완산동"
+                    }
+                },
+                {
+                    "index": "110",
+                    "region": "경상북도",
+                    "name": "e편한세상 영천2단지",
+                    "status": "LIVE",
+                    "serverIp": "211.112.5.78",
+                    "geolocation": {
+                        "state": "경상북도",
+                        "city": "영천시",
+                        "details": "완산동"
+                    }
                 }
             ]
         },
@@ -1313,7 +1510,7 @@
             "region": "전라북도",
             "complexes": [
                 {
-                    "index": "17",
+                    "index": "13",
                     "region": "전라북도",
                     "name": "e편한세상 군산디오션시티",
                     "status": "LIVE",
@@ -1325,7 +1522,7 @@
                     }
                 },
                 {
-                    "index": "44",
+                    "index": "43",
                     "region": "전라북도",
                     "name": "e편한세상 디오션시티2차",
                     "status": "LIVE",
@@ -1337,7 +1534,7 @@
                     }
                 },
                 {
-                    "index": "124",
+                    "index": "127",
                     "region": "전라북도",
                     "name": "e편한세상 우아",
                     "status": "LIVE",
@@ -1354,11 +1551,11 @@
             "region": "대구광역시",
             "complexes": [
                 {
-                    "index": "23",
+                    "index": "21",
                     "region": "대구광역시",
                     "name": "e편한세상 남산",
                     "status": "LIVE",
-                    "serverIp": "121.181.170.152",
+                    "serverIp": "211.195.13.230",
                     "geolocation": {
                         "state": "대구광역시",
                         "city": "중구",
@@ -1366,7 +1563,7 @@
                     }
                 },
                 {
-                    "index": "28",
+                    "index": "26",
                     "region": "대구광역시",
                     "name": "e편한세상 대구 금호",
                     "status": "LIVE",
@@ -1378,7 +1575,7 @@
                     }
                 },
                 {
-                    "index": "29",
+                    "index": "27",
                     "region": "대구광역시",
                     "name": "e편한세상 대신",
                     "status": "LIVE",
@@ -1388,6 +1585,18 @@
                         "city": "중구",
                         "details": "대신동"
                     }
+                },
+                {
+                    "index": "51",
+                    "region": "대구광역시",
+                    "name": "e편한세상 복현",
+                    "status": "LIVE",
+                    "serverIp": "203.239.187.59",
+                    "geolocation": {
+                        "state": "대구광역시",
+                        "city": "북구",
+                        "details": "복현1동"
+                    }
                 }
             ]
         },
@@ -1395,7 +1604,7 @@
             "region": "대전광역시",
             "complexes": [
                 {
-                    "index": "30",
+                    "index": "28",
                     "region": "대전광역시",
                     "name": "e편한세상 대전법동",
                     "status": "LIVE",
@@ -1407,7 +1616,19 @@
                     }
                 },
                 {
-                    "index": "42",
+                    "index": "29",
+                    "region": "대전광역시",
+                    "name": "e편한세상 대전에코포레",
+                    "status": "LIVE",
+                    "serverIp": "211.174.214.78",
+                    "geolocation": {
+                        "state": "대전광역시",
+                        "city": "동구",
+                        "details": "용운동"
+                    }
+                },
+                {
+                    "index": "41",
                     "region": "대전광역시",
                     "name": "e편한세상 둔산1단지",
                     "status": "LIVE",
@@ -1419,7 +1640,7 @@
                     }
                 },
                 {
-                    "index": "43",
+                    "index": "42",
                     "region": "대전광역시",
                     "name": "e편한세상 둔산2단지",
                     "status": "LIVE",
@@ -1433,111 +1654,10 @@
             ]
         },
         {
-            "region": "인천광역시",
-            "complexes": [
-                {
-                    "index": "31",
-                    "region": "인천광역시",
-                    "name": "e편한세상 도화 5B",
-                    "status": "LIVE",
-                    "serverIp": "121.172.163.132",
-                    "geolocation": {
-                        "state": "인천광역시",
-                        "city": "남구",
-                        "details": "도화1동"
-                    }
-                },
-                {
-                    "index": "32",
-                    "region": "인천광역시",
-                    "name": "e편한세상 도화 6-1B",
-                    "status": "LIVE",
-                    "serverIp": "220.126.100.147",
-                    "geolocation": {
-                        "state": "인천광역시",
-                        "city": "남구",
-                        "details": "도화1동"
-                    }
-                },
-                {
-                    "index": "33",
-                    "region": "인천광역시",
-                    "name": "e편한세상 도화 6-2B",
-                    "status": "LIVE",
-                    "serverIp": "220.126.100.152",
-                    "geolocation": {
-                        "state": "인천광역시",
-                        "city": "남구",
-                        "details": "도화1동"
-                    }
-                },
-                {
-                    "index": "65",
-                    "region": "인천광역시",
-                    "name": "e편한세상 서창",
-                    "status": "LIVE",
-                    "serverIp": "58.181.26.212",
-                    "geolocation": {
-                        "state": "인천광역시",
-                        "city": "남동구",
-                        "details": "장수서창동"
-                    }
-                },
-                {
-                    "index": "71",
-                    "region": "인천광역시",
-                    "name": "e편한세상 송도",
-                    "status": "LIVE",
-                    "serverIp": "221.154.21.4",
-                    "geolocation": {
-                        "state": "인천광역시",
-                        "city": "연수구",
-                        "details": "송도3동"
-                    }
-                },
-                {
-                    "index": "79",
-                    "region": "인천광역시",
-                    "name": "e편한세상 시티인하대역",
-                    "status": "LIVE",
-                    "serverIp": "210.102.29.139",
-                    "geolocation": {
-                        "state": "인천광역시",
-                        "city": "남구",
-                        "details": "용현5동"
-                    }
-                },
-                {
-                    "index": "106",
-                    "region": "인천광역시",
-                    "name": "e편한세상 영종하늘도시",
-                    "status": "LIVE",
-                    "serverIp": "59.17.207.132",
-                    "geolocation": {
-                        "state": "인천광역시",
-                        "city": "중구",
-                        "details": "영종동"
-                    }
-                },
-                {
-                    "index": "107",
-                    "region": "인천광역시",
-                    "name": "e편한세상 영종국제도시오션하임",
-                    "status": "LIVE",
-                    "serverIp": "211.112.59.91",
-                    "geolocation": {
-                        "state": "인천광역시",
-                        "city": "중구",
-                        "details": "영종동"
-                    }
-                }
-            ]
-        },
-        {
             "region": "강원도",
             "complexes": [
                 {
-                    "index": "39",
+                    "index": "38",
                     "region": "강원도",
                     "name": "e편한세상 동해",
                     "status": "LIVE",
@@ -1549,7 +1669,7 @@
                     }
                 },
                 {
-                    "index": "50",
+                    "index": "49",
                     "region": "강원도",
                     "name": "e편한세상 반곡",
                     "status": "LIVE",
@@ -1561,7 +1681,7 @@
                     }
                 },
                 {
-                    "index": "58",
+                    "index": "59",
                     "region": "강원도",
                     "name": "e편한세상 삼척교동",
                     "status": "LIVE",
@@ -1585,7 +1705,7 @@
                     }
                 },
                 {
-                    "index": "110",
+                    "index": "113",
                     "region": "강원도",
                     "name": "e편한세상 영랑호",
                     "status": "LIVE",
@@ -1597,7 +1717,7 @@
                     }
                 },
                 {
-                    "index": "126",
+                    "index": "129",
                     "region": "강원도",
                     "name": "e편한세상 원주태장",
                     "status": "LIVE",
@@ -1609,7 +1729,7 @@
                     }
                 },
                 {
-                    "index": "133",
+                    "index": "139",
                     "region": "강원도",
                     "name": "e편한세상춘천한숲시티",
                     "status": "LIVE",
@@ -1626,7 +1746,7 @@
             "region": "충청남도",
             "complexes": [
                 {
-                    "index": "40",
+                    "index": "39",
                     "region": "충청남도",
                     "name": "e편한세상 두정3차",
                     "status": "LIVE",
@@ -1638,7 +1758,7 @@
                     }
                 },
                 {
-                    "index": "41",
+                    "index": "40",
                     "region": "충청남도",
                     "name": "e편한세상 두정4차",
                     "status": "LIVE",
@@ -1650,7 +1770,7 @@
                     }
                 },
                 {
-                    "index": "51",
+                    "index": "50",
                     "region": "충청남도",
                     "name": "e편한세상 보령",
                     "status": "LIVE",
@@ -1674,7 +1794,7 @@
                     }
                 },
                 {
-                    "index": "60",
+                    "index": "61",
                     "region": "충청남도",
                     "name": "e편한세상 서산 테크노벨리",
                     "status": "LIVE",
@@ -1686,7 +1806,7 @@
                     }
                 },
                 {
-                    "index": "61",
+                    "index": "62",
                     "region": "충청남도",
                     "name": "e편한세상 서산예천",
                     "status": "LIVE",
@@ -1698,7 +1818,7 @@
                     }
                 },
                 {
-                    "index": "69",
+                    "index": "70",
                     "region": "충청남도",
                     "name": "e편한세상 세종리버파크",
                     "status": "LIVE",
@@ -1710,7 +1830,7 @@
                     }
                 },
                 {
-                    "index": "75",
+                    "index": "76",
                     "region": "충청남도",
                     "name": "e편한세상 스마일시티2차",
                     "status": "LIVE",
@@ -1722,7 +1842,7 @@
                     }
                 },
                 {
-                    "index": "132",
+                    "index": "136",
                     "region": "충청남도",
                     "name": "e편한세상 천안부성",
                     "status": "LIVE",
@@ -1739,11 +1859,11 @@
             "region": "경상남도",
             "complexes": [
                 {
-                    "index": "48",
+                    "index": "47",
                     "region": "경상남도",
                     "name": "e편한세상 밀양강",
                     "status": "LIVE",
-                    "serverIp": "121.176.38.20",
+                    "serverIp": "121.126.243.123",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "밀양시",
@@ -1751,7 +1871,7 @@
                     }
                 },
                 {
-                    "index": "49",
+                    "index": "48",
                     "region": "경상남도",
                     "name": "e편한세상 밀양삼문",
                     "status": "LIVE",
@@ -1767,7 +1887,7 @@
                     "region": "경상남도",
                     "name": "e편한세상 봉황역",
                     "status": "LIVE",
-                    "serverIp": "211.36.56.19",
+                    "serverIp": "211.33.210.74",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "김해시",
@@ -1775,7 +1895,7 @@
                     }
                 },
                 {
-                    "index": "116",
+                    "index": "119",
                     "region": "경상남도",
                     "name": "e편한세상 옥포 1단지",
                     "status": "LIVE",
@@ -1787,7 +1907,7 @@
                     }
                 },
                 {
-                    "index": "117",
+                    "index": "120",
                     "region": "경상남도",
                     "name": "e편한세상 옥포 2단지",
                     "status": "LIVE",
@@ -1799,7 +1919,7 @@
                     }
                 },
                 {
-                    "index": "129",
+                    "index": "132",
                     "region": "경상남도",
                     "name": "e편한세상 장유2차",
                     "status": "LIVE",
@@ -1811,7 +1931,7 @@
                     }
                 },
                 {
-                    "index": "130",
+                    "index": "134",
                     "region": "경상남도",
                     "name": "e편한세상 창원파크센트럴1단지",
                     "status": "LIVE",
@@ -1823,7 +1943,7 @@
                     }
                 },
                 {
-                    "index": "131",
+                    "index": "135",
                     "region": "경상남도",
                     "name": "e편한세상 창원파크센트럴2단지",
                     "status": "LIVE",
@@ -1840,7 +1960,7 @@
             "region": "세종특별자치시",
             "complexes": [
                 {
-                    "index": "70",
+                    "index": "71",
                     "region": "세종특별자치시",
                     "name": "세종e편한세상푸르지오",
                     "status": "LIVE",
@@ -1857,7 +1977,7 @@
             "region": "울산광역시",
             "complexes": [
                 {
-                    "index": "125",
+                    "index": "128",
                     "region": "울산광역시",
                     "name": "e편한세상 울산온양",
                     "status": "LIVE",
@@ -1871,10 +1991,27 @@
             ]
         },
         {
+            "region": "제주특별자치도",
+            "complexes": [
+                {
+                    "index": "133",
+                    "region": "제주특별자치도",
+                    "name": "e편한세상 중문",
+                    "status": "LIVE",
+                    "serverIp": "211.240.10.203",
+                    "geolocation": {
+                        "state": "제주특별자치도",
+                        "city": "서귀포시",
+                        "details": "중문동"
+                    }
+                }
+            ]
+        },
+        {
             "region": "충청북도",
             "complexes": [
                 {
-                    "index": "134",
+                    "index": "140",
                     "region": "충청북도",
                     "name": "e편한세상 충주",
                     "status": "LIVE",
@@ -1891,11 +2028,11 @@
             "region": "기타",
             "complexes": [
                 {
-                    "index": "151",
+                    "index": "162",
                     "region": "기타",
                     "name": "e편한세상 CVNET모델하우스",
                     "status": "LIVE",
-                    "serverIp": "119.194.107.92",
+                    "serverIp": "119.194.107.91",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "서초구",
@@ -1903,19 +2040,7 @@
                     }
                 },
                 {
-                    "index": "152",
-                    "region": "기타",
-                    "name": "e편한세상 대전에코포레(테스트)",
-                    "status": "LIVE",
-                    "serverIp": "223.171.53.241",
-                    "geolocation": {
-                        "state": "대전광역시",
-                        "city": "동구",
-                        "details": "용운동"
-                    }
-                },
-                {
-                    "index": "153",
+                    "index": "163",
                     "region": "기타",
                     "name": "e편한세상 모델하우스",
                     "status": "DEV",
@@ -1927,7 +2052,7 @@
                     }
                 },
                 {
-                    "index": "155",
+                    "index": "165",
                     "region": "기타",
                     "name": "e편한세상서울대입구3단지(테스트)",
                     "status": "DEV",
@@ -1939,7 +2064,7 @@
                     }
                 },
                 {
-                    "index": "156",
+                    "index": "166",
                     "region": "기타",
                     "name": "e편한세상서울대입구4단지(테스트)",
                     "status": "DEV",
@@ -1951,7 +2076,7 @@
                     }
                 },
                 {
-                    "index": "157",
+                    "index": "167",
                     "region": "기타",
                     "name": "계영정보통신테스트단지",
                     "status": "LIVE",
@@ -1963,7 +2088,7 @@
                     }
                 },
                 {
-                    "index": "158",
+                    "index": "168",
                     "region": "기타",
                     "name": "대림 시연용",
                     "status": "DEV",
@@ -1975,7 +2100,7 @@
                     }
                 },
                 {
-                    "index": "159",
+                    "index": "169",
                     "region": "기타",
                     "name": "대림코퍼기능테스트단지",
                     "status": "LIVE",
@@ -1987,7 +2112,7 @@
                     }
                 },
                 {
-                    "index": "160",
+                    "index": "170",
                     "region": "기타",
                     "name": "스마트홈 대림코퍼 시연용",
                     "status": "LIVE",
@@ -1999,7 +2124,7 @@
                     }
                 },
                 {
-                    "index": "161",
+                    "index": "171",
                     "region": "기타",
                     "name": "신봉담 모델하우스",
                     "status": "DEV",
@@ -2011,7 +2136,7 @@
                     }
                 },
                 {
-                    "index": "162",
+                    "index": "172",
                     "region": "기타",
                     "name": "아이엠 삼송(테스트)",
                     "status": "DEV",
@@ -2023,7 +2148,7 @@
                     }
                 },
                 {
-                    "index": "163",
+                    "index": "173",
                     "region": "기타",
                     "name": "코콤테스트1",
                     "status": "LIVE",
@@ -2035,7 +2160,7 @@
                     }
                 },
                 {
-                    "index": "164",
+                    "index": "174",
                     "region": "기타",
                     "name": "코콤테스트2",
                     "status": "LIVE",
@@ -2047,7 +2172,19 @@
                     }
                 },
                 {
-                    "index": "165",
+                    "index": "175",
+                    "region": "기타",
+                    "name": "코콤테스트3",
+                    "status": "LIVE",
+                    "serverIp": "58.142.5.97",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "중구",
+                        "details": "소공동"
+                    }
+                },
+                {
+                    "index": "176",
                     "region": "기타",
                     "name": "현대통신 리눅스테스트",
                     "status": "LIVE",
@@ -2059,7 +2196,7 @@
                     }
                 },
                 {
-                    "index": "166",
+                    "index": "177",
                     "region": "기타",
                     "name": "현대통신 테스트단지",
                     "status": "LIVE",
@@ -2071,7 +2208,7 @@
                     }
                 },
                 {
-                    "index": "167",
+                    "index": "178",
                     "region": "기타",
                     "name": "현대통신 테스트단지2",
                     "status": "LIVE",
@@ -2083,7 +2220,7 @@
                     }
                 },
                 {
-                    "index": "168",
+                    "index": "179",
                     "region": "기타",
                     "name": "현대통신 테스트단지3",
                     "status": "LIVE",
