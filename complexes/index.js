@@ -13,7 +13,15 @@ class FetcherBase {
             const response = await axios({
                 url: this.baseURL,
                 method: 'get'
+            }).catch(reason => {
+                console.error(reason);
+                return undefined;
             });
+            if(response === undefined) {
+                console.error('Failed to parse from complex server');
+                process.exit(1);
+                return undefined;
+            }
             return response.data;
         });
         this.addPipe(async (response) => {
