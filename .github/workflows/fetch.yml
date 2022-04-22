@@ -1,0 +1,38 @@
+name: fetch
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js 17
+        uses: actions/setup-node@v3
+        with:
+          node-version: '17'
+
+      - name: Install Packages
+        run: npm install
+
+      - name: Run Cronjob
+        run: npm run refresh
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          add-paths: |
+            complexes/*.json
+          commit-message: '[Scheduled] Update complex info'
+          branch: fetch-complex-patch
+          title: '[Scheduled] Update complex info'
+          body: |
+            Complex info have been changed
+            
+            This is automatically generated Pull Request
+          reviewers: OrigamiDream
