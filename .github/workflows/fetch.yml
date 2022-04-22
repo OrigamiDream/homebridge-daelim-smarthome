@@ -1,4 +1,4 @@
-name: fetch
+name: Fetch Complex Info
 
 on:
   workflow_dispatch:
