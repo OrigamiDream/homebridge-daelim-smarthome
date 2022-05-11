@@ -20,7 +20,7 @@ e편한세상 아파트 단지를 위한 비공식 [Homebridge](https://github.c
 
 ## 설치 요구사항
 
-<img alt="node" src="https://img.shields.io/badge/node-%3E%3D10.17-brightgreen"> &nbsp;
+<img alt="node" src="https://img.shields.io/badge/node-%3E%3D14.15-brightgreen"> &nbsp;
 <img alt="homebridge" src="https://img.shields.io/badge/homebridge-%3E%3D1.0.0-brightgreen"> &nbsp;
 <img alt="iOS" src="https://img.shields.io/badge/iOS-%3E%3D12.0.0-brightgreen">
 
