@@ -102,7 +102,8 @@ export class Accessories<T extends AccessoryInterface> {
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
-        this.log.info("Configuring accessory %s", accessory.displayName);
+        const accessoryType = this.getAccessoryTypes()[this.getAccessoryTypes().length - 1];
+        this.log.info("Configuring accessory %s :: %s", accessoryType, accessory.displayName);
         accessory.on("identify", async () => {
             await this.identify(accessory);
             this.log.info("%s identified!", accessory.displayName);
