@@ -93,9 +93,7 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
-                if(!accessory.context.init) {
-                    callback(new Error('Accessory have not initialized'));
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
                     return;
                 }
                 callback(undefined, accessory.context.on ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
@@ -103,13 +101,17 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
 
         service.getCharacteristic(this.api.hap.Characteristic.InUse)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
                 callback(undefined, accessory.context.on ? this.api.hap.Characteristic.InUse.IN_USE : this.api.hap.Characteristic.InUse.NOT_IN_USE);
             });
 
         service.getCharacteristic(this.api.hap.Characteristic.ValveType)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
                 callback(undefined, this.api.hap.Characteristic.ValveType.GENERIC_VALVE);
             });
     }
