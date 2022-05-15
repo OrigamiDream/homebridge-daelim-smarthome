@@ -10,7 +10,7 @@ export enum Types {
     INFO = 5,
     HEALTHCARE = 6,
     SETTING = 7,
-    ELEVATOR_CELL = 8,
+    ELEVATOR_CALL = 8,
     ETCETERA = 9,
     APPLICATION_LOG = 100
     

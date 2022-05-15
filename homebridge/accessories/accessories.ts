@@ -18,17 +18,11 @@ type ServiceType = WithUUID<typeof Service>;
 
 export class Accessories<T extends AccessoryInterface> {
 
-    protected readonly log: Logging;
-    protected readonly api: API;
-    protected readonly config?: DaelimConfig;
-
     protected client?: Client;
 
     protected readonly accessories: PlatformAccessory[] = [];
-    protected readonly serviceTypes: ServiceType[];
-    protected readonly accessoryTypes: string[];
 
-    private lastInitRequestTimestamp: number;
+    private lastInitRequestTimestamp: number = -1;
 
     /**
      * Accessories class
@@ -41,14 +35,12 @@ export class Accessories<T extends AccessoryInterface> {
      *                       TODO: This is anti-pattern. Must be changed in near future.
      * @param serviceTypes Array of service types that would be used for registering accessory to Homebridge
      */
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined, accessoryTypes: string[], serviceTypes: ServiceType[]) {
-        this.log = log;
-        this.api = api;
-        this.config = config;
-        this.accessoryTypes = accessoryTypes;
-        this.serviceTypes = serviceTypes;
+    constructor(protected readonly log: Logging,
+                protected readonly api: API,
+                protected readonly config: DaelimConfig | undefined,
+                protected readonly accessoryTypes: string[],
+                protected readonly serviceTypes: ServiceType[]) {
         this.serviceTypes.push(api.hap.Service.AccessoryInformation);
-        this.lastInitRequestTimestamp = -1;
     }
 
     setClient(client: Client) {
@@ -165,6 +157,9 @@ export class Accessories<T extends AccessoryInterface> {
             }
         }
         throw `Invalid service type '${serviceType}' in services [${services.map((service) => service.displayName).join(", ")}]`
+    }
+
+    registerAccessories() {
     }
 
     registerListeners() {
