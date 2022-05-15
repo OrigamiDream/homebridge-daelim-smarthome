@@ -81,7 +81,7 @@ export class Utils {
                 return HealthcareSubTypes;
             case Types.SETTING:
                 return SettingSubTypes;
-            case Types.ELEVATOR_CELL:
+            case Types.ELEVATOR_CALL:
                 return ElevatorCallSubTypes;
             case Types.ETCETERA:
                 return EtceteraSubTypes;

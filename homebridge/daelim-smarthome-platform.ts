@@ -1,6 +1,6 @@
 import {
     API,
-    APIEvent,
+    APIEvent, DynamicPlatformPlugin,
     Logging,
     PlatformAccessory,
     PlatformConfig,
@@ -13,12 +13,13 @@ import {Accessories, AccessoryInterface} from "./accessories/accessories";
 import {OutletAccessories} from "./accessories/outlet";
 import {HeaterAccessories} from "./accessories/heater";
 import {GasAccessories} from "./accessories/gas";
+import {ElevatorAccessories} from "./accessories/elevator";
 
 export = (api: API) => {
     api.registerPlatform(Utils.PLATFORM_NAME, DaelimSmartHomePlatform);
 }
 
-class DaelimSmartHomePlatform {
+class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
 
     private readonly log: Logging;
     private readonly api: API;
@@ -37,6 +38,7 @@ class DaelimSmartHomePlatform {
         this.accessories.push(new OutletAccessories(this.log, this.api, this.config));
         this.accessories.push(new HeaterAccessories(this.log, this.api, this.config));
         this.accessories.push(new GasAccessories(this.log, this.api, this.config));
+        this.accessories.push(new ElevatorAccessories(this.log, this.api, this.config));
 
         log.info("Daelim-SmartHome finished initializing!");
 
@@ -61,7 +63,6 @@ class DaelimSmartHomePlatform {
         };
     }
 
-    /* override */
     configureAccessory(accessory: PlatformAccessory): void {
         for(const accessories of this.accessories) {
             if(!accessories.getAccessoryTypes().includes(accessory.context.accessoryType)) {
@@ -87,6 +88,7 @@ class DaelimSmartHomePlatform {
         this.accessories.forEach(accessories => {
             accessories.setClient(this.client!);
             accessories.registerListeners();
+            accessories.registerAccessories();
         });
 
         this.client.startService();
