@@ -1,5 +1,5 @@
 {
-  "displayName": "Homebridge Daelim SmartHome",
+  "displayName": "Homebridge DL E&C Smart Home",
   "name": "homebridge-daelim-smarthome",
   "version": "1.2.2",
   "description": "A third-party Homebridge platform plugin for DL E&C SmartHome",
@@ -7,7 +7,9 @@
   "keywords": [
     "homebridge-plugin",
     "homekit",
-    "daelim"
+    "daelim",
+    "dl e&c",
+    "smarthome"
   ],
   "scripts": {
     "prepare": "npm run build",
