@@ -44,5 +44,19 @@
     "axios": "^0.22.0",
     "node-fetch": "^2.6.1",
     "readline-sync": "^1.4.10"
-  }
+  },
+  "funding": [
+    {
+      "type": "paypal",
+      "url": "https://paypal.me/OrigamiDream"
+    },
+    {
+      "type": "buymeacoffee",
+      "url": "https://buymeacoffee.com/OrigamiDream"
+    },
+    {
+      "type": "toss",
+      "url": "https://toss.me/steinway"
+    }
+  ]
 }
