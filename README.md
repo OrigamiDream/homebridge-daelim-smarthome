@@ -17,14 +17,12 @@ e편한세상 및 아크로 계열 아파트 단지를 위한 공식 [Homebridge
 4. 가스 (단방향)
 5. 엘레베이터 호출 (도착알림 없음)
 
-###### DL건설에서 새로 출시한 [스마트 eLife](https://apps.apple.com/kr/app/%EC%8A%A4%EB%A7%88%ED%8A%B8-elife/id1551248421) 앱과의 프로토콜 호환성을 확인할 수 없습니다.<br>해당하는 신축 아파트단지 거주민이 계시다면 해당하는 [이슈(#6)](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/6) 에 관련 정보 공유 부탁드립니다. 
+###### DL건설에서 새로 출시한 [스마트 eLife](https://apps.apple.com/kr/app/%EC%8A%A4%EB%A7%88%ED%8A%B8-elife/id1551248421) 앱과의 프로토콜 호환성을 확인할 수 없습니다.<br>해당하는 신축 아파트단지 거주민이 계시다면 해당하는 [이슈(#6)](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/6) 에 관련 정보 공유 부탁드립니다.
 
 
 ## 설치 요구사항
 
-<img alt="node" src="https://img.shields.io/badge/node-%3E%3D14.15-brightgreen">
-<img alt="homebridge" src="https://img.shields.io/badge/homebridge-%3E%3D1.0.0-brightgreen">
-<img alt="iOS" src="https://img.shields.io/badge/iOS-%3E%3D12.0.0-brightgreen">
+<img alt="node" src="https://img.shields.io/badge/node-%3E%3D14.15-brightgreen"> <img alt="homebridge" src="https://img.shields.io/badge/homebridge-%3E%3D1.0.0-brightgreen"> <img alt="iOS" src="https://img.shields.io/badge/iOS-%3E%3D12.0.0-brightgreen">
 
 ## 설치
 
