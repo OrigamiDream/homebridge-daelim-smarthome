@@ -125,6 +125,10 @@ export class Accessories<T extends AccessoryInterface> {
         return false;
     }
 
+    protected checkForciblyRefreshable(context: T, force: boolean) {
+        return !(force && context.init);
+    }
+
     private requestAccessoryInit() {
         const currentTime = Date.now();
         if(this.lastInitRequestTimestamp != -1 && currentTime - this.lastInitRequestTimestamp < 10 * 60) {

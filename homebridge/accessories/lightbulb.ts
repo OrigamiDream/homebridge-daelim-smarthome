@@ -17,12 +17,41 @@ interface LightbulbAccessoryInterface extends AccessoryInterface {
     brightness: number
     brightnessAdjustable: boolean
     on: boolean
+    maxBrightness: number
+    minBrightness: number
+    minSteps: number
+    brightnessExceedJumpTo: number
 
 }
 
-export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
+interface BrightnessAdjustableSettings {
 
-    static MAX_BRIGHTNESS = 80
+    condition: (brightness: string) => boolean
+    maxBrightness: number
+    minBrightness: number
+    minSteps: number
+    brightnessExceedJumpTo: number
+
+}
+
+const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
+    {
+        condition: brightness => brightness.length >= 2, // 00, 10, 20, ...
+        maxBrightness: 80,
+        minBrightness: 10,
+        minSteps: 10,
+        brightnessExceedJumpTo: 100
+    },
+    {
+        condition: brightness => brightness.length == 1, // 0, 1, 2, ...
+        maxBrightness: 7,
+        minBrightness: 1,
+        minSteps: 1,
+        brightnessExceedJumpTo: 7
+    }
+]
+
+export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
 
     constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
         super(log, api, config, ["light", "lightbulb"], [api.hap.Service.Lightbulb]);
@@ -86,18 +115,25 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             service.getCharacteristic(this.api.hap.Characteristic.Brightness)
                 .setProps({
                     minValue: 0,
-                    maxValue: LightbulbAccessories.MAX_BRIGHTNESS,
-                    minStep: 10
+                    maxValue: accessory.context.maxBrightness,
+                    minStep: accessory.context.minSteps
                 })
                 .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                    let brightness = value;
-                    if(brightness >= LightbulbAccessories.MAX_BRIGHTNESS) {
-                        brightness = 100;
+                    const context = accessory.context as LightbulbAccessoryInterface;
+
+                    let brightness = Math.trunc(value as number);
+                    if(brightness >= context.maxBrightness) {
+                        brightness = context.brightnessExceedJumpTo;
+                    }
+                    if(accessory.context.brightness === brightness) {
+                        callback(undefined);
+                        return;
                     }
                     accessory.context.brightness = brightness;
+
                     const response = await this.client?.sendDeferredRequest({
                         type: 'invoke',
-                        item: [ this.createItemInterface(accessory, brightness >= 10) ]
+                        item: [ this.createItemInterface(accessory, brightness >= context.minBrightness) ]
                     }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
                         return this.matchesAccessoryDeviceID(accessory, body);
                     }).catch(_ => {
@@ -114,7 +150,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     if(!this.checkAccessoryAvailability(accessory, callback)) {
                         return;
                     }
-                    callback(undefined, Math.min(LightbulbAccessories.MAX_BRIGHTNESS, accessory.context.brightness));
+                    callback(undefined, Math.min(accessory.context.maxBrightness, accessory.context.brightness));
                 });
         }
     }
@@ -149,6 +185,9 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             const deviceID = item['uid'];
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
+                if(!this.checkForciblyRefreshable(accessory.context as LightbulbAccessoryInterface, force)) {
+                    continue;
+                }
                 accessory.context.on = item['arg1'] === 'on';
                 accessory.context.init = true;
                 if(force) {
@@ -157,12 +196,38 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     });
                 }
 
-                if(accessory.context.brightnessAdjustable && accessory.context.on) {
+                if(accessory.context.brightnessAdjustable) {
                     // Update new brightness rate when the accessory is on.
-                    accessory.context.brightness = Math.min(LightbulbAccessories.MAX_BRIGHTNESS, parseInt(item['arg2']));
-                    this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.Brightness, accessory.context.brightness);
-                    });
+                    const brightness = item['arg2'];
+                    if(force) {
+                        const setting = this.findAdjustableBrightnessSetting(brightness);
+
+                        accessory.context.minBrightness = setting.minBrightness;
+                        accessory.context.maxBrightness = setting.maxBrightness;
+                        accessory.context.minSteps = setting.minSteps;
+                        accessory.context.brightnessExceedJumpTo = setting.brightnessExceedJumpTo;
+                        this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
+                            service.getCharacteristic(this.api.hap.Characteristic.Brightness)
+                                .setProps({
+                                    minValue: 0,
+                                    maxValue: accessory.context.maxBrightness,
+                                    minStep: accessory.context.minSteps,
+                                });
+                        });
+                    }
+
+                    if(accessory.context.on) {
+                        accessory.context.brightness = parseInt(brightness);
+
+                        if(force) {
+                            this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
+                                service.setCharacteristic(
+                                    this.api.hap.Characteristic.Brightness,
+                                    Math.min(accessory.context.maxBrightness, accessory.context.brightness)
+                                );
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -187,7 +252,11 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                         init: false,
                         brightness: 0,
                         brightnessAdjustable: brightnessAdjustable,
-                        on: false
+                        on: false,
+                        maxBrightness: 100,
+                        minBrightness: 0,
+                        minSteps: 10,
+                        brightnessExceedJumpTo: 100
                     });
                 }
                 this.client?.sendUnreliableRequest({
@@ -209,4 +278,11 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         });
     }
 
+    findAdjustableBrightnessSetting(brightness: string): BrightnessAdjustableSettings {
+        const setting = BRIGHTNESS_ADJUSTABLE_SETTINGS.find(setting => setting.condition(brightness));
+        if(setting) {
+            return setting;
+        }
+        return BRIGHTNESS_ADJUSTABLE_SETTINGS[0];
+    }
 }
