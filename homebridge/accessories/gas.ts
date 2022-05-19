@@ -131,11 +131,12 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
     refreshGasValveState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
-
             const deviceID = item['uid'];
-
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
+                if(!this.checkForciblyRefreshable(accessory.context as GasAccessoryInterface, force)) {
+                    continue;
+                }
                 accessory.context.on = item['arg1'] === 'on';
                 accessory.context.init = true;
                 if(force) {
