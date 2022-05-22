@@ -5,7 +5,7 @@ import {
     CharacteristicEventTypes,
     CharacteristicGetCallback,
     CharacteristicSetCallback,
-    CharacteristicValue,
+    CharacteristicValue, Formats,
     Logging,
     PlatformAccessory,
     Service
@@ -21,6 +21,7 @@ interface LightbulbAccessoryInterface extends AccessoryInterface {
     minBrightness: number
     minSteps: number
     brightnessExceedJumpTo: number
+    brightnessSettingIndex: number
 
 }
 
@@ -32,6 +33,9 @@ interface BrightnessAdjustableSettings {
     minSteps: number
     brightnessExceedJumpTo: number
 
+    getBrightness: (brightness: number, settings: BrightnessAdjustableSettings) => number,
+    fromBrightness: (brightness: CharacteristicValue, settings: BrightnessAdjustableSettings) => number,
+
 }
 
 const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
@@ -39,15 +43,37 @@ const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
         condition: brightness => brightness.length >= 2, // 00, 10, 20, ...
         maxBrightness: 80,
         minBrightness: 10,
-        minSteps: 10,
-        brightnessExceedJumpTo: 100
+        minSteps: 100 / 8, // 10,
+        brightnessExceedJumpTo: 100,
+
+        getBrightness: (brightness, settings) => {
+            return (brightness / 10) * settings.minSteps;
+        },
+        fromBrightness: (brightness, settings) => {
+            const level = (brightness as number) / settings.minSteps * 10;
+            if(level >= settings.maxBrightness) {
+                return settings.brightnessExceedJumpTo;
+            }
+            return level;
+        }
     },
     {
         condition: brightness => brightness.length == 1, // 0, 1, 2, ...
         maxBrightness: 7,
         minBrightness: 1,
-        minSteps: 1,
-        brightnessExceedJumpTo: 7
+        minSteps: 100 / 7, // 1
+        brightnessExceedJumpTo: 7,
+
+        getBrightness: (brightness, settings) => {
+            return brightness * settings.minSteps;
+        },
+        fromBrightness: (brightness, settings) => {
+            const level = (brightness as number) / settings.minSteps;
+            if(level >= settings.maxBrightness) {
+                return settings.brightnessExceedJumpTo;
+            }
+            return level;
+        }
     }
 ]
 
@@ -114,17 +140,16 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         if(accessory.context.brightnessAdjustable) {
             service.getCharacteristic(this.api.hap.Characteristic.Brightness)
                 .setProps({
+                    format: Formats.FLOAT,
                     minValue: 0,
-                    maxValue: accessory.context.maxBrightness,
+                    maxValue: 100,
                     minStep: accessory.context.minSteps
                 })
                 .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                     const context = accessory.context as LightbulbAccessoryInterface;
+                    const settings = BRIGHTNESS_ADJUSTABLE_SETTINGS[context.brightnessSettingIndex];
+                    const brightness = Math.round(settings.fromBrightness(value, settings));
 
-                    let brightness = Math.trunc(value as number);
-                    if(brightness >= context.maxBrightness) {
-                        brightness = context.brightnessExceedJumpTo;
-                    }
                     if(accessory.context.brightness === brightness) {
                         callback(undefined);
                         return;
@@ -150,7 +175,10 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     if(!this.checkAccessoryAvailability(accessory, callback)) {
                         return;
                     }
-                    callback(undefined, Math.min(accessory.context.maxBrightness, accessory.context.brightness));
+                    const context = accessory.context as LightbulbAccessoryInterface;
+                    const settings = BRIGHTNESS_ADJUSTABLE_SETTINGS[context.brightnessSettingIndex];
+                    const brightness = settings.getBrightness(Math.min(context.maxBrightness, context.brightness), settings);
+                    callback(undefined, brightness);
                 });
         }
     }
@@ -199,18 +227,20 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                 if(accessory.context.brightnessAdjustable) {
                     // Update new brightness rate when the accessory is on.
                     const brightness = item['arg2'];
-                    if(force) {
-                        const setting = this.findAdjustableBrightnessSetting(brightness);
+                    const index = this.findAdjustableBrightnessSettingIndex(brightness);
+                    const settings = BRIGHTNESS_ADJUSTABLE_SETTINGS[index];
 
-                        accessory.context.minBrightness = setting.minBrightness;
-                        accessory.context.maxBrightness = setting.maxBrightness;
-                        accessory.context.minSteps = setting.minSteps;
-                        accessory.context.brightnessExceedJumpTo = setting.brightnessExceedJumpTo;
+                    if(force) {
+                        accessory.context.minBrightness = settings.minBrightness;
+                        accessory.context.maxBrightness = settings.maxBrightness;
+                        accessory.context.minSteps = settings.minSteps;
+                        accessory.context.brightnessExceedJumpTo = settings.brightnessExceedJumpTo;
+                        accessory.context.brightnessSettingIndex = index;
                         this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
                             service.getCharacteristic(this.api.hap.Characteristic.Brightness)
                                 .setProps({
                                     minValue: 0,
-                                    maxValue: accessory.context.maxBrightness,
+                                    maxValue: 100,
                                     minStep: accessory.context.minSteps,
                                 });
                         });
@@ -221,10 +251,8 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
 
                         if(force) {
                             this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
-                                service.setCharacteristic(
-                                    this.api.hap.Characteristic.Brightness,
-                                    Math.min(accessory.context.maxBrightness, accessory.context.brightness)
-                                );
+                                const brightness = settings.getBrightness(Math.min(accessory.context.maxBrightness, accessory.context.brightness), settings)
+                                service.setCharacteristic(this.api.hap.Characteristic.Brightness, brightness);
                             });
                         }
                     }
@@ -256,7 +284,8 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                         maxBrightness: 100,
                         minBrightness: 0,
                         minSteps: 10,
-                        brightnessExceedJumpTo: 100
+                        brightnessExceedJumpTo: 100,
+                        brightnessSettingIndex: 0
                     });
                 }
                 this.client?.sendUnreliableRequest({
@@ -278,11 +307,13 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         });
     }
 
-    findAdjustableBrightnessSetting(brightness: string): BrightnessAdjustableSettings {
-        const setting = BRIGHTNESS_ADJUSTABLE_SETTINGS.find(setting => setting.condition(brightness));
-        if(setting) {
-            return setting;
+    findAdjustableBrightnessSettingIndex(brightness: string): number {
+        for(let i = 0; i < BRIGHTNESS_ADJUSTABLE_SETTINGS.length; i++) {
+            const settings = BRIGHTNESS_ADJUSTABLE_SETTINGS[i];
+            if(settings.condition(brightness)) {
+                return i;
+            }
         }
-        return BRIGHTNESS_ADJUSTABLE_SETTINGS[0];
+        return 0;
     }
 }
