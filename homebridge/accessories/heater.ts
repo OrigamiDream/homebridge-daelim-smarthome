@@ -162,9 +162,6 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
             const deviceID = item['uid'];
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
-                if(!this.checkForciblyRefreshable(accessory.context as HeaterAccessoryInterface, force)) {
-                    continue;
-                }
                 const active = item['arg1'] === 'on';
                 const desiredTemperature = parseInt(item['arg2']);
                 const currentTemperature = parseInt(item['arg3']);
