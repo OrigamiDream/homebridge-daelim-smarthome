@@ -15,6 +15,13 @@ export interface AccessoryInterface {
 }
 
 type ServiceType = WithUUID<typeof Service>;
+type UUIDCombinationGenerator = (context: AccessoryInterface) => string;
+
+const UUID_SEED_COMBINATIONS: UUIDCombinationGenerator[] = [
+    (context) => `${context.deviceID}`,
+    (context) => `${context.deviceID}-${context.displayName}`,
+    (context) => `${context.deviceID}-${context.displayName}-${context.accessoryType}`
+];
 
 export class Accessories<T extends AccessoryInterface> {
 
@@ -69,9 +76,28 @@ export class Accessories<T extends AccessoryInterface> {
     }
 
     addAccessory(context: T) {
-        const uuid = this.api.hap.uuid.generate(context.deviceID);
-        if(!this.accessories.find(accessory => accessory.UUID === uuid)) {
-            this.log.info("Adding new accessory: %s(%s)", context.displayName, context.deviceID);
+        // Verify cached accessory availability
+        for(const fn of UUID_SEED_COMBINATIONS) {
+            const uuid = this.api.hap.uuid.generate(fn(context));
+            const cachedAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+            if(cachedAccessory) {
+                cachedAccessory.context = context;
+                cachedAccessory.context.accessoryType = this.getDeviceType();
+                cachedAccessory.context.init = false;
+                return;
+            }
+        }
+        // Attempt to add new accessory to the platform
+        let index = 0;
+        let failed = false;
+        do {
+            const fn = UUID_SEED_COMBINATIONS[index];
+            const uuid = this.api.hap.uuid.generate(fn(context));
+            if(index > 0) {
+                this.log.info("Adding new accessory (%dth attempts): %s(%s)", index + 1, context.displayName, context.deviceID);
+            } else {
+                this.log.info("Adding new accessory: %s(%s)", context.displayName, context.deviceID);
+            }
             const accessory = new this.api.platformAccessory(context.displayName, uuid);
 
             let services = this.serviceTypes.map((serviceType) => {
@@ -82,15 +108,18 @@ export class Accessories<T extends AccessoryInterface> {
             accessory.context.accessoryType = this.getDeviceType();
             accessory.context.init = false;
 
-            this.configureAccessory(accessory, services);
-            this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ accessory ]);
-        } else {
-            this.accessories.filter(accessory => accessory.UUID === uuid).forEach(accessory => {
-                accessory.context = context;
-                accessory.context.accessoryType = this.getDeviceType();
-                accessory.context.init = false;
-            });
-        }
+            try {
+                this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ accessory ]);
+                this.configureAccessory(accessory, services);
+                failed = false;
+            } catch(e) {
+                this.log.debug("Failed to register accessory due to UUID conflicts");
+                failed = true;
+                index++;
+            }
+        } while(failed && UUID_SEED_COMBINATIONS.length > index);
+
+        this.log.error("The accessory %s(%s) cannot be registered for group '%s'", context.displayName, context.deviceID, this.getDeviceType());
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
