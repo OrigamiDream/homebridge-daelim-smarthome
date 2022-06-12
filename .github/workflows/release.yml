@@ -4,8 +4,8 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - 'master'
+    tags-ignore:
+      - 'v**.beta*'
 
 jobs:
   deploy:
