@@ -119,7 +119,9 @@ export class Accessories<T extends AccessoryInterface> {
             }
         } while(failed && UUID_SEED_COMBINATIONS.length > index);
 
-        this.log.error("The accessory %s(%s) cannot be registered for group '%s'", context.displayName, context.deviceID, this.getDeviceType());
+        if(failed) {
+            this.log.error("The accessory %s(%s) cannot be registered for group '%s'", context.displayName, context.deviceID, this.getDeviceType());
+        }
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
