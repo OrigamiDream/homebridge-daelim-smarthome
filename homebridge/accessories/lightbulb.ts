@@ -199,8 +199,9 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         const items = body['item'] || [];
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
+            const deviceType = item['device'];
             const deviceID = item['uid'];
-            if(accessory.context.deviceID === deviceID) {
+            if(accessory.context.deviceID === deviceID && this.getDeviceType() === deviceType) {
                 return true;
             }
         }
@@ -210,6 +211,10 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
     refreshLightbulbState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
+            const deviceType = item['device'];
+            if(deviceType !== this.getDeviceType()) {
+                continue;
+            }
             const deviceID = item['uid'];
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
@@ -259,39 +264,23 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
     }
 
     registerListeners() {
-        this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
-            const controls = body['controlinfo'];
-            const lights = controls['light'];
-            if(lights) {
-                for(let i = 0; i < lights.length; i++) {
-                    const light = lights[i];
-
-                    const deviceID = light['uid'];
-                    const displayName = light['uname'];
-
-                    const brightnessAdjustable = light['dimming'] === 'y';
-
-                    this.addAccessory({
-                        deviceID: deviceID,
-                        displayName: displayName,
-                        init: false,
-                        brightness: 0,
-                        brightnessAdjustable: brightnessAdjustable,
-                        on: false,
-                        maxBrightness: 100,
-                        minBrightness: 0,
-                        minSteps: 10,
-                        brightnessExceedJumpTo: 100,
-                        brightnessSettingIndex: 0
-                    });
-                }
-                this.client?.sendUnreliableRequest({
-                    type: 'query',
-                    item: [{
-                        device: 'light',
-                        uid: 'All'
-                    }]
-                }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+        this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (body) => {
+            const devices = await this.findControllableAccessories(body['controlinfo'], ['dimming']);
+            for(const { deviceID, displayName, info } of devices) {
+                const brightnessAdjustable = info['dimming'] === 'y';
+                this.addAccessory({
+                    deviceID: deviceID,
+                    displayName: displayName,
+                    init: false,
+                    brightness: 0,
+                    brightnessAdjustable: brightnessAdjustable,
+                    on: false,
+                    maxBrightness: 100,
+                    minBrightness: 0,
+                    minSteps: 10,
+                    brightnessExceedJumpTo: 100,
+                    brightnessSettingIndex: 0
+                });
             }
         });
 

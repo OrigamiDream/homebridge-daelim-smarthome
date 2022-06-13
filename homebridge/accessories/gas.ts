@@ -120,8 +120,9 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
         const items = body['item'] || [];
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
+            const deviceType = item['device'];
             const deviceID = item['uid'];
-            if(accessory.context.deviceID === deviceID) {
+            if(accessory.context.deviceID === deviceID && this.getDeviceType() === deviceType) {
                 return true;
             }
         }
@@ -131,6 +132,10 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
     refreshGasValveState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
+            const deviceType = item['device'];
+            if(deviceType !== this.getDeviceType()) {
+                continue;
+            }
             const deviceID = item['uid'];
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
@@ -148,30 +153,15 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
     }
 
     registerListeners() {
-        this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
-            const controls = body['controlinfo'];
-            const gases = controls['gas'];
-            if(gases) {
-                for(let i = 0; i < gases.length; i++) {
-                    const gas = gases[i];
-
-                    const deviceID = gas['uid'];
-                    const displayName = gas['uname'];
-
-                    this.addAccessory({
-                        deviceID: deviceID,
-                        displayName: displayName,
-                        init: false,
-                        on: true // active as a default since this is off-only valve
-                    });
-                }
-                this.client?.sendUnreliableRequest({
-                    type: 'query',
-                    item: [{
-                        device: 'gas',
-                        uid: 'All'
-                    }]
-                }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+        this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (body) => {
+            const devices = await this.findControllableAccessories(body['controlinfo']);
+            for(const { deviceID, displayName } of devices) {
+                this.addAccessory({
+                    deviceID: deviceID,
+                    displayName: displayName,
+                    init: false,
+                    on: true // active as a default since this is off-only valve
+                });
             }
         })
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
