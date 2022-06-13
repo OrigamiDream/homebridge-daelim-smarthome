@@ -75,6 +75,66 @@ export class Accessories<T extends AccessoryInterface> {
         return undefined;
     }
 
+    protected async findControllableAccessories(controlInfo: any, keys: any[] = []): Promise<any[]> {
+        const devices = controlInfo[this.getDeviceType()];
+        if(!devices) {
+            return [];
+        }
+        const infos: { [key: string]: any } = {};
+        for(let i = 0; i < devices.length; i++) {
+            const device = devices[i];
+            const values: { [key: string]: string } = {};
+            for(const key of keys) {
+                values[key] = device[key];
+            }
+            infos[device['uid']] = {
+                displayName: device['uname'],
+                values: values
+            };
+        }
+        const response = await this.client?.sendDeferredRequest({
+            type: 'query',
+            item: [{
+                device: this.getDeviceType(),
+                uid: 'All'
+            }]
+        }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST, DeviceSubTypes.QUERY_RESPONSE, body => {
+            const items = body['item'] || [];
+            for(let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const deviceType = item['device'];
+                if(deviceType === this.getDeviceType()) {
+                    return true;
+                }
+            }
+            return false;
+        }).catch(_ => undefined);
+        if(response === undefined) {
+            return [];
+        }
+        const items = response['item'] || [];
+        const accessories = [];
+        for(let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const device = item['device'];
+            if(device !== this.getDeviceType()) {
+                continue;
+            }
+            const deviceID = item['uid'];
+            if(!(deviceID in infos)) {
+                continue;
+            }
+            const { displayName, values } = infos[deviceID];
+
+            accessories.push({
+                deviceID: deviceID,
+                displayName: displayName,
+                info: values,
+            });
+        }
+        return accessories;
+    }
+
     addAccessory(context: T) {
         // Verify cached accessory availability
         for(const fn of UUID_SEED_COMBINATIONS) {
@@ -84,6 +144,8 @@ export class Accessories<T extends AccessoryInterface> {
                 cachedAccessory.context = context;
                 cachedAccessory.context.accessoryType = this.getDeviceType();
                 cachedAccessory.context.init = false;
+
+                this.log.info("Restoring cached accessory: %s(%s)", context.displayName, context.deviceID);
                 return;
             }
         }

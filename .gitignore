@@ -1,5 +1,8 @@
 # ------------- Defaults ------------- #
 
+# Homebridge
+.homebridge*
+
 # macOS
 .DS_Store
 
