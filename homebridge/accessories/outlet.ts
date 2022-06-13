@@ -92,8 +92,9 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
         const items = body['item'] || [];
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
+            const deviceType = item['device'];
             const deviceID = item['uid'];
-            if(accessory.context.deviceID === deviceID) {
+            if(accessory.context.deviceID === deviceID && this.getDeviceType() === deviceType) {
                 return true;
             }
         }
@@ -103,6 +104,10 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
     refreshOutletState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
+            const deviceType = item['device'];
+            if(deviceType !== this.getDeviceType()) {
+                continue;
+            }
             const deviceID = item['uid'];
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
@@ -118,30 +123,15 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
     }
 
     registerListeners() {
-        this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
-            const controls = body['controlinfo'];
-            const outlets = controls['wallsocket'];
-            if(outlets) {
-                for(let i = 0; i < outlets.length; i++) {
-                    const outlet = outlets[i];
-
-                    const deviceID = outlet['uid'];
-                    const displayName = outlet['uname'];
-
-                    this.addAccessory({
-                        deviceID: deviceID,
-                        displayName: displayName,
-                        init: false,
-                        on: false
-                    });
-                }
-                this.client?.sendUnreliableRequest({
-                    type: 'query',
-                    item: [{
-                        device: 'wallsocket',
-                        uid: 'All'
-                    }]
-                }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+        this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (body) => {
+            const devices = await this.findControllableAccessories(body['controlinfo']);
+            for(const { deviceID, displayName } of devices) {
+                this.addAccessory({
+                    deviceID: deviceID,
+                    displayName: displayName,
+                    init: false,
+                    on: false
+                });
             }
         });
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {

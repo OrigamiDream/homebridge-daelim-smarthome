@@ -209,12 +209,14 @@ export class NetworkHandler {
             this.log.debug(`<=== HEAD(${header.toString()}) :: ${JSON.stringify(packet.getJSONBody())}`);
             if(header.getError() === Errors.SUCCESS) {
                 if(this.deferredRequests.length > 0) {
+                    let timedOut = 0;
                     let index = 0;
                     while(index < this.deferredRequests.length) {
                         const request = this.deferredRequests[index];
                         if(Date.now() - request.timestamp > 1000 * 10) {
                             // 10 seconds timeout
-                            request.reject('Deferred request time out.');
+                            timedOut++;
+                            request.resolve({ item: [] });
                             this.deferredRequests.splice(index, 1);
                             continue;
                         }
@@ -226,6 +228,9 @@ export class NetworkHandler {
                             continue;
                         }
                         index++;
+                    }
+                    if(timedOut > 0) {
+                        this.log.debug('%d deferred requests have timed out for 10+ seconds', timedOut);
                     }
                 }
                 for(const listener of this.listeners) {
