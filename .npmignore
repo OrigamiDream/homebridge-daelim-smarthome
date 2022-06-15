@@ -5,6 +5,9 @@ core/
 complexes/
 branding/
 
+# Ignore temporary volume
+.homebridge*
+
 # ------------- Defaults ------------- #
 
 # macOS

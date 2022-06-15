@@ -4,11 +4,17 @@
   "singular": true,
   "customUi": true,
   "customUiPath": "./dist/homebridge-ui",
-  "headerDisplay": "Homebridge plugin for Daelim SmartHome",
+  "headerDisplay": "Homebridge plugin for DL E&C SmartHome",
   "footerDisplay": "For a detailed description, see the [GitHub](https://github.com/OrigamiDream/homebridge-daelim-smarthome.git)",
   "schema": {
     "type": "object",
     "properties": {
+      "name": {
+        "description": "The name of the plugin",
+        "type": "string",
+        "required": true,
+        "default": "DL E&C"
+      },
       "region": {
         "description": "거주하는 지역을 선택하세요.",
         "type": "string",

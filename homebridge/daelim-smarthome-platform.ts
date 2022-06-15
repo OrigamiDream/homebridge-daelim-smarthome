@@ -32,7 +32,7 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
         this.log = log;
         this.api = api;
 
-        this.config = this.setupDaelimConfig(config);
+        this.config = this.configureCredentials(config);
 
         this.accessories.push(new LightbulbAccessories(this.log, this.api, this.config));
         this.accessories.push(new OutletAccessories(this.log, this.api, this.config));
@@ -40,14 +40,13 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
         this.accessories.push(new GasAccessories(this.log, this.api, this.config));
         this.accessories.push(new ElevatorAccessories(this.log, this.api, this.config));
 
-        log.info("Daelim-SmartHome finished initializing!");
-
         api.on(APIEvent.DID_FINISH_LAUNCHING, async () => {
-            await this.createDaelimSmarthomeService();
+            await this.createSmartHomeService();
+            log.info("DL E&C Smart Home did finished launching");
         });
     }
 
-    setupDaelimConfig(config: PlatformConfig): DaelimConfig | undefined {
+    configureCredentials(config: PlatformConfig): DaelimConfig | undefined {
         for(const key in config) {
             const value = config[key];
             if(value === undefined || !value) {
@@ -77,7 +76,7 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
         }
     }
 
-    async createDaelimSmarthomeService() {
+    async createSmartHomeService() {
         if(!this.config?.uuid) {
             this.log.warn("Config parameters are not set. No accessories.");
             return;
