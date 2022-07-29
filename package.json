@@ -18,7 +18,8 @@
     "prepublishOnly": "npm run build",
     "postpublish": "npm run clean",
     "refresh": "node complexes/index.js",
-    "interface": "node homebridge-ui/server.js"
+    "interface": "node homebridge-ui/server.js",
+    "deployPi": "npm run build && python3 scripts/deploy.py"
   },
   "author": "OrigamiDream <crystal_vc31@naver.com>",
   "engines": {
