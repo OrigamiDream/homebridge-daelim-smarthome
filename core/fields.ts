@@ -206,5 +206,15 @@ export enum EtceteraSubTypes {
 }
 
 export enum ApplicationLogSubTypes {
-    // TODO: These types are not necessary on HomeBridge
+
+    WEATHER_REQUEST = 1,
+    LIVING_REQUEST = 2,
+    MAIN_MENU_REQUEST = 3,
+    SMART_ELECTRONICS_REQUEST = 4,
+    EMS_ELECTRONICS_REQUEST = 5,
+    EMS_GAS_REQUEST = 6,
+    EMS_WATER_REQUEST = 7,
+    EMS_HOTWATER_REQUEST = 8,
+    EMS_HEATING_REQUEST = 9
+
 }
