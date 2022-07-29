@@ -3,7 +3,7 @@ import {DaelimConfig} from "./interfaces/daelim-config";
 import {Utils} from "./utils";
 import {Logging} from "homebridge";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
-import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "./fields";
+import {ApplicationLogSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "./fields";
 import {Complex} from "./interfaces/complex";
 
 interface ClientAuthorization {
@@ -50,7 +50,7 @@ export class Client {
             return;
         }
         this.lastKeepAliveTimestamp = currentTime;
-        this.sendUnreliableRequest({}, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+        this.sendUnreliableRequest({}, Types.APPLICATION_LOG, ApplicationLogSubTypes.MAIN_MENU_REQUEST);
         this.log('Attempted to check the socket connection is alive');
     }
 
