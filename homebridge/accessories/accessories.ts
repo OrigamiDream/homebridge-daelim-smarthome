@@ -136,6 +136,11 @@ export class Accessories<T extends AccessoryInterface> {
     }
 
     addAccessory(context: T) {
+        if(this.client?.isNetworkRefreshing()) {
+            // This prevents changing the accessories to uninitialized state while refreshing the connection.
+            // Uninitialized state makes the accessories are no response in Home app.
+            return;
+        }
         // Verify cached accessory availability
         for(const fn of UUID_SEED_COMBINATIONS) {
             const uuid = this.api.hap.uuid.generate(fn(context));

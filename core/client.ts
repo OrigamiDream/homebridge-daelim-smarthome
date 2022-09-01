@@ -3,7 +3,7 @@ import {DaelimConfig} from "./interfaces/daelim-config";
 import {Utils} from "./utils";
 import {Logging} from "homebridge";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
-import {ApplicationLogSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "./fields";
+import {Errors, LoginSubTypes, SubTypes, Types} from "./fields";
 import {Complex} from "./interfaces/complex";
 
 interface ClientAuthorization {
@@ -27,6 +27,7 @@ export class Client {
     private complex?: Complex;
     private handler?: NetworkHandler;
     private isLoggedIn = false;
+    private isRefreshing = false;
     private lastKeepAliveTimestamp: number;
 
     constructor(log: Logging, config: DaelimConfig) {
@@ -50,8 +51,8 @@ export class Client {
             return;
         }
         this.lastKeepAliveTimestamp = currentTime;
-        this.sendUnreliableRequest({}, Types.APPLICATION_LOG, ApplicationLogSubTypes.MAIN_MENU_REQUEST);
-        this.log('Attempted to check the socket connection is alive');
+        this.log('Refreshing connection to MMF server');
+        this.refresh();
     }
 
     private getAuthorizationPIN(): string {
@@ -187,10 +188,27 @@ export class Client {
             this.sendCertificationRequest();
         };
         this.handler.onDisconnected = () => {
+            if(this.isRefreshing) {
+                return;
+            }
             this.isLoggedIn = false;
             this.log("Connection broken. Reconnect to the server...");
             this.handler?.handle();
         };
+    }
+
+    refresh() {
+        this.log.debug("Refreshing MMF client service...");
+        this.isRefreshing = true;
+        this.handler?.handle();
+        setTimeout(() => {
+            this.isRefreshing = false;
+            this.log("Refreshing has been finished");
+        }, 5000);
+    }
+
+    isNetworkRefreshing() {
+        return this.isRefreshing;
     }
 
     startService() {
