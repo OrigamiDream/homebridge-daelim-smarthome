@@ -128,7 +128,7 @@ export class NetworkHandler {
 
     disconnect() {
         if(this.socket) {
-            this.socket.end();
+            this.socket.destroy();
             this.socket = undefined;
         }
     }
