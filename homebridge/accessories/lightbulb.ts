@@ -5,7 +5,8 @@ import {
     CharacteristicEventTypes,
     CharacteristicGetCallback,
     CharacteristicSetCallback,
-    CharacteristicValue, Formats,
+    CharacteristicValue,
+    Formats,
     Logging,
     PlatformAccessory,
     Service
@@ -22,6 +23,7 @@ interface LightbulbAccessoryInterface extends AccessoryInterface {
     minSteps: number
     brightnessExceedJumpTo: number
     brightnessSettingIndex: number
+    numAttemptsForBrightness: number
 
 }
 
@@ -33,14 +35,36 @@ interface BrightnessAdjustableSettings {
     minSteps: number
     brightnessExceedJumpTo: number
 
-    getBrightness: (brightness: number, settings: BrightnessAdjustableSettings) => number,
-    fromBrightness: (brightness: CharacteristicValue, settings: BrightnessAdjustableSettings) => number,
+    getBrightness: (brightness: number, settings: BrightnessAdjustableSettings) => number // DL E&C → HomeKit
+    fromBrightness: (brightness: CharacteristicValue, settings: BrightnessAdjustableSettings) => number // HomeKit → DL E&C
 
 }
 
+function isFewerLevelBrightness(response?: any): boolean {
+    if(response === undefined) {
+        return false;
+    }
+    return response["uid"].startsWith("Lt");
+}
+
+function fixLevelStatic(level: number): number {
+    let fixedLevel = Math.round(level);
+    if(fixedLevel < 1) {
+        fixedLevel = 0;
+    } else if (fixedLevel < 2) {
+        fixedLevel = 1;
+    } else if(fixedLevel < 3) {
+        fixedLevel = 3;
+    } else {
+        fixedLevel = 5;
+    }
+    return fixedLevel;
+}
+
+const MAX_NUM_ATTEMPTS_BRIGHTNESS = 5;
 const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
     {
-        condition: (brightness) => brightness !== undefined && brightness.length >= 2, // 00, 10, 20, ...
+        condition: (brightness) => brightness.length >= 2, // 00, 10, 20, ...
         maxBrightness: 80,
         minBrightness: 10,
         minSteps: 100 / 8, // 10,
@@ -58,25 +82,29 @@ const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
         }
     },
     {
-        condition: (brightness, response) => {
-            // 0, 1, 2, ...
-            return (brightness !== undefined && brightness.length == 1) ||
-                   ('arg2' in response && response['uid'].startsWith('Lt'));
-        },
-        maxBrightness: 7,
-        minBrightness: 1,
-        minSteps: 100 / 7, // 1
-        brightnessExceedJumpTo: 7,
+        condition: (brightness, response) => brightness.length == 1 || isFewerLevelBrightness(response), // 0, 1, 3, 5
+        maxBrightness: 100,
+        minBrightness: 10,
+        minSteps: 100 / 3,
+        brightnessExceedJumpTo: 100,
 
         getBrightness: (brightness, settings) => {
-            return brightness * settings.minSteps;
+            // DL E&C → HomeKit
+            let level = brightness;
+            if(String(brightness).length >= 2) {
+                level = parseInt(String(brightness).substring(0, 1));
+            }
+            level = Math.min(Math.round(level / 5 * 3), 3);
+            return level * settings.minSteps;
         },
         fromBrightness: (brightness, settings) => {
+            // HomeKit → DL E&C
             const level = (brightness as number) / settings.minSteps;
-            if(level >= settings.maxBrightness) {
-                return settings.brightnessExceedJumpTo;
+            const fixedLevel = fixLevelStatic(level);
+            if(fixedLevel >= settings.maxBrightness) {
+                return settings.brightnessExceedJumpTo * 10;
             }
-            return level;
+            return fixedLevel * 10;
         }
     }
 ]
@@ -193,8 +221,9 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             uid: accessory.context.deviceID,
             arg1: isActive ? "on" : "off"
         };
-        if(isActive) {
-            item["arg2"] = String(accessory.context.brightness)
+        if(isActive && accessory.context.brightnessAdjustable) {
+            item["arg2"] = String(accessory.context.brightness);
+            item["arg3"] = "y";
         }
         return item;
     }
@@ -231,15 +260,23 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                 }
 
                 if(accessory.context.brightnessAdjustable) {
+                    if(!('arg2' in item)) {
+                        accessory.context.numAttemptsForBrightness += 1;
+                        if(accessory.context.numAttemptsForBrightness > MAX_NUM_ATTEMPTS_BRIGHTNESS) {
+                            this.log.warn("Failed to fetch brightness info from device %s", deviceID);
+                            return;
+                        }
+                        this.log.debug('%dth attempt for invalid brightness info from device %s', deviceID);
+                        this.client?.sendUnreliableRequest({
+                            type: 'query',
+                            uid: 'All'
+                        }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+                        return;
+                    }
                     // Update new brightness rate when the accessory is on.
                     let brightness = item['arg2'];
                     const index = this.findAdjustableBrightnessSettingIndex(brightness, item);
                     const settings = BRIGHTNESS_ADJUSTABLE_SETTINGS[index];
-
-                    if(brightness === undefined) {
-                        this.log.warn("Brightness info is not available from device %s", deviceID);
-                        brightness = "0";
-                    }
 
                     if(force) {
                         accessory.context.minBrightness = settings.minBrightness;
@@ -288,7 +325,8 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                     minBrightness: 0,
                     minSteps: 10,
                     brightnessExceedJumpTo: 100,
-                    brightnessSettingIndex: 0
+                    brightnessSettingIndex: 0,
+                    numAttemptsForBrightness: 1,
                 });
             }
         });
