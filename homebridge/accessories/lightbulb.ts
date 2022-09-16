@@ -269,7 +269,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                         this.log.debug('%dth attempt for invalid brightness info from device %s', deviceID);
                         this.client?.sendUnreliableRequest({
                             type: 'query',
-                            uid: 'All'
+                            uid: deviceID,
                         }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
                         return;
                     }
