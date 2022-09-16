@@ -27,7 +27,7 @@ interface LightbulbAccessoryInterface extends AccessoryInterface {
 
 interface BrightnessAdjustableSettings {
 
-    condition: (brightness: string) => boolean
+    condition: (brightness: string, response?: any) => boolean
     maxBrightness: number
     minBrightness: number
     minSteps: number
@@ -40,7 +40,7 @@ interface BrightnessAdjustableSettings {
 
 const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
     {
-        condition: brightness => brightness.length >= 2, // 00, 10, 20, ...
+        condition: (brightness) => brightness !== undefined && brightness.length >= 2, // 00, 10, 20, ...
         maxBrightness: 80,
         minBrightness: 10,
         minSteps: 100 / 8, // 10,
@@ -58,7 +58,11 @@ const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
         }
     },
     {
-        condition: brightness => brightness.length == 1, // 0, 1, 2, ...
+        condition: (brightness, response) => {
+            // 0, 1, 2, ...
+            return (brightness !== undefined && brightness.length == 1) ||
+                   ('arg2' in response && response['uid'].startsWith('Lt'));
+        },
         maxBrightness: 7,
         minBrightness: 1,
         minSteps: 100 / 7, // 1
@@ -228,9 +232,14 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
 
                 if(accessory.context.brightnessAdjustable) {
                     // Update new brightness rate when the accessory is on.
-                    const brightness = item['arg2'];
-                    const index = this.findAdjustableBrightnessSettingIndex(brightness);
+                    let brightness = item['arg2'];
+                    const index = this.findAdjustableBrightnessSettingIndex(brightness, item);
                     const settings = BRIGHTNESS_ADJUSTABLE_SETTINGS[index];
+
+                    if(brightness === undefined) {
+                        this.log.warn("Brightness info is not available from device %s", deviceID);
+                        brightness = "0";
+                    }
 
                     if(force) {
                         accessory.context.minBrightness = settings.minBrightness;
@@ -293,10 +302,10 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         });
     }
 
-    findAdjustableBrightnessSettingIndex(brightness: string): number {
+    findAdjustableBrightnessSettingIndex(brightness: string, response?: any): number {
         for(let i = 0; i < BRIGHTNESS_ADJUSTABLE_SETTINGS.length; i++) {
             const settings = BRIGHTNESS_ADJUSTABLE_SETTINGS[i];
-            if(settings.condition(brightness)) {
+            if(settings.condition(brightness, response)) {
                 return i;
             }
         }
