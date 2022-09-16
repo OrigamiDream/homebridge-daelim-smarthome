@@ -266,10 +266,13 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                             this.log.warn("Failed to fetch brightness info from device %s", deviceID);
                             return;
                         }
-                        this.log.debug('%dth attempt for invalid brightness info from device %s', deviceID);
+                        this.log.debug('%dth attempt for invalid brightness info from device %s', accessory.context.numAttemptsForBrightness, deviceID);
                         this.client?.sendUnreliableRequest({
                             type: 'query',
-                            uid: deviceID,
+                            item: [{
+                                device: 'light',
+                                uid: deviceID,
+                            }]
                         }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
                         return;
                     }
