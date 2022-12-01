@@ -69,7 +69,11 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
 
         service.getCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState)
             .setProps({
-                maxValue: this.api.hap.Characteristic.CurrentHeaterCoolerState.HEATING,
+                validValues: [
+                    this.api.hap.Characteristic.CurrentHeaterCoolerState.INACTIVE,
+                    this.api.hap.Characteristic.CurrentHeaterCoolerState.IDLE,
+                    this.api.hap.Characteristic.CurrentHeaterCoolerState.HEATING,
+                ],
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 if(!this.checkAccessoryAvailability(accessory, callback)) {
@@ -80,8 +84,9 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
 
         service.getCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState)
             .setProps({
-                minValue: this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT,
-                maxValue: this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT,
+                validValues: [
+                    this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT,
+                ],
             })
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 // NOTE: No need to update heater state
