@@ -1,4 +1,5 @@
 import fetch from "node-fetch";
+import {version} from "../package.json";
 import {
     ApplicationLogSubTypes,
     DeviceSubTypes,
@@ -15,6 +16,15 @@ import {
 } from "./fields";
 import {Complex, ComplexInfo} from "./interfaces/complex";
 
+export interface SemanticVersion {
+    major: number,
+    minor: number,
+    patch: number,
+    beta: number,
+    toString(): string,
+    isNewerThan(spec: SemanticVersion): boolean,
+}
+
 export class Utils {
 
     public static PLUGIN_NAME = "homebridge-daelim-smarthome";
@@ -22,6 +32,61 @@ export class Utils {
     public static MANUFACTURER_NAME = "DL E&C Co.,Ltd.";
 
     public static COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/complexes.json";
+
+    static createSemanticVersion(major: number, minor: number, patch: number, beta: number = -1): SemanticVersion {
+        return {
+            major, minor, patch, beta,
+            toString(): string {
+                let string = major + "." + minor + "." + patch;
+                if(beta !== -1) {
+                    string += "-beta." + beta;
+                }
+                return string;
+            },
+            isNewerThan(spec: SemanticVersion): boolean {
+                const a = [this.major, this.minor, this.patch]
+                const b = [spec.major, spec.minor, spec.patch]
+                for(let i = 0; i < a.length; i++) {
+                    if(a[i] > b[i]) {
+                        return true;
+                    } else if (a[i] < b[i]) {
+                        return false;
+                    }
+                }
+                if(this.beta === -1 && spec.beta !== -1) {
+                    // 1.0.0 > 1.0.0-beta.1 == true
+                    return true;
+                } else if(this.beta !== -1 && spec.beta === -1) {
+                    // 1.0.0-beta.1 > 1.0.0 == false
+                    return false;
+                } else if(this.beta !== -1 && spec.beta !== -1 && this.beta > spec.beta) {
+                    // 1.0.0-beta.2 > 1.0.0-beta.1 == true
+                    return true;
+                }
+                return false;
+            }
+        };
+    }
+
+    static parseSemanticVersion(version: string): SemanticVersion {
+        let beta = -1;
+        if(version.indexOf("-beta.") !== -1) {
+            const splits = version.split("-beta.");
+            version = splits[0];
+            beta = parseInt(splits[1]);
+        }
+        const splits = version.split(".");
+        return Utils.createSemanticVersion(
+            parseInt(splits[0]),
+            parseInt(splits[1]),
+            parseInt(splits[2]),
+            beta
+        );
+    }
+
+    static currentSemanticVersion(): SemanticVersion {
+        return Utils.parseSemanticVersion(version);
+    }
 
     static arraycopy(src: Uint8Array, srcPos: number, dst: Uint8Array, dstPos: number, length: number) {
         for(let i = 0; i < length; i++) {

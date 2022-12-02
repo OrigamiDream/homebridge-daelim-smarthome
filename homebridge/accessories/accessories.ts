@@ -10,18 +10,16 @@ export interface AccessoryInterface {
     deviceID: string,
     displayName: string,
     accessoryType?: string,
-    init: boolean
+    init: boolean,
+    version?: string,
 
 }
 
 type ServiceType = WithUUID<typeof Service>;
 type UUIDCombinationGenerator = (context: AccessoryInterface) => string;
 
-const UUID_SEED_COMBINATIONS: UUIDCombinationGenerator[] = [
-    (context) => `${context.deviceID}`,
-    (context) => `${context.deviceID}-${context.displayName}`,
-    (context) => `${context.deviceID}-${context.displayName}-${context.accessoryType}`
-];
+const OLD_UUID_COMBINATION: UUIDCombinationGenerator = (context) => `${context.deviceID}`;
+const NEW_UUID_COMBINATION: UUIDCombinationGenerator = (context) => `${context.deviceID}-${context.displayName}-${context.accessoryType}`;
 
 export class Accessories<T extends AccessoryInterface> {
 
@@ -141,54 +139,43 @@ export class Accessories<T extends AccessoryInterface> {
             // Uninitialized state makes the accessories are no response in Home app.
             return;
         }
-        // Verify cached accessory availability
-        for(const fn of UUID_SEED_COMBINATIONS) {
-            const uuid = this.api.hap.uuid.generate(fn(context));
+        // Support backward compatibility
+        const generators = [OLD_UUID_COMBINATION, NEW_UUID_COMBINATION];
+        for(let i = 0; i < generators.length; i++) {
+            const generate = generators[i];
+            const uuid = this.api.hap.uuid.generate(generate(context));
             const cachedAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+            const isLegacy = i === 0;
+
             if(cachedAccessory) {
+                const version = cachedAccessory.context.version;
                 cachedAccessory.context = context;
+                cachedAccessory.context.version = version; // Always keep first-initial version for compatibility management
                 cachedAccessory.context.accessoryType = this.getDeviceType();
                 cachedAccessory.context.init = false;
 
-                this.log.info("Restoring cached accessory: %s(%s)", context.displayName, context.deviceID);
-                return;
+                if(isLegacy) {
+                    this.log.info("Restoring cached legacy accessory: %s(%s)", context.displayName, context.deviceID);
+                } else {
+                    this.log.info("Restoring cached accessory: %s(%s)", context.displayName, context.deviceID);
+                }
+                return true;
             }
         }
-        // Attempt to add new accessory to the platform
-        let index = 0;
-        let failed = false;
-        do {
-            const fn = UUID_SEED_COMBINATIONS[index];
-            const uuid = this.api.hap.uuid.generate(fn(context));
-            if(index > 0) {
-                this.log.info("Adding new accessory (%dth attempts): %s(%s)", index + 1, context.displayName, context.deviceID);
-            } else {
-                this.log.info("Adding new accessory: %s(%s)", context.displayName, context.deviceID);
-            }
-            const accessory = new this.api.platformAccessory(context.displayName, uuid);
+        const uuid = this.api.hap.uuid.generate(NEW_UUID_COMBINATION(context));
+        this.log.info("Adding new accessory: %s(%s)", context.displayName, context.deviceID);
+        const accessory = new this.api.platformAccessory(context.displayName, uuid);
 
-            let services = this.serviceTypes.map((serviceType) => {
-                return accessory.getService(serviceType) || accessory.addService(serviceType, context.displayName);
-            })
+        let services = this.serviceTypes.map((serviceType) => {
+            return accessory.getService(serviceType) || accessory.addService(serviceType, context.displayName);
+        })
+        accessory.context = context;
+        accessory.context.version = Utils.currentSemanticVersion().toString();
+        accessory.context.accessoryType = this.getDeviceType();
+        accessory.context.init = false;
 
-            accessory.context = context;
-            accessory.context.accessoryType = this.getDeviceType();
-            accessory.context.init = false;
-
-            try {
-                this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ accessory ]);
-                this.configureAccessory(accessory, services);
-                failed = false;
-            } catch(e) {
-                this.log.debug("Failed to register accessory due to UUID conflicts");
-                failed = true;
-                index++;
-            }
-        } while(failed && UUID_SEED_COMBINATIONS.length > index);
-
-        if(failed) {
-            this.log.error("The accessory %s(%s) cannot be registered for group '%s'", context.displayName, context.deviceID, this.getDeviceType());
-        }
+        this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ accessory ]);
+        this.configureAccessory(accessory, services);
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {

@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2019",
+    "resolveJsonModule": true,
     "module": "CommonJS",
     "lib": [
       "ES2015",
