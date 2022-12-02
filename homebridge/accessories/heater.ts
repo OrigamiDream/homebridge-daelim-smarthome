@@ -83,6 +83,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
             });
 
         service.getCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState)
+            .setValue(this.getTargetHeaterCoolerState())
             .setProps({
                 validValues: [
                     this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT,
@@ -100,6 +101,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
             });
 
         service.getCharacteristic(this.api.hap.Characteristic.HeatingThresholdTemperature)
+            .setValue(this.getHeatingThresholdTemperature(accessory))
             .setProps({
                 minValue: HeaterAccessories.MINIMUM_TEMPERATURE,
                 maxValue: HeaterAccessories.MAXIMUM_TEMPERATURE,
@@ -134,7 +136,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 if(!this.checkAccessoryAvailability(accessory, callback)) {
                     return;
                 }
-                callback(undefined, Math.max(HeaterAccessories.MINIMUM_TEMPERATURE, Math.min(HeaterAccessories.MAXIMUM_TEMPERATURE, parseFloat(accessory.context.desiredTemperature))));
+                callback(undefined, this.getHeatingThresholdTemperature(accessory));
             });
 
         service.getCharacteristic(this.api.hap.Characteristic.CurrentTemperature)
@@ -186,6 +188,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                         service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
                         service.setCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState, this.getCurrentHeaterCoolerState(accessory));
                         service.setCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState, this.getTargetHeaterCoolerState());
+                        service.setCharacteristic(this.api.hap.Characteristic.HeatingThresholdTemperature, this.getHeatingThresholdTemperature(accessory));
                     });
                 }
             }
@@ -229,6 +232,10 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
 
     getTargetHeaterCoolerState(): CharacteristicValue {
         return this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT;
+    }
+
+    getHeatingThresholdTemperature(accessory: PlatformAccessory): CharacteristicValue {
+        return Math.max(HeaterAccessories.MINIMUM_TEMPERATURE, Math.min(HeaterAccessories.MAXIMUM_TEMPERATURE, parseFloat(accessory.context.desiredTemperature)))
     }
 
 }
