@@ -3,7 +3,7 @@ import {API, CharacteristicGetCallback, Logging, PlatformAccessory, Service} fro
 import {Utils} from "../../core/utils";
 import {WithUUID} from "hap-nodejs";
 import {DaelimConfig} from "../../core/interfaces/daelim-config";
-import {DeviceSubTypes, Types} from "../../core/fields";
+import {DeviceSubTypes, LoginSubTypes, Types} from "../../core/fields";
 
 export interface AccessoryInterface {
 
@@ -14,6 +14,14 @@ export interface AccessoryInterface {
     version?: string,
 
 }
+
+type EnqueuedAccessoryValues = { [key: string]: string };
+
+interface EnqueuedAccessoryInfo {
+    displayName: string,
+    values: EnqueuedAccessoryValues,
+}
+type EnqueuedAccessoryMap = { [deviceID: string]: EnqueuedAccessoryInfo };
 
 type ServiceType = WithUUID<typeof Service>;
 type UUIDCombinationGenerator = (context: AccessoryInterface) => string;
@@ -26,6 +34,7 @@ export class Accessories<T extends AccessoryInterface> {
     protected client?: Client;
 
     protected readonly accessories: PlatformAccessory[] = [];
+    protected readonly enqueuedAccessoriesCache: EnqueuedAccessoryMap = {};
 
     private lastInitRequestTimestamp: number = -1;
 
@@ -73,64 +82,71 @@ export class Accessories<T extends AccessoryInterface> {
         return undefined;
     }
 
-    protected async findControllableAccessories(controlInfo: any, keys: any[] = []): Promise<any[]> {
+    private enqueueControllableAccessories(controlInfo: any, keysToKeep: any[] = []) {
         const devices = controlInfo[this.getDeviceType()];
         if(!devices) {
-            return [];
+            return;
         }
-        const infos: { [key: string]: any } = {};
         for(let i = 0; i < devices.length; i++) {
             const device = devices[i];
-            const values: { [key: string]: string } = {};
-            for(const key of keys) {
+            const values: EnqueuedAccessoryValues = {};
+            for(const key of keysToKeep) {
                 values[key] = device[key];
             }
-            infos[device['uid']] = {
+            this.enqueuedAccessoriesCache[device['uid']] = {
                 displayName: device['uname'],
-                values: values
+                values: values,
             };
         }
-        const response = await this.client?.sendDeferredRequest({
+        this.client?.sendUnreliableRequest({
             type: 'query',
             item: [{
                 device: this.getDeviceType(),
                 uid: 'All'
             }]
-        }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST, DeviceSubTypes.QUERY_RESPONSE, body => {
-            const items = body['item'] || [];
-            for(let i = 0; i < items.length; i++) {
-                const item = items[i];
-                const deviceType = item['device'];
-                if(deviceType === this.getDeviceType()) {
-                    return true;
-                }
-            }
-            return false;
-        }).catch(_ => undefined);
-        if(response === undefined) {
-            return [];
-        }
-        const items = response['item'] || [];
-        const accessories = [];
+        }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+    }
+
+    private verifyAndFlushEnqueuedAccessories(body: any): any[] {
+        const items = body['item'] || [];
+        const filtered = [];
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
+            const deviceType = item['device'];
+            if(deviceType === this.getDeviceType()) {
+                filtered.push(item);
+            }
+        }
+        if(!filtered) {
+            return [];
+        }
+        const accessories = [];
+        for(let i = 0; i < filtered.length; i++) {
+            const item = filtered[i];
             const device = item['device'];
             if(device !== this.getDeviceType()) {
                 continue;
             }
             const deviceID = item['uid'];
-            if(!(deviceID in infos)) {
+            if(!(deviceID in this.enqueuedAccessoriesCache)) {
                 continue;
             }
-            const { displayName, values } = infos[deviceID];
-
+            const cache = this.enqueuedAccessoriesCache[deviceID];
             accessories.push({
                 deviceID: deviceID,
-                displayName: displayName,
-                info: values,
-            });
+                displayName: cache.displayName,
+                info: cache.values,
+            })
+            delete this.enqueuedAccessoriesCache[deviceID];
         }
         return accessories;
+    }
+
+    protected registerLazyAccessories(body: any, registrar: (deviceID: string, displayName: string, info?: any) => T) {
+        const devices = this.verifyAndFlushEnqueuedAccessories(body);
+        for(const device of devices) {
+            this.addAccessory(registrar(device.deviceID, device.displayName, device.info));
+        }
     }
 
     addAccessory(context: T) {
@@ -155,15 +171,15 @@ export class Accessories<T extends AccessoryInterface> {
                 cachedAccessory.context.init = false;
 
                 if(isLegacy) {
-                    this.log.info("Restoring cached legacy accessory: %s(%s)", context.displayName, context.deviceID);
+                    this.log.info("Restoring cached legacy accessory: %s (%s, %s)", context.displayName, context.deviceID, this.getDeviceType());
                 } else {
-                    this.log.info("Restoring cached accessory: %s(%s)", context.displayName, context.deviceID);
+                    this.log.info("Restoring cached accessory: %s (%s, %s)", context.displayName, context.deviceID, this.getDeviceType());
                 }
                 return true;
             }
         }
         const uuid = this.api.hap.uuid.generate(NEW_UUID_COMBINATION(context));
-        this.log.info("Adding new accessory: %s(%s)", context.displayName, context.deviceID);
+        this.log.info("Adding new accessory: %s (%s, %s)", context.displayName, context.deviceID, this.getDeviceType());
         const accessory = new this.api.platformAccessory(context.displayName, uuid);
 
         let services = this.serviceTypes.map((serviceType) => {
@@ -226,6 +242,19 @@ export class Accessories<T extends AccessoryInterface> {
         }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
     }
 
+    matchesAccessoryDeviceID(accessory: PlatformAccessory, body: any): boolean {
+        const items = body['item'] || [];
+        for(let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const deviceType = item['device'];
+            const deviceID = item['uid'];
+            if(accessory.context.deviceID === deviceID && this.getDeviceType() === deviceType) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     findService(accessory: PlatformAccessory, serviceType: ServiceType, callback: (service: Service) => void): boolean {
         const service = accessory.getService(serviceType);
         if(service) {
@@ -248,6 +277,9 @@ export class Accessories<T extends AccessoryInterface> {
     }
 
     registerListeners() {
+        this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
+            this.enqueueControllableAccessories(body['controlinfo']);
+        });
     }
 
 }

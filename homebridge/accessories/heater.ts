@@ -9,7 +9,7 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
-import {DeviceSubTypes, LoginSubTypes, Types} from "../../core/fields";
+import {DeviceSubTypes, Types} from "../../core/fields";
 import {DaelimConfig} from "../../core/interfaces/daelim-config";
 
 interface HeaterAccessoryInterface extends AccessoryInterface {
@@ -151,19 +151,6 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
             });
     }
 
-    matchesAccessoryDeviceID(accessory: PlatformAccessory, body: any): boolean {
-        const items = body['item'] || [];
-        for(let i = 0; i < items.length; i++) {
-            const item = items[i];
-            const deviceType = item['device'];
-            const deviceID = item['uid'];
-            if(accessory.context.deviceID === deviceID && this.getDeviceType() === deviceType) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     refreshHeaterState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
@@ -196,20 +183,18 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
     }
 
     registerListeners() {
-        this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (body) => {
-            const devices = await this.findControllableAccessories(body['controlinfo']);
-            for(const { deviceID, displayName } of devices) {
-                this.addAccessory({
+        super.registerListeners();
+        this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
+            this.registerLazyAccessories(body, (deviceID, displayName) => {
+                return {
                     deviceID: deviceID,
                     displayName: displayName,
                     init: false,
                     active: false,
                     desiredTemperature: 0,
                     currentTemperature: 0
-                });
-            }
-        });
-        this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
+                }
+            })
             this.refreshHeaterState(body['item'] || [], true);
         });
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.INVOKE_RESPONSE, (body) => {
