@@ -140,14 +140,17 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
             });
 
         service.getCharacteristic(this.api.hap.Characteristic.CurrentTemperature)
+            .setValue(this.getCurrentTemperature(accessory))
             .setProps({
+                minValue: HeaterAccessories.MINIMUM_TEMPERATURE,
+                maxValue: HeaterAccessories.MAXIMUM_TEMPERATURE,
                 minStep: 1
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 if(!this.checkAccessoryAvailability(accessory, callback)) {
                     return;
                 }
-                callback(undefined, parseFloat(accessory.context.currentTemperature));
+                callback(undefined, this.getCurrentTemperature(accessory));
             });
     }
 
@@ -171,7 +174,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
                 accessory.context.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.HeaterCooler, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.CurrentTemperature, parseFloat(accessory.context.currentTemperature));
+                        service.setCharacteristic(this.api.hap.Characteristic.CurrentTemperature, this.getCurrentTemperature(accessory));
                         service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
                         service.setCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState, this.getCurrentHeaterCoolerState(accessory));
                         service.setCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState, this.getTargetHeaterCoolerState());
@@ -221,6 +224,10 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
 
     getHeatingThresholdTemperature(accessory: PlatformAccessory): CharacteristicValue {
         return Math.max(HeaterAccessories.MINIMUM_TEMPERATURE, Math.min(HeaterAccessories.MAXIMUM_TEMPERATURE, parseFloat(accessory.context.desiredTemperature)))
+    }
+
+    getCurrentTemperature(accessory: PlatformAccessory): CharacteristicValue {
+        return Math.max(HeaterAccessories.MINIMUM_TEMPERATURE, Math.min(HeaterAccessories.MAXIMUM_TEMPERATURE, parseFloat(accessory.context.currentTemperature)));
     }
 
 }
