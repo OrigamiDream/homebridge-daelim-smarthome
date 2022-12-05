@@ -162,11 +162,13 @@ export class Accessories<T extends AccessoryInterface> {
         const generators = [OLD_UUID_COMBINATION, NEW_UUID_COMBINATION];
         for(let i = 0; i < generators.length; i++) {
             const generate = generators[i];
-            const uuid = this.api.hap.uuid.generate(generate(context));
+            const seed = generate(context);
+            const uuid = this.api.hap.uuid.generate(seed);
             const cachedAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
             const isLegacy = i === 0;
 
             if(cachedAccessory) {
+                this.log.debug("Found cached UUID (%s) generated from %s %s", uuid, seed, isLegacy ? "(Legacy)" : "");
                 const version = cachedAccessory.context.version;
                 cachedAccessory.context = context;
                 cachedAccessory.context.version = version; // Always keep first-initial version for compatibility management
@@ -181,7 +183,9 @@ export class Accessories<T extends AccessoryInterface> {
                 return true;
             }
         }
-        const uuid = this.api.hap.uuid.generate(NEW_UUID_COMBINATION(context));
+        const seed = NEW_UUID_COMBINATION(context);
+        const uuid = this.api.hap.uuid.generate(seed);
+        this.log.debug("Generating new UUID (%s) from %s", uuid, seed);
         this.log.info("Adding new accessory: %s (%s, %s)", context.displayName, context.deviceID, this.getDeviceType());
         const accessory = new this.api.platformAccessory(context.displayName, uuid);
 
@@ -235,6 +239,7 @@ export class Accessories<T extends AccessoryInterface> {
             // Check init request when last init request time has passed for 1 minute
             return;
         }
+        this.log.debug("Sending a device query to ensure accessory initialization");
         this.lastInitRequestTimestamp = currentTime;
         this.client?.sendUnreliableRequest({
             type: 'query',
