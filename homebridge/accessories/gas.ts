@@ -66,7 +66,7 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
                             type: 'query',
                             item: [{
                                 device: 'gas',
-                                uid: 'All'
+                                uid: 'all'
                             }]
                         }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
                     }

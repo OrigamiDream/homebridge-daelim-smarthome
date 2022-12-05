@@ -102,7 +102,7 @@ export class Accessories<T extends AccessoryInterface> {
             type: 'query',
             item: [{
                 device: this.getDeviceType(),
-                uid: 'All'
+                uid: 'all'
             }]
         }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
     }
@@ -155,6 +155,9 @@ export class Accessories<T extends AccessoryInterface> {
             // Uninitialized state makes the accessories are no response in Home app.
             return;
         }
+        // accessory type must be specified for proper uuid generation
+        context.accessoryType = this.getDeviceType();
+
         // Support backward compatibility
         const generators = [OLD_UUID_COMBINATION, NEW_UUID_COMBINATION];
         for(let i = 0; i < generators.length; i++) {
@@ -237,7 +240,7 @@ export class Accessories<T extends AccessoryInterface> {
             type: 'query',
             item: [{
                 device: this.getDeviceType(),
-                uid: 'All'
+                uid: 'all'
             }]
         }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
     }
