@@ -93,7 +93,11 @@ export class NetworkHandler {
         if(!this.isConnected || !this.socket) {
             return false;
         }
-        this.log.debug(`===> ${JSON.stringify(body)}`);
+        const deepcopy = JSON.parse(JSON.stringify(body));
+        if("pw" in deepcopy) {
+            deepcopy["pw"] = "********";
+        }
+        this.log.debug(`===> ${JSON.stringify(deepcopy)}`);
         return this.socket?.write(Buffer.from(Packet.create(body, pin, type, subType, 1, 3).getBytes()));
     }
 
