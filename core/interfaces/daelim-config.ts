@@ -1,3 +1,5 @@
+import {SemanticVersion} from "../utils";
+
 export interface DaelimConfig {
 
     region: string,
@@ -5,5 +7,6 @@ export interface DaelimConfig {
     username: string,
     password: string,
     uuid: string,
+    version: SemanticVersion
 
 }
