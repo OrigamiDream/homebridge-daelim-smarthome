@@ -48,12 +48,14 @@ export class Accessories<T extends AccessoryInterface> {
      *                       First element must be device type from DL E&C API.
      *                       TODO: This is anti-pattern. Must be changed in near future.
      * @param serviceTypes Array of service types that would be used for registering accessory to Homebridge
+     * @param deviceInfoKeys String keys to keep from parsed device info in menu responses
      */
     constructor(protected readonly log: Logging,
                 protected readonly api: API,
                 protected readonly config: DaelimConfig | undefined,
                 protected readonly accessoryTypes: string[],
-                protected readonly serviceTypes: ServiceType[]) {
+                protected readonly serviceTypes: ServiceType[],
+                protected readonly deviceInfoKeys: string[] = []) {
         this.serviceTypes.push(api.hap.Service.AccessoryInformation);
     }
 
@@ -82,7 +84,7 @@ export class Accessories<T extends AccessoryInterface> {
         return undefined;
     }
 
-    private enqueueControllableAccessories(controlInfo: any, keysToKeep: any[] = []) {
+    private enqueueControllableAccessories(controlInfo: any, keysToKeep: string[] = []) {
         const devices = controlInfo[this.getDeviceType()];
         if(!devices) {
             return;
@@ -286,7 +288,7 @@ export class Accessories<T extends AccessoryInterface> {
 
     registerListeners() {
         this.client?.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (body) => {
-            this.enqueueControllableAccessories(body['controlinfo']);
+            this.enqueueControllableAccessories(body['controlinfo'], this.deviceInfoKeys);
         });
     }
 

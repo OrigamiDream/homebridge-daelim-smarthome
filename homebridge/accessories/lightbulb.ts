@@ -80,7 +80,7 @@ const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
 export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
 
     constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
-        super(log, api, config, ["light", "lightbulb"], [api.hap.Service.Lightbulb]);
+        super(log, api, config, ["light", "lightbulb"], [api.hap.Service.Lightbulb], ["dimming"]);
     }
 
     async identify(accessory: PlatformAccessory) {
@@ -254,7 +254,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         super.registerListeners();
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
             this.registerLazyAccessories(body, (deviceID, displayName, info) => {
-                const brightnessAdjustable = info['dimming'] === 'y';
+                const brightnessAdjustable = info["dimming"] === "y";
                 return {
                     deviceID: deviceID,
                     displayName: displayName,
