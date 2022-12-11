@@ -244,7 +244,7 @@
                     }
                 },
                 {
-                    "index": "137",
+                    "index": "139",
                     "region": "서울특별시",
                     "name": "e편한세상 청계센트럴포레",
                     "status": "LIVE",
@@ -256,7 +256,7 @@
                     }
                 },
                 {
-                    "index": "156",
+                    "index": "158",
                     "region": "서울특별시",
                     "name": "e편한세상 화랑대",
                     "status": "LIVE",
@@ -268,7 +268,7 @@
                     }
                 },
                 {
-                    "index": "157",
+                    "index": "159",
                     "region": "서울특별시",
                     "name": "아크로리버파크",
                     "status": "LIVE",
@@ -280,7 +280,7 @@
                     }
                 },
                 {
-                    "index": "158",
+                    "index": "160",
                     "region": "서울특별시",
                     "name": "아크로타워스퀘어",
                     "status": "LIVE",
@@ -292,7 +292,7 @@
                     }
                 },
                 {
-                    "index": "159",
+                    "index": "161",
                     "region": "서울특별시",
                     "name": "아크로리버뷰",
                     "status": "LIVE",
@@ -304,7 +304,7 @@
                     }
                 },
                 {
-                    "index": "160",
+                    "index": "162",
                     "region": "서울특별시",
                     "name": "아크로리버하임1블럭(101~107)",
                     "status": "LIVE",
@@ -316,7 +316,7 @@
                     }
                 },
                 {
-                    "index": "161",
+                    "index": "163",
                     "region": "서울특별시",
                     "name": "아크로리버하임2블럭(108~120)",
                     "status": "LIVE",
@@ -328,7 +328,7 @@
                     }
                 },
                 {
-                    "index": "164",
+                    "index": "166",
                     "region": "서울특별시",
                     "name": "e편한세상 반포 테스트",
                     "status": "DEV",
@@ -1099,7 +1099,7 @@
                     }
                 },
                 {
-                    "index": "138",
+                    "index": "140",
                     "region": "경기도",
                     "name": "e편한세상 초지역센트럴포레",
                     "status": "LIVE",
@@ -1111,7 +1111,7 @@
                     }
                 },
                 {
-                    "index": "141",
+                    "index": "143",
                     "region": "경기도",
                     "name": "e편한세상 캐널시티",
                     "status": "LIVE",
@@ -1123,7 +1123,7 @@
                     }
                 },
                 {
-                    "index": "142",
+                    "index": "144",
                     "region": "경기도",
                     "name": "e편한세상 태전2차 1단지",
                     "status": "LIVE",
@@ -1135,7 +1135,7 @@
                     }
                 },
                 {
-                    "index": "143",
+                    "index": "145",
                     "region": "경기도",
                     "name": "e편한세상 태전2차 2단지",
                     "status": "LIVE",
@@ -1147,7 +1147,7 @@
                     }
                 },
                 {
-                    "index": "144",
+                    "index": "146",
                     "region": "경기도",
                     "name": "e편한세상 태전2차 3단지",
                     "status": "LIVE",
@@ -1159,7 +1159,7 @@
                     }
                 },
                 {
-                    "index": "145",
+                    "index": "147",
                     "region": "경기도",
                     "name": "e편한세상 테라스 광교 3단지",
                     "status": "LIVE",
@@ -1171,7 +1171,7 @@
                     }
                 },
                 {
-                    "index": "146",
+                    "index": "148",
                     "region": "경기도",
                     "name": "e편한세상 테라스 광교 4단지",
                     "status": "LIVE",
@@ -1183,7 +1183,7 @@
                     }
                 },
                 {
-                    "index": "147",
+                    "index": "149",
                     "region": "경기도",
                     "name": "e편한세상 테라스오포2블록",
                     "status": "LIVE",
@@ -1195,7 +1195,7 @@
                     }
                 },
                 {
-                    "index": "148",
+                    "index": "150",
                     "region": "경기도",
                     "name": "e편한세상 테라스오포3블록",
                     "status": "LIVE",
@@ -1207,7 +1207,7 @@
                     }
                 },
                 {
-                    "index": "149",
+                    "index": "151",
                     "region": "경기도",
                     "name": "e편한세상 테라스오포4블록",
                     "status": "LIVE",
@@ -1219,7 +1219,7 @@
                     }
                 },
                 {
-                    "index": "150",
+                    "index": "152",
                     "region": "경기도",
                     "name": "e편한세상 테라스위례",
                     "status": "LIVE",
@@ -1231,7 +1231,7 @@
                     }
                 },
                 {
-                    "index": "151",
+                    "index": "153",
                     "region": "경기도",
                     "name": "e편한세상 태재1단지",
                     "status": "LIVE",
@@ -1243,7 +1243,7 @@
                     }
                 },
                 {
-                    "index": "152",
+                    "index": "154",
                     "region": "경기도",
                     "name": "e편한세상 태재2단지",
                     "status": "LIVE",
@@ -1255,7 +1255,7 @@
                     }
                 },
                 {
-                    "index": "153",
+                    "index": "155",
                     "region": "경기도",
                     "name": "e편한세상 평택용이 1단지",
                     "status": "LIVE",
@@ -1267,7 +1267,7 @@
                     }
                 },
                 {
-                    "index": "154",
+                    "index": "156",
                     "region": "경기도",
                     "name": "e편한세상 평택용이 2단지",
                     "status": "LIVE",
@@ -1279,7 +1279,7 @@
                     }
                 },
                 {
-                    "index": "155",
+                    "index": "157",
                     "region": "경기도",
                     "name": "e편한세상 한강신도시2차",
                     "status": "LIVE",
@@ -1729,7 +1729,7 @@
                     }
                 },
                 {
-                    "index": "139",
+                    "index": "141",
                     "region": "강원도",
                     "name": "e편한세상춘천한숲시티",
                     "status": "LIVE",
@@ -1842,7 +1842,7 @@
                     }
                 },
                 {
-                    "index": "136",
+                    "index": "138",
                     "region": "충청남도",
                     "name": "e편한세상 천안부성",
                     "status": "LIVE",
@@ -1919,7 +1919,7 @@
                     }
                 },
                 {
-                    "index": "132",
+                    "index": "133",
                     "region": "경상남도",
                     "name": "e편한세상 장유2차",
                     "status": "LIVE",
@@ -1931,7 +1931,7 @@
                     }
                 },
                 {
-                    "index": "134",
+                    "index": "136",
                     "region": "경상남도",
                     "name": "e편한세상 창원파크센트럴1단지",
                     "status": "LIVE",
@@ -1943,7 +1943,7 @@
                     }
                 },
                 {
-                    "index": "135",
+                    "index": "137",
                     "region": "경상남도",
                     "name": "e편한세상 창원파크센트럴2단지",
                     "status": "LIVE",
@@ -1991,10 +1991,243 @@
             ]
         },
         {
+            "region": "기타",
+            "complexes": [
+                {
+                    "index": "132",
+                    "region": "기타",
+                    "name": "e편한세상 일산 어반스카이[테스트]",
+                    "status": "LIVE",
+                    "serverIp": "115.144.67.52",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "고양시일산서구",
+                        "details": "일산2동"
+                    }
+                },
+                {
+                    "index": "134",
+                    "region": "기타",
+                    "name": "e편한세상 일산 어반스카이 오피스텔[테스트]",
+                    "status": "LIVE",
+                    "serverIp": "124.198.6.252",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "고양시일산서구",
+                        "details": "일산2동"
+                    }
+                },
+                {
+                    "index": "164",
+                    "region": "기타",
+                    "name": "e편한세상 CVNET모델하우스",
+                    "status": "LIVE",
+                    "serverIp": "119.194.107.91",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "서초구",
+                        "details": "반포본동"
+                    }
+                },
+                {
+                    "index": "165",
+                    "region": "기타",
+                    "name": "e편한세상 모델하우스",
+                    "status": "DEV",
+                    "serverIp": "220.79.251.67",
+                    "geolocation": {
+                        "state": "인천광역시",
+                        "city": "중구",
+                        "details": "영종동"
+                    }
+                },
+                {
+                    "index": "167",
+                    "region": "기타",
+                    "name": "e편한세상서울대입구3단지(테스트)",
+                    "status": "DEV",
+                    "serverIp": "211.240.121.51",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "관악구",
+                        "details": "신림동"
+                    }
+                },
+                {
+                    "index": "168",
+                    "region": "기타",
+                    "name": "e편한세상서울대입구4단지(테스트)",
+                    "status": "DEV",
+                    "serverIp": "211.240.121.59",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "관악구",
+                        "details": "신림동"
+                    }
+                },
+                {
+                    "index": "169",
+                    "region": "기타",
+                    "name": "계영정보통신테스트단지",
+                    "status": "LIVE",
+                    "serverIp": "210.120.112.18",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "안양시동안구",
+                        "details": "관양1동"
+                    }
+                },
+                {
+                    "index": "170",
+                    "region": "기타",
+                    "name": "대림 시연용",
+                    "status": "DEV",
+                    "serverIp": "223.171.35.162",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "종로구",
+                        "details": "종로1.2.3.4가동"
+                    }
+                },
+                {
+                    "index": "171",
+                    "region": "기타",
+                    "name": "대림코퍼기능테스트단지",
+                    "status": "LIVE",
+                    "serverIp": "223.171.35.162",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "중구",
+                        "details": "소공동"
+                    }
+                },
+                {
+                    "index": "172",
+                    "region": "기타",
+                    "name": "스마트홈 대림코퍼 시연용",
+                    "status": "LIVE",
+                    "serverIp": "223.171.66.42",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "중구",
+                        "details": "소공동"
+                    }
+                },
+                {
+                    "index": "173",
+                    "region": "기타",
+                    "name": "신봉담 모델하우스",
+                    "status": "DEV",
+                    "serverIp": "172.20.200.200",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "화성시",
+                        "details": "봉담읍"
+                    }
+                },
+                {
+                    "index": "174",
+                    "region": "기타",
+                    "name": "아이엠 삼송(테스트)",
+                    "status": "DEV",
+                    "serverIp": "210.180.57.131",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "고양시덕양구",
+                        "details": "고양동"
+                    }
+                },
+                {
+                    "index": "175",
+                    "region": "기타",
+                    "name": "코콤테스트1",
+                    "status": "LIVE",
+                    "serverIp": "222.108.131.137",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "중구",
+                        "details": "소공동"
+                    }
+                },
+                {
+                    "index": "176",
+                    "region": "기타",
+                    "name": "코콤테스트2",
+                    "status": "LIVE",
+                    "serverIp": "222.108.131.139",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "중구",
+                        "details": "소공동"
+                    }
+                },
+                {
+                    "index": "177",
+                    "region": "기타",
+                    "name": "코콤테스트3",
+                    "status": "LIVE",
+                    "serverIp": "58.142.5.97",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "중구",
+                        "details": "소공동"
+                    }
+                },
+                {
+                    "index": "178",
+                    "region": "기타",
+                    "name": "현대통신 리눅스테스트",
+                    "status": "LIVE",
+                    "serverIp": "13.125.160.103",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "남양주시",
+                        "details": "지금동"
+                    }
+                },
+                {
+                    "index": "179",
+                    "region": "기타",
+                    "name": "현대통신 테스트단지",
+                    "status": "LIVE",
+                    "serverIp": "211.55.59.232",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "영등포구",
+                        "details": "당산제2동"
+                    }
+                },
+                {
+                    "index": "180",
+                    "region": "기타",
+                    "name": "현대통신 테스트단지2",
+                    "status": "LIVE",
+                    "serverIp": "211.232.143.68",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "영등포구",
+                        "details": "당산제2동"
+                    }
+                },
+                {
+                    "index": "181",
+                    "region": "기타",
+                    "name": "현대통신 테스트단지3",
+                    "status": "LIVE",
+                    "serverIp": "211.240.121.35",
+                    "geolocation": {
+                        "state": "서울특별시",
+                        "city": "관악구",
+                        "details": "신림동"
+                    }
+                }
+            ]
+        },
+        {
             "region": "제주특별자치도",
             "complexes": [
                 {
-                    "index": "133",
+                    "index": "135",
                     "region": "제주특별자치도",
                     "name": "e편한세상 중문",
                     "status": "LIVE",
@@ -2011,7 +2244,7 @@
             "region": "충청북도",
             "complexes": [
                 {
-                    "index": "140",
+                    "index": "142",
                     "region": "충청북도",
                     "name": "e편한세상 충주",
                     "status": "LIVE",
@@ -2020,215 +2253,6 @@
                         "state": "충청북도",
                         "city": "충주시",
                         "details": "중앙탑면"
-                    }
-                }
-            ]
-        },
-        {
-            "region": "기타",
-            "complexes": [
-                {
-                    "index": "162",
-                    "region": "기타",
-                    "name": "e편한세상 CVNET모델하우스",
-                    "status": "LIVE",
-                    "serverIp": "119.194.107.91",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "서초구",
-                        "details": "반포본동"
-                    }
-                },
-                {
-                    "index": "163",
-                    "region": "기타",
-                    "name": "e편한세상 모델하우스",
-                    "status": "DEV",
-                    "serverIp": "220.79.251.67",
-                    "geolocation": {
-                        "state": "인천광역시",
-                        "city": "중구",
-                        "details": "영종동"
-                    }
-                },
-                {
-                    "index": "165",
-                    "region": "기타",
-                    "name": "e편한세상서울대입구3단지(테스트)",
-                    "status": "DEV",
-                    "serverIp": "211.240.121.51",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "관악구",
-                        "details": "신림동"
-                    }
-                },
-                {
-                    "index": "166",
-                    "region": "기타",
-                    "name": "e편한세상서울대입구4단지(테스트)",
-                    "status": "DEV",
-                    "serverIp": "211.240.121.59",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "관악구",
-                        "details": "신림동"
-                    }
-                },
-                {
-                    "index": "167",
-                    "region": "기타",
-                    "name": "계영정보통신테스트단지",
-                    "status": "LIVE",
-                    "serverIp": "210.120.112.18",
-                    "geolocation": {
-                        "state": "경기도",
-                        "city": "안양시동안구",
-                        "details": "관양1동"
-                    }
-                },
-                {
-                    "index": "168",
-                    "region": "기타",
-                    "name": "대림 시연용",
-                    "status": "DEV",
-                    "serverIp": "223.171.35.162",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "종로구",
-                        "details": "종로1.2.3.4가동"
-                    }
-                },
-                {
-                    "index": "169",
-                    "region": "기타",
-                    "name": "대림코퍼기능테스트단지",
-                    "status": "LIVE",
-                    "serverIp": "223.171.35.162",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "중구",
-                        "details": "소공동"
-                    }
-                },
-                {
-                    "index": "170",
-                    "region": "기타",
-                    "name": "스마트홈 대림코퍼 시연용",
-                    "status": "LIVE",
-                    "serverIp": "223.171.66.42",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "중구",
-                        "details": "소공동"
-                    }
-                },
-                {
-                    "index": "171",
-                    "region": "기타",
-                    "name": "신봉담 모델하우스",
-                    "status": "DEV",
-                    "serverIp": "172.20.200.200",
-                    "geolocation": {
-                        "state": "경기도",
-                        "city": "화성시",
-                        "details": "봉담읍"
-                    }
-                },
-                {
-                    "index": "172",
-                    "region": "기타",
-                    "name": "아이엠 삼송(테스트)",
-                    "status": "DEV",
-                    "serverIp": "210.180.57.131",
-                    "geolocation": {
-                        "state": "경기도",
-                        "city": "고양시덕양구",
-                        "details": "고양동"
-                    }
-                },
-                {
-                    "index": "173",
-                    "region": "기타",
-                    "name": "코콤테스트1",
-                    "status": "LIVE",
-                    "serverIp": "222.108.131.137",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "중구",
-                        "details": "소공동"
-                    }
-                },
-                {
-                    "index": "174",
-                    "region": "기타",
-                    "name": "코콤테스트2",
-                    "status": "LIVE",
-                    "serverIp": "222.108.131.139",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "중구",
-                        "details": "소공동"
-                    }
-                },
-                {
-                    "index": "175",
-                    "region": "기타",
-                    "name": "코콤테스트3",
-                    "status": "LIVE",
-                    "serverIp": "58.142.5.97",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "중구",
-                        "details": "소공동"
-                    }
-                },
-                {
-                    "index": "176",
-                    "region": "기타",
-                    "name": "현대통신 리눅스테스트",
-                    "status": "LIVE",
-                    "serverIp": "13.125.160.103",
-                    "geolocation": {
-                        "state": "경기도",
-                        "city": "남양주시",
-                        "details": "지금동"
-                    }
-                },
-                {
-                    "index": "177",
-                    "region": "기타",
-                    "name": "현대통신 테스트단지",
-                    "status": "LIVE",
-                    "serverIp": "211.55.59.232",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "영등포구",
-                        "details": "당산제2동"
-                    }
-                },
-                {
-                    "index": "178",
-                    "region": "기타",
-                    "name": "현대통신 테스트단지2",
-                    "status": "LIVE",
-                    "serverIp": "211.232.143.68",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "영등포구",
-                        "details": "당산제2동"
-                    }
-                },
-                {
-                    "index": "179",
-                    "region": "기타",
-                    "name": "현대통신 테스트단지3",
-                    "status": "LIVE",
-                    "serverIp": "211.240.121.35",
-                    "geolocation": {
-                        "state": "서울특별시",
-                        "city": "관악구",
-                        "details": "신림동"
                     }
                 }
             ]
