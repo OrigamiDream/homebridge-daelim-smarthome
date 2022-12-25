@@ -1099,6 +1099,30 @@
                     }
                 },
                 {
+                    "index": "132",
+                    "region": "경기도",
+                    "name": "e편한세상 일산 어반스카이",
+                    "status": "LIVE",
+                    "serverIp": "115.144.67.52",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "고양시일산서구",
+                        "details": "일산2동"
+                    }
+                },
+                {
+                    "index": "134",
+                    "region": "경기도",
+                    "name": "e편한세상 일산 어반스카이 오피스텔",
+                    "status": "LIVE",
+                    "serverIp": "124.198.6.252",
+                    "geolocation": {
+                        "state": "경기도",
+                        "city": "고양시일산서구",
+                        "details": "일산2동"
+                    }
+                },
+                {
                     "index": "140",
                     "region": "경기도",
                     "name": "e편한세상 초지역센트럴포레",
@@ -1991,32 +2015,42 @@
             ]
         },
         {
-            "region": "기타",
+            "region": "제주특별자치도",
             "complexes": [
                 {
-                    "index": "132",
-                    "region": "기타",
-                    "name": "e편한세상 일산 어반스카이[테스트]",
+                    "index": "135",
+                    "region": "제주특별자치도",
+                    "name": "e편한세상 중문",
                     "status": "LIVE",
-                    "serverIp": "115.144.67.52",
+                    "serverIp": "211.240.10.203",
                     "geolocation": {
-                        "state": "경기도",
-                        "city": "고양시일산서구",
-                        "details": "일산2동"
+                        "state": "제주특별자치도",
+                        "city": "서귀포시",
+                        "details": "중문동"
                     }
-                },
+                }
+            ]
+        },
+        {
+            "region": "충청북도",
+            "complexes": [
                 {
-                    "index": "134",
-                    "region": "기타",
-                    "name": "e편한세상 일산 어반스카이 오피스텔[테스트]",
+                    "index": "142",
+                    "region": "충청북도",
+                    "name": "e편한세상 충주",
                     "status": "LIVE",
-                    "serverIp": "124.198.6.252",
+                    "serverIp": "211.112.23.91",
                     "geolocation": {
-                        "state": "경기도",
-                        "city": "고양시일산서구",
-                        "details": "일산2동"
+                        "state": "충청북도",
+                        "city": "충주시",
+                        "details": "중앙탑면"
                     }
-                },
+                }
+            ]
+        },
+        {
+            "region": "기타",
+            "complexes": [
                 {
                     "index": "164",
                     "region": "기타",
@@ -2219,40 +2253,6 @@
                         "state": "서울특별시",
                         "city": "관악구",
                         "details": "신림동"
-                    }
-                }
-            ]
-        },
-        {
-            "region": "제주특별자치도",
-            "complexes": [
-                {
-                    "index": "135",
-                    "region": "제주특별자치도",
-                    "name": "e편한세상 중문",
-                    "status": "LIVE",
-                    "serverIp": "211.240.10.203",
-                    "geolocation": {
-                        "state": "제주특별자치도",
-                        "city": "서귀포시",
-                        "details": "중문동"
-                    }
-                }
-            ]
-        },
-        {
-            "region": "충청북도",
-            "complexes": [
-                {
-                    "index": "142",
-                    "region": "충청북도",
-                    "name": "e편한세상 충주",
-                    "status": "LIVE",
-                    "serverIp": "211.112.23.91",
-                    "geolocation": {
-                        "state": "충청북도",
-                        "city": "충주시",
-                        "details": "중앙탑면"
                     }
                 }
             ]
