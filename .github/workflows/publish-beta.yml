@@ -17,17 +17,21 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.branch }}
+
       - uses: fregante/setup-git-user@v1
+
       - uses: actions/setup-node@v3
         with:
           node-version: '16.x'
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
-      - run: npm version "${{ github.event.inputs.version }}"
-      - name: Push all commits and tags
-        run: |
-          git push origin "${{ github.event.inputs.branch }}"
-          git push origin "v${{ github.event.inputs.version }}"
+
+      - name: Update the package version
+        run: npm version "${{ github.event.inputs.version }}"
+
+      - name: Push changes to the repo
+        run: git push origin "${{ github.event.inputs.branch }}"
+
       - name: Publish on npm.js
         run: npm publish --tag beta
         env:
