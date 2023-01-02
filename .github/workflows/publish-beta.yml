@@ -1,4 +1,4 @@
-name: Publish beta packages on npm.js with automatic versioning
+name: Publish beta packages on npm.js
 
 on:
   workflow_dispatch:
