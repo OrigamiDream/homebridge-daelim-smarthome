@@ -1,0 +1,34 @@
+name: Publish beta packages on npm.js with automatic versioning
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        type: string
+        description: Name of the branch where the workflow to be executed
+      version:
+        type: string
+        description: Semantic version string with beta suffix (e.g. 1.0.2-beta.1)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.branch }}
+      - uses: fregante/setup-git-user@v1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm version "${{ github.event.inputs.version }}"
+      - name: Push all commits and tags
+        run: |
+          git push origin "${{ github.event.inputs.branch }}"
+          git push origin "v${{ github.event.inputs.version }}"
+      - name: Publish on npm.js
+        run: npm publish --tag beta
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
