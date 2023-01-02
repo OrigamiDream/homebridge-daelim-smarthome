@@ -1,4 +1,4 @@
-name: Deploy GitHub Releases
+name: Publish
 
 on:
   push:
@@ -8,14 +8,11 @@ on:
 
 jobs:
   deploy:
-    name: Deploy GitHub Releases
+    name: Deploy a release on GitHub
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v3
       - name: Parse release info
-        id: parse_all
         env:
           LOG_DIR: logs
         run: |
@@ -24,8 +21,7 @@ jobs:
           echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
           echo "$(tail -n +2 $filename)" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-      - name: Deploy release
-        id: deploy_release
+      - name: Deploy a release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -36,3 +32,19 @@ jobs:
             ${{ env.RELEASE_BODY }}
           draft: false
           prerelease: false
+
+  publish:
+    needs: deploy
+    name: Publish packages on npm.js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - name: Publish on npm.js
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
