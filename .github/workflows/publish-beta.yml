@@ -6,9 +6,6 @@ on:
       branch:
         type: string
         description: Name of the branch where the workflow to be executed
-      version:
-        type: string
-        description: Semantic version string with beta suffix (e.g. 1.0.2-beta.1)
 
 jobs:
   publish:
@@ -26,8 +23,8 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
 
-      - name: Update the package version
-        run: npm version "${{ github.event.inputs.version }}"
+      - name: Update the package version in beta stage
+        run: npm version prerelease --preid=beta
 
       - name: Push changes to the repo
         run: git push origin "${{ github.event.inputs.branch }}"
