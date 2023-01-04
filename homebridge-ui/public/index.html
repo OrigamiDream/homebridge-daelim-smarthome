@@ -3,7 +3,7 @@
         <img class="branding-logo" alt="branding" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/master/branding/smarthome%2Bhomebridge.png?raw=true">
         <h3><span class="brand-name">DL E&C</span> 아파트 Homebridge 설정</h3>
     </div>
-    <div class="card-body">
+    <div class="card-body" id="setupForm">
         <p class="text-center">
             <span class="brand-name">DL E&C</span> 아파트 거주민을 위한 Homebridge 플러그인을 설치해주셔서 감사합니다.<br>
             설정을 위해 아래의 요구사항을 따라 주세요.
@@ -68,6 +68,7 @@
                         <div class="text-center">
                             <h2>설정이 완료되었습니다.</h2>
                             <p>이제 <span class="brand-name">DL E&C</span> 아파트의 가구를 애플 기기에서 제어할 수 있습니다.</p>
+                            <button type="button" id="advanced-button" class="btn btn-secondary" disabled>고급</button>
                             <button type="button" id="reset-button" class="btn btn-primary">재설정</button>
                             <button type="button" id="done-button" class="btn btn-primary">닫기</button>
                         </div>
@@ -76,7 +77,10 @@
             </div>
         </div>
     </div>
-    <div class="card-footer text-center">
+    <div class="card-body hidden text-left" id="advancedForm">
+        <button type="button" id="back-button" class="btn btn-primary">돌아가기</button>
+    </div>
+    <div class="card-footer text-center" id="footer">
         <small>이 플러그인은 DL E&C Co.,Ltd. 의 공식 배포 소프트웨어가 아닙니다. 소프트웨어 사용에 대한 책임은 사용자에게 있습니다.</small>
     </div>
 </div>
@@ -88,6 +92,11 @@
 
     let regionList = [];
     let complexList = [];
+    let devices = [];
+
+    const setupForm = document.getElementById("setupForm");
+    const advancedForm = document.getElementById("advancedForm");
+    const footer = document.getElementById("footer");
 
     const regionNextButton = document.getElementById("region-next-button");
 
@@ -99,6 +108,8 @@
 
     const verifyButton = document.getElementById("verify-button");
 
+    const advancedButton = document.getElementById("advanced-button");
+    const backButton = document.getElementById("back-button");
     const resetButton = document.getElementById("reset-button");
     const doneButton = document.getElementById("done-button");
 
@@ -123,6 +134,7 @@
         usernameEl.value = pluginConfig.username || '';
         passwordEl.value = pluginConfig.password || '';
         uuidEl.value = pluginConfig.uuid || '';
+        devices = pluginConfig.devices || [];
     }
 
     function updateConfigFromForm() {
@@ -131,6 +143,7 @@
         pluginConfig.username = usernameEl.value;
         pluginConfig.password = passwordEl.value;
         pluginConfig.uuid = uuidEl.value;
+        pluginConfig.devices = Object.assign(devices, [], pluginConfig.devices);
     }
 
     function refreshRegions() {
@@ -326,6 +339,7 @@
             pluginConfig.username = undefined;
             pluginConfig.password = undefined;
             pluginConfig.uuid = undefined;
+            pluginConfig.devices = [];
             await window.homebridge.request('/invalidate', {});
             await window.homebridge.updatePluginConfig([pluginConfig]);
             await window.homebridge.savePluginConfig();
@@ -338,7 +352,34 @@
         resetCancelButton.addEventListener('click', async () => {
             doTransition(document.getElementById('confirmable'), document.getElementById('done'));
         });
+        advancedButton.addEventListener('click', async () => {
+            // turn off setup form
+            setupForm.classList.add('hidden');
+            footer.classList.add('hidden');
 
+            // turn on advanced form
+            advancedForm.classList.remove('hidden');
+
+            await window.homebridge.updatePluginConfig([pluginConfig]);
+
+            const configSchema = await window.homebridge.getPluginConfigSchema();
+            const configForm = window.homebridge.createForm(configSchema, pluginConfig);
+            configForm.onChange((change) => {
+                Object.assign(pluginConfig, change);
+                window.homebridge.updatePluginConfig([pluginConfig]);
+            });
+        });
+        backButton.addEventListener('click', async () => {
+            // turn off advanced form
+            advancedForm.classList.add('hidden');
+
+            // turn on setup form
+            setupForm.classList.remove('hidden');
+            footer.classList.remove('hidden');
+
+            await window.homebridge.updatePluginConfig([pluginConfig]);
+            window.homebridge.endForm();
+        });
         resetButton.addEventListener('click', async () => {
             doTransition(document.getElementById('done'), document.getElementById('confirmable'));
         });
@@ -353,21 +394,38 @@
         regionList = await loadJSON(REGIONS_URL).then(json => json.regions);
         complexList = await loadJSON(COMPLEXES_URL).then(json => json.complexes);
 
+        let signIn = false;
         const pluginConfigBlocks = await window.homebridge.getPluginConfig();
         console.log(JSON.stringify(pluginConfigBlocks));
+
+        refreshRegions();
         if(!pluginConfigBlocks.length || !pluginConfigBlocks[0]['region']) {
-            refreshRegions();
             doTransition(null, document.getElementById('setup-regions'));
-        } else if(!pluginConfigBlocks[0]['complex']) {
-            refreshComplexes(pluginConfig['region']);
-            doTransition(null, document.getElementById('setup-complexes'));
-        } else if(!pluginConfigBlocks[0]['uuid']) {
-            doTransition(null, document.getElementById('setup-authorization'));
         } else {
-            doTransition(null, document.getElementById('done'));
+            regionEl.value = pluginConfigBlocks[0].region;
+            refreshComplexes(pluginConfigBlocks[0]['region']);
         }
+
         if(pluginConfigBlocks[0]) {
             pluginConfig = pluginConfigBlocks[0];
+            if(!pluginConfig['complex']) {
+                doTransition(null, document.getElementById('setup-complexes'));
+            } else {
+                complexEl.value = pluginConfig.complex;
+            }
+
+            if(!pluginConfig['uuid']) {
+                doTransition(null, document.getElementById('setup-authorization'));
+            } else {
+                doTransition(null, document.getElementById('done'));
+                signIn = true;
+            }
+        }
+        if(signIn) {
+            updateFormFromConfig();
+            await window.homebridge.request('/choose-region', { region: pluginConfig.region });
+            await window.homebridge.request('/choose-complex', { complex: pluginConfig.complex });
+            await window.homebridge.request('/sign-in', { username: usernameEl.value, password: passwordEl.value });
         }
 
         window.homebridge.addEventListener('require-wall-pad-number', () => {
@@ -410,6 +468,17 @@
                 doTransition(currentTab, document.getElementById('done'));
             }
         });
+
+        window.homebridge.addEventListener('devices-fetched', (event) => {
+            devices = event.data.devices;
+
+            console.log(`${devices.length} devices have been fetched`);
+            updateConfigFromForm();
+
+            // enable the advanced button
+            advancedButton.removeAttribute('disabled');
+        });
+
         updateFormFromConfig();
         updateBrandName();
     })();

@@ -192,8 +192,10 @@ export class Client {
                 return;
             }
             this.isLoggedIn = false;
-            this.log("Connection broken. Reconnect to the server...");
-            this.handler?.handle();
+            this.log("Connection broken. Reconnect to the server in 10 seconds...");
+            setTimeout(() => {
+                this.handler?.handle();
+            }, 1000 * 10);
         };
     }
 

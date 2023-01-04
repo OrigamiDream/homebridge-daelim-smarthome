@@ -59,7 +59,8 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
             username: config['username'],
             password: config['password'],
             uuid: config['uuid'],
-            version: Utils.currentSemanticVersion()
+            version: Utils.currentSemanticVersion(),
+            devices: config['devices'] || []
         };
     }
 

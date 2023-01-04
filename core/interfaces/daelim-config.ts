@@ -7,6 +7,15 @@ export interface DaelimConfig {
     username: string,
     password: string,
     uuid: string,
-    version: SemanticVersion
+    version: SemanticVersion,
+    devices: Device[]
 
+}
+
+export interface Device {
+    displayName: string,
+    name: string,
+    deviceType: string,
+    deviceId: string,
+    disabled: boolean
 }
