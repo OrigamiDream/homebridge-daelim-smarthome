@@ -143,7 +143,22 @@
         pluginConfig.username = usernameEl.value;
         pluginConfig.password = passwordEl.value;
         pluginConfig.uuid = uuidEl.value;
-        pluginConfig.devices = Object.assign(devices, [], pluginConfig.devices);
+
+        // 1. add device if `devices` have, and `pluginConfig.devices` doesn't have
+        // 2. the order follows order of `devices`
+        const availableDevices = [];
+        for(const device of devices) {
+            const equiv = pluginConfig.devices.filter(oldDevice => {
+                return oldDevice.name === device.name && oldDevice.deviceId === device.deviceId && oldDevice.deviceType === device.deviceType;
+            });
+            // add device
+            if(!equiv || !equiv.length) {
+                availableDevices.push(device);
+            } else {
+                availableDevices.push(equiv[0]);
+            }
+        }
+        pluginConfig.devices = availableDevices;
     }
 
     function refreshRegions() {

@@ -19,9 +19,9 @@ interface ElevatorAccessoryInterface extends AccessoryInterface {
 
 }
 
-const ELEVATOR_DEVICE_ID = "EV-000000";
-const ELEVATOR_DISPLAY_NAME = "엘레베이터";
-const ELEVATOR_TIMEOUT_DURATION = 30 * 1000; // 30 seconds
+export const ELEVATOR_DEVICE_ID = "EV-000000";
+export const ELEVATOR_DISPLAY_NAME = "엘레베이터";
+export const ELEVATOR_TIMEOUT_DURATION = 30 * 1000; // 30 seconds
 
 export class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface> {
 

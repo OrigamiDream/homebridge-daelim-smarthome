@@ -4,6 +4,7 @@ import {Utils} from "../core/utils";
 import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "../core/fields";
 import * as crypto from 'crypto';
 import {Device} from "../core/interfaces/daelim-config";
+import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME} from "../homebridge/accessories/elevator";
 
 interface ClientAuthorization {
     certification: string,
@@ -73,6 +74,13 @@ export class UiServer extends HomebridgePluginUiServer {
             complex: '',
             room: ''
         };
+        this.devices.push({
+            displayName: ELEVATOR_DISPLAY_NAME,
+            name: ELEVATOR_DISPLAY_NAME,
+            deviceType: 'elevator',
+            deviceId: ELEVATOR_DEVICE_ID,
+            disabled: false
+        });
 
         this.onRequest('/choose-region', this.chooseRegion.bind(this));
         this.onRequest('/choose-complex', this.chooseComplex.bind(this));
@@ -169,9 +177,14 @@ export class UiServer extends HomebridgePluginUiServer {
             'heating': '난방',
             'wallsocket': '콘센트',
             'fan': '환풍기',
+            'elevator': '', // elevator does not need pretty name
             'gas': ''  // gas does not need pretty name
         }
-        return nameMap[deviceType] || '기기';
+        const name = nameMap[deviceType];
+        if(name === undefined) {
+            return '기기'
+        }
+        return name;
     }
 
     private getAuthorizationPIN(): string {
