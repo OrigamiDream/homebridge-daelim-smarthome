@@ -1,8 +1,11 @@
 import {HomebridgePluginUiServer} from "@homebridge/plugin-ui-utils";
 import {ErrorCallback, LoggerBase, NetworkHandler, ResponseCallback} from "../core/network";
-import {Utils} from "../core/utils";
-import {Errors, LoginSubTypes, SubTypes, Types} from "../core/fields";
+import {Semaphore, Utils} from "../core/utils";
+import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "../core/fields";
 import * as crypto from 'crypto';
+import {Device} from "../core/interfaces/daelim-config";
+import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME} from "../homebridge/accessories/elevator";
+import Timeout = NodeJS.Timeout;
 
 interface ClientAuthorization {
     certification: string,
@@ -12,6 +15,12 @@ interface ClientAuthorization {
 interface ClientAddress {
     complex: string,
     room: string
+}
+
+interface EnqueuedAccessory {
+    name: string,
+    deviceType: string,
+    uid: string
 }
 
 class Logger implements LoggerBase {
@@ -43,11 +52,16 @@ export class UiServer extends HomebridgePluginUiServer {
     private username?: string = undefined;
     private password?: string = undefined;
     private uuid?: string = undefined;
+    private enqueuedAccessories: { [key: string]: EnqueuedAccessory[] } = {};
+    private enqueuedDeviceTypes: string[] = [];
+    private devices: Device[] = [];
 
     private handler?: NetworkHandler = undefined;
     private isLoggedIn: boolean = false;
     private readonly authorization: ClientAuthorization;
     private readonly address: ClientAddress;
+    private readonly semaphore = new Semaphore();
+    private semaphoreTimeout?: Timeout;
 
     constructor() {
         super();
@@ -63,6 +77,13 @@ export class UiServer extends HomebridgePluginUiServer {
             complex: '',
             room: ''
         };
+        this.devices.push({
+            displayName: ELEVATOR_DISPLAY_NAME,
+            name: ELEVATOR_DISPLAY_NAME,
+            deviceType: 'elevator',
+            deviceId: ELEVATOR_DEVICE_ID,
+            disabled: false
+        });
 
         this.onRequest('/choose-region', this.chooseRegion.bind(this));
         this.onRequest('/choose-complex', this.chooseComplex.bind(this));
@@ -129,6 +150,18 @@ export class UiServer extends HomebridgePluginUiServer {
         this.uuid = UiServer.generateUUID(username);
 
         if(this.region && this.complex) {
+            // create semaphores and its expirations
+            this.semaphore.createSemaphore();
+            this.semaphoreTimeout = setTimeout(() => {
+                if(!this.semaphoreTimeout) {
+                    return;
+                }
+                this.semaphore.removeSemaphore(); // remove timed out semaphore
+
+                clearTimeout(this.semaphoreTimeout);
+                this.semaphoreTimeout = undefined;
+            }, 10 * 1000);
+
             this.log.info('Starting service...');
             await this.createService();
         }
@@ -151,6 +184,22 @@ export class UiServer extends HomebridgePluginUiServer {
             .update(key)
             .digest('hex')
             .toUpperCase();
+    }
+
+    private static prettierDeviceType(deviceType: string): string {
+        const nameMap: { [key: string]: string } = {
+            'light': '전등',
+            'heating': '난방',
+            'wallsocket': '콘센트',
+            'fan': '환풍기',
+            'elevator': '', // elevator does not need pretty name
+            'gas': ''  // gas does not need pretty name
+        }
+        const name = nameMap[deviceType];
+        if(name === undefined) {
+            return '기기'
+        }
+        return name;
     }
 
     private getAuthorizationPIN(): string {
@@ -219,19 +268,94 @@ export class UiServer extends HomebridgePluginUiServer {
         });
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.LOGIN_PIN_RESPONSE, async (body) => {
             this.authorization.login = body['loginpin'];
+            this.sendUnreliableRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
+        })
+        this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (_) => {
             this.isLoggedIn = true;
-
-            // On complete
             this.pushEvent('complete', { uuid: this.uuid });
-
-            if(this.handler) {
-                this.handler.disconnect();
-                this.handler = undefined;
-            }
-            await this.invalidate(null);
         })
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.WALL_PAD_RESPONSE, async (_) => {
             this.sendCertificationRequest();
+        });
+        this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (body) => {
+            const controlInfo = body['controlinfo'];
+            const keys = Object.keys(controlInfo);
+            for(const key of keys) {
+                // TODO: 'fan' accessory doesn't yet support
+                if(key === 'fan') {
+                    continue;
+                }
+                const devices = controlInfo[key]
+                if(devices && devices.length && !this.enqueuedAccessories[key]) {
+                    this.enqueuedAccessories[key] = [];
+                }
+                for(const device of devices) {
+                    this.enqueuedAccessories[key].push({
+                        name: device['uname'],
+                        deviceType: key,
+                        uid: device['uid']
+                    });
+                }
+                this.enqueuedDeviceTypes.push(key);
+                this.sendUnreliableRequest({
+                    type: 'query',
+                    item: [{
+                        device: key,
+                        uid: 'all'
+                    }]
+                }, Types.DEVICE, DeviceSubTypes.QUERY_REQUEST);
+            }
+        });
+        this.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, async (body) => {
+            const items = body['item'] || [];
+            const filtered: EnqueuedAccessory[] = items.map((item: any) => {
+                const devices = this.enqueuedAccessories[item['device']];
+                for(const device of devices) {
+                    if(device.uid === item['uid']) {
+                        return device;
+                    }
+                }
+                return undefined;
+            }).filter((device: EnqueuedAccessory) => device !== undefined);
+
+            if(!filtered || !filtered.length) {
+                return;
+            }
+            for(const enqueuedAccessory of filtered) {
+                const deviceType = enqueuedAccessory.deviceType;
+                this.devices.push({
+                    displayName: `${enqueuedAccessory.name} ${UiServer.prettierDeviceType(deviceType)}`,
+                    name: enqueuedAccessory.name,
+                    deviceType: deviceType,
+                    deviceId: enqueuedAccessory.uid,
+                    disabled: false
+                })
+                const index = this.enqueuedAccessories[deviceType].indexOf(enqueuedAccessory);
+                if(index !== -1) {
+                    this.enqueuedAccessories[deviceType].splice(index, 1);
+                }
+                const typeIndex = this.enqueuedDeviceTypes.indexOf(deviceType);
+                if(typeIndex !== -1) {
+                    this.enqueuedDeviceTypes.splice(typeIndex, 1);
+                }
+            }
+            if(this.enqueuedDeviceTypes.length === 0) {
+                // disconnect all
+                if(this.handler) {
+                    this.handler.disconnect();
+                    this.handler = undefined;
+                }
+                await this.invalidate(null);
+
+                // remove all semaphores
+                this.semaphore.removeSemaphore();
+                clearTimeout(this.semaphoreTimeout);
+                this.semaphoreTimeout = undefined;
+
+                this.pushEvent('devices-fetched', {
+                    devices: this.devices
+                });
+            }
         });
         // Error Listeners
         this.registerErrorListener(Errors.UNCERTIFIED_DEVICE, () => {

@@ -15,6 +15,7 @@ import {
     Types
 } from "./fields";
 import {Complex, ComplexInfo} from "./interfaces/complex";
+import * as fs from "fs";
 
 export interface SemanticVersion {
     major: number,
@@ -23,6 +24,34 @@ export interface SemanticVersion {
     beta: number,
     toString(): string,
     isNewerThan(spec: SemanticVersion): boolean,
+}
+
+export class Semaphore {
+
+    public static readonly FILENAME = 'daelim-semaphore';
+
+    private getFilePath() {
+        return `${process.cwd()}/${Semaphore.FILENAME}`;
+    }
+
+    public createSemaphore() {
+        if(this.isLocked()) {
+            return;
+        }
+        fs.openSync(this.getFilePath(), 'w');
+    }
+
+    public removeSemaphore() {
+        if(!this.isLocked()) {
+            return;
+        }
+        fs.unlinkSync(this.getFilePath());
+    }
+
+    public isLocked() {
+        return fs.existsSync(this.getFilePath());
+    }
+
 }
 
 export class Utils {

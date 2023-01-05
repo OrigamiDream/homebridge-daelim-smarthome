@@ -40,7 +40,47 @@
         "type": "string",
         "required": true,
         "pattern": "^[a-fA-F0-9]{32}$"
+      },
+      "devices": {
+        "title": "기기",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "displayName": {
+              "title": "메뉴 표기 이름",
+              "type": "string",
+              "required": true
+            },
+            "name": {
+              "title": "기기 이름",
+              "type": "string",
+              "required": true
+            },
+            "deviceType": {
+              "title": "기기 종류",
+              "type": "string"
+            },
+            "deviceId": {
+              "title": "기기 아이디",
+              "type": "string"
+            },
+            "disabled": {
+              "title": "기기 비활성화",
+              "type": "boolean"
+            }
+          }
+        }
       }
     }
-  }
+  },
+  "layout": [{
+    "key": "devices",
+    "type": "tabarray",
+    "title": "{{ value.displayName }}",
+    "items": [
+      "devices[].displayName",
+      "devices[].disabled"
+    ]
+  }]
 }

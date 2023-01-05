@@ -2,7 +2,7 @@ import {Client} from "../../core/client";
 import {API, CharacteristicGetCallback, Logging, PlatformAccessory, Service} from "homebridge";
 import {Utils} from "../../core/utils";
 import {WithUUID} from "hap-nodejs";
-import {DaelimConfig} from "../../core/interfaces/daelim-config";
+import {DaelimConfig, Device} from "../../core/interfaces/daelim-config";
 import {DeviceSubTypes, LoginSubTypes, Types} from "../../core/fields";
 
 export interface AccessoryInterface {
@@ -73,6 +73,21 @@ export class Accessories<T extends AccessoryInterface> {
 
     getServiceTypes(): ServiceType[] {
         return this.serviceTypes;
+    }
+
+    private getConfiguredDevices(): Device[] {
+        const devices = this.config?.devices || [];
+        return devices.filter(device => device.deviceType === this.getDeviceType());
+    }
+
+    private findDeviceInfo(deviceId: string, name: string): Device | undefined {
+        const devices = this.getConfiguredDevices();
+        for(const device of devices) {
+            if(device.deviceId === deviceId && device.name === name) {
+                return device;
+            }
+        }
+        return undefined;
     }
 
     protected findAccessoryWithDeviceID(deviceID: string): PlatformAccessory | undefined {
@@ -159,6 +174,7 @@ export class Accessories<T extends AccessoryInterface> {
         }
         // accessory type must be specified for proper uuid generation
         context.accessoryType = this.getDeviceType();
+        const deviceInfo = this.findDeviceInfo(context.deviceID, context.displayName);
 
         // Support backward compatibility
         const generators = [OLD_UUID_COMBINATION, NEW_UUID_COMBINATION];
@@ -171,6 +187,12 @@ export class Accessories<T extends AccessoryInterface> {
 
             if(cachedAccessory) {
                 this.log.debug("Found cached UUID (%s) generated from %s %s", uuid, seed, isLegacy ? "(Legacy)" : "");
+                if(deviceInfo && deviceInfo.disabled) {
+                    // unregister the accessory since the accessory is cached in homebridge
+                    this.api.unregisterPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ cachedAccessory ]);
+                    this.log.debug('The device (%s, uid:%s) is disabled in config, therefore unregistered immediately', deviceInfo.name, deviceInfo.deviceId);
+                    return false;
+                }
                 const version = cachedAccessory.context.version;
                 cachedAccessory.context = context;
                 cachedAccessory.context.version = version; // Always keep first-initial version for compatibility management
@@ -184,6 +206,10 @@ export class Accessories<T extends AccessoryInterface> {
                 }
                 return true;
             }
+        }
+        if(deviceInfo && deviceInfo.disabled) {
+            this.log.debug('The device (%s, uid:%s) is disabled in config', deviceInfo.name, deviceInfo.deviceId);
+            return false;
         }
         const seed = NEW_UUID_COMBINATION(context);
         const uuid = this.api.hap.uuid.generate(seed);
@@ -201,6 +227,7 @@ export class Accessories<T extends AccessoryInterface> {
 
         this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ accessory ]);
         this.configureAccessory(accessory, services);
+        return true;
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {

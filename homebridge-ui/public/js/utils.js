@@ -3,6 +3,9 @@ function loadJSON(url) {
 }
 
 function doTransition(elementFrom, elementTo) {
+    if(elementFrom && elementTo && elementFrom.id === elementTo.id) {
+        return;
+    }
     const mainElement = document.getElementById("main");
     if(elementFrom) {
         transitionFadeIn(elementFrom, elementTo, mainElement);

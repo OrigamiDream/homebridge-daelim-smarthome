@@ -1,10 +1,12 @@
 import readlineSync from 'readline-sync';
 import {DaelimConfig} from "./interfaces/daelim-config";
-import {Utils} from "./utils";
+import {Semaphore, Utils} from "./utils";
 import {Logging} from "homebridge";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
 import {Errors, LoginSubTypes, SubTypes, Types} from "./fields";
 import {Complex} from "./interfaces/complex";
+import Timeout = NodeJS.Timeout;
+import {setInterval} from "timers";
 
 interface ClientAuthorization {
     certification: string,
@@ -24,11 +26,13 @@ export class Client {
     private readonly config: DaelimConfig;
     private readonly authorization: ClientAuthorization;
     private readonly address: ClientAddress;
+    private readonly semaphore = new Semaphore();
     private complex?: Complex;
     private handler?: NetworkHandler;
     private isLoggedIn = false;
     private isRefreshing = false;
     private lastKeepAliveTimestamp: number;
+    private enqueuedEstablishment?: Timeout;
 
     constructor(log: Logging, config: DaelimConfig) {
         this.log = log;
@@ -192,12 +196,36 @@ export class Client {
                 return;
             }
             this.isLoggedIn = false;
+            if(this.semaphore.isLocked()) {
+                this.enqueueEstablishment();
+                return;
+            }
             this.log("Connection broken. Reconnect to the server...");
             this.handler?.handle();
         };
     }
 
+    enqueueEstablishment() {
+        if(this.enqueuedEstablishment) {
+            return;
+        }
+        this.enqueuedEstablishment = setInterval(() => {
+            if(this.semaphore.isLocked()) {
+                this.log.debug("Establishing connection failed due to semaphore from ui-server");
+                return;
+            }
+            clearInterval(this.enqueuedEstablishment);
+            this.enqueuedEstablishment = undefined;
+
+            this.handler?.handle();
+        }, 5000);
+    }
+
     refresh() {
+        if(this.semaphore.isLocked()) {
+            this.enqueueEstablishment();
+            return;
+        }
         this.log.debug("Refreshing MMF client service...");
         this.isRefreshing = true;
         this.handler?.handle();

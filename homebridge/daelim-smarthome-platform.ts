@@ -8,7 +8,7 @@ import {
 import {DaelimConfig} from "../core/interfaces/daelim-config";
 import {Client} from "../core/client";
 import {LightbulbAccessories} from "./accessories/lightbulb";
-import {Utils} from "../core/utils";
+import {Semaphore, Utils} from "../core/utils";
 import {Accessories, AccessoryInterface} from "./accessories/accessories";
 import {OutletAccessories} from "./accessories/outlet";
 import {HeaterAccessories} from "./accessories/heater";
@@ -41,6 +41,9 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
         this.accessories.push(new ElevatorAccessories(this.log, this.api, this.config));
 
         api.on(APIEvent.DID_FINISH_LAUNCHING, async () => {
+            const semaphore = new Semaphore();
+            semaphore.removeSemaphore(); // remove all orphan semaphores
+
             await this.createSmartHomeService();
             log.info("DL E&C Smart Home did finished launching");
         });
@@ -59,7 +62,8 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
             username: config['username'],
             password: config['password'],
             uuid: config['uuid'],
-            version: Utils.currentSemanticVersion()
+            version: Utils.currentSemanticVersion(),
+            devices: config['devices'] || []
         };
     }
 
