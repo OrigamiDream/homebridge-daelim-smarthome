@@ -3,10 +3,15 @@ import {DaelimConfig} from "./interfaces/daelim-config";
 import {Semaphore, Utils} from "./utils";
 import {Logging} from "homebridge";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
-import {Errors, LoginSubTypes, SubTypes, Types} from "./fields";
+import {Errors, LoginSubTypes, PushSubTypes, PushTypes, SettingSubTypes, SubTypes, Types} from "./fields";
 import {Complex} from "./interfaces/complex";
-import Timeout = NodeJS.Timeout;
 import {setInterval} from "timers";
+import {FirebaseCredentials, PushData} from "./interfaces/firebase";
+import Timeout = NodeJS.Timeout;
+
+const fcm = require("push-receiver");
+
+export type PushEventCallback = (data: PushData) => void;
 
 interface ClientAuthorization {
     certification: string,
@@ -18,12 +23,16 @@ interface ClientAddress {
     room: string
 }
 
+interface PushEventListener {
+    type: PushTypes
+    subType: PushSubTypes
+    callback: PushEventCallback
+}
+
 export class Client {
 
     public static MMF_SERVER_PORT = 25301;
 
-    private readonly log: Logging
-    private readonly config: DaelimConfig;
     private readonly authorization: ClientAuthorization;
     private readonly address: ClientAddress;
     private readonly semaphore = new Semaphore();
@@ -33,9 +42,11 @@ export class Client {
     private isRefreshing = false;
     private lastKeepAliveTimestamp: number;
     private enqueuedEstablishment?: Timeout;
+    private readonly pushEventListeners: PushEventListener[] = [];
 
-    constructor(log: Logging, config: DaelimConfig) {
-        this.log = log;
+    constructor(private readonly log: Logging,
+                private readonly config: DaelimConfig,
+                private readonly credentials: FirebaseCredentials) {
         this.config = config;
         this.authorization = {
             certification: '00000000',
@@ -94,6 +105,14 @@ export class Client {
         }
     }
 
+    registerPushEventListener(type: PushTypes, subType: PushSubTypes, callback: PushEventCallback) {
+        this.pushEventListeners.push({
+            type: type,
+            subType: subType,
+            callback: callback
+        });
+    }
+
     registerListeners() {
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.CERTIFICATION_PIN_RESPONSE, (body) => {
             this.authorization.certification = body['certpin'];
@@ -111,6 +130,14 @@ export class Client {
             this.sendUnreliableRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
         });
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (_) => {
+            // registering fcm push token
+            this.sendUnreliableRequest({
+                dong: this.address.complex,
+                ho: this.address.room,
+                pushID: this.credentials.fcm.token,
+                phoneType: "android"
+            }, Types.LOGIN, LoginSubTypes.PUSH_REQUEST);
+
             this.isLoggedIn = true;
             if(this.handler?.flushAllEnqueuedBuffers(this.getAuthorizationPIN())) {
                 this.log("Flushed entire enqueued request buffers");
@@ -184,6 +211,23 @@ export class Client {
     }
 
     async prepareService() {
+        fcm.listen({ ...this.credentials, persistentIds: [] }, (data: any) => {
+            const orig = data.notification;
+            const pushData: PushData = {
+                from: orig.from,
+                priority: orig.priority,
+                title: orig.data.title,
+                message: orig.data.message,
+                reserved: orig.data.data3
+            };
+            this.log.debug(`<=== PUSH(Type: ${orig.data.data1}, Sub Type: ${orig.data.data2}) :: ${JSON.stringify(pushData)}`);
+            for(const eventListener of this.pushEventListeners) {
+                if(eventListener.type === parseInt(orig.data.data1) && eventListener.subType == parseInt(orig.data.data2)) {
+                    eventListener.callback(pushData);
+                }
+            }
+        });
+
         this.log('Looking for complex info...');
         this.complex = await Utils.findMatchedComplex(this.config.region, this.config.complex);
         this.log(`Complex info about (${this.config.complex}) has found.`);
@@ -243,9 +287,6 @@ export class Client {
         if(this.handler === undefined) {
             return;
         }
-        this.registerListeners();
-        this.registerErrorListeners();
-
         this.handler.handle();
     }
 

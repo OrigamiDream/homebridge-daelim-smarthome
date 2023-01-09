@@ -59,6 +59,7 @@ export class Utils {
     public static PLUGIN_NAME = "homebridge-daelim-smarthome";
     public static PLATFORM_NAME = "DaelimSmartHomePlatform";
     public static MANUFACTURER_NAME = "DL E&C Co.,Ltd.";
+    public static FCM_SENDER_ID = "251248256994";
 
     public static COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/complexes.json";
 

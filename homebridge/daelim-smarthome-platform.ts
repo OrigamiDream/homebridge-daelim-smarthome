@@ -1,10 +1,4 @@
-import {
-    API,
-    APIEvent, DynamicPlatformPlugin,
-    Logging,
-    PlatformAccessory,
-    PlatformConfig,
-} from "homebridge";
+import {API, APIEvent, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig,} from "homebridge";
 import {DaelimConfig} from "../core/interfaces/daelim-config";
 import {Client} from "../core/client";
 import {LightbulbAccessories} from "./accessories/lightbulb";
@@ -14,6 +8,9 @@ import {OutletAccessories} from "./accessories/outlet";
 import {HeaterAccessories} from "./accessories/heater";
 import {GasAccessories} from "./accessories/gas";
 import {ElevatorAccessories} from "./accessories/elevator";
+import {FirebaseCredentials} from "../core/interfaces/firebase";
+
+const fcm = require("push-receiver");
 
 export = (api: API) => {
     api.registerPlatform(Utils.PLATFORM_NAME, DaelimSmartHomePlatform);
@@ -86,8 +83,14 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
             this.log.warn("Config parameters are not set. No accessories.");
             return;
         }
-        this.client = new Client(this.log, this.config);
+
+        // firebase cloud messaging
+        const credentials = await fcm.register(Utils.FCM_SENDER_ID);
+        this.client = new Client(this.log, this.config, credentials as FirebaseCredentials);
         await this.client.prepareService();
+
+        this.client.registerListeners();
+        this.client.registerErrorListeners();
 
         this.accessories.forEach(accessories => {
             accessories.setClient(this.client!);
