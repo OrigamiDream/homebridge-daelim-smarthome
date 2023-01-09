@@ -151,10 +151,10 @@ export class NetworkHandler {
                 this.onConnected();
             }
         });
-        this.socket.on('data', (data) => {
+        this.socket.on('data', async (data) => {
             this.appendBuffer(data);
             do {
-            } while(this.handleResponse());
+            } while(await this.handleResponse());
         });
         this.socket.on('end', () => {
             this.log.info('Disconnected from MMF server');
@@ -196,7 +196,7 @@ export class NetworkHandler {
         this.readBuffers = temp.buffer;
     }
 
-    private handleResponse(): boolean {
+    private async handleResponse(): Promise<boolean> {
         const rawData = new Uint8Array(this.readBuffers);
         const chunk = Chunk.parse(rawData);
         if(chunk === undefined) {
@@ -239,14 +239,14 @@ export class NetworkHandler {
                 }
                 for(const listener of this.listeners) {
                     if(listener.type === header.getType() && listener.subType == header.getSubType()) {
-                        listener.callback(packet.getJSONBody());
+                        await listener.callback(packet.getJSONBody());
                     }
                 }
             } else {
                 let found = false;
                 for(const listener of this.errorListeners) {
                     if(listener.error === header.getError()) {
-                        listener.callback();
+                        await listener.callback();
                         found = true;
                     }
                 }
