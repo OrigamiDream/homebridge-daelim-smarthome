@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 import {Device} from "../core/interfaces/daelim-config";
 import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME} from "../homebridge/accessories/elevator";
 import {DOOR_DEVICE_ID, DOOR_DISPLAY_NAME} from "../homebridge/accessories/door";
+import {VEHICLE_DEVICE_ID, VEHICLE_DISPLAY_NAME} from "../homebridge/accessories/vehicle";
 import Timeout = NodeJS.Timeout;
 
 interface ClientAuthorization {
@@ -90,6 +91,13 @@ export class UiServer extends HomebridgePluginUiServer {
             name: DOOR_DISPLAY_NAME,
             deviceType: 'door',
             deviceId: DOOR_DEVICE_ID,
+            disabled: false
+        });
+        this.devices.push({
+            displayName: VEHICLE_DISPLAY_NAME,
+            name: VEHICLE_DISPLAY_NAME,
+            deviceType: 'vehicle',
+            deviceId: VEHICLE_DEVICE_ID,
             disabled: false
         });
 
@@ -202,6 +210,7 @@ export class UiServer extends HomebridgePluginUiServer {
             'fan': '환풍기',
             'elevator': '', // elevator does not need pretty name
             'door': '', // door does not need pretty name
+            'vehicle': '', // vehicle does not need pretty name
             'gas': ''  // gas does not need pretty name
         }
         const name = nameMap[deviceType];
