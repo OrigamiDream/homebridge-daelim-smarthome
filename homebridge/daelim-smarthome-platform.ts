@@ -9,6 +9,7 @@ import {HeaterAccessories} from "./accessories/heater";
 import {GasAccessories} from "./accessories/gas";
 import {ElevatorAccessories} from "./accessories/elevator";
 import {FirebaseCredentials} from "../core/interfaces/firebase";
+import {DoorAccessories} from "./accessories/door";
 
 const fcm = require("push-receiver");
 
@@ -36,6 +37,7 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
         this.accessories.push(new HeaterAccessories(this.log, this.api, this.config));
         this.accessories.push(new GasAccessories(this.log, this.api, this.config));
         this.accessories.push(new ElevatorAccessories(this.log, this.api, this.config));
+        this.accessories.push(new DoorAccessories(this.log, this.api, this.config));
 
         api.on(APIEvent.DID_FINISH_LAUNCHING, async () => {
             const semaphore = new Semaphore();

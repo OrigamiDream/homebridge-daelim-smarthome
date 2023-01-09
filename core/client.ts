@@ -80,6 +80,24 @@ export class Client {
         return pin;
     }
 
+    private async forceUpdatePushPreferences(name: string, state: string = "on") {
+        await this.sendDeferredRequest({
+            type: "setting",
+            item: [{
+                name: name,
+                arg1: state
+            }]
+        }, Types.SETTING, SettingSubTypes.PUSH_SETTING_REQUEST, SettingSubTypes.PUSH_SETTING_RESPONSE, (body) => {
+            const items = body['item'] || [];
+            for(const item of items) {
+                if(item['name'] === name) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
     sendUnreliableRequest(body: any, type: Types, subType: SubTypes) {
         if(this.handler !== undefined) {
             this.handler.sendUnreliableRequest(body, this.getAuthorizationPIN(), type, subType);
@@ -129,7 +147,9 @@ export class Client {
             this.authorization.login = body['loginpin'];
             this.sendUnreliableRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
         });
-        this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (_) => {
+        this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (_) => {
+            await this.forceUpdatePushPreferences("door");
+
             // registering fcm push token
             this.sendUnreliableRequest({
                 dong: this.address.complex,
