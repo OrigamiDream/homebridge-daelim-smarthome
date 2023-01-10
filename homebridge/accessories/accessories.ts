@@ -166,11 +166,11 @@ export class Accessories<T extends AccessoryInterface> {
         }
     }
 
-    addAccessory(context: T) {
+    addAccessory(context: T): PlatformAccessory | undefined {
         if(this.client?.isNetworkRefreshing()) {
             // This prevents changing the accessories to uninitialized state while refreshing the connection.
             // Uninitialized state makes the accessories are no response in Home app.
-            return;
+            return undefined;
         }
         // accessory type must be specified for proper uuid generation
         context.accessoryType = this.getDeviceType();
@@ -191,7 +191,7 @@ export class Accessories<T extends AccessoryInterface> {
                     // unregister the accessory since the accessory is cached in homebridge
                     this.api.unregisterPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ cachedAccessory ]);
                     this.log.debug('The device (%s, uid:%s) is disabled in config, therefore unregistered immediately', deviceInfo.name, deviceInfo.deviceId);
-                    return false;
+                    return undefined;
                 }
                 const version = cachedAccessory.context.version;
                 cachedAccessory.context = context;
@@ -204,12 +204,12 @@ export class Accessories<T extends AccessoryInterface> {
                 } else {
                     this.log.info("Restoring cached accessory: %s (%s, %s)", context.displayName, context.deviceID, this.getDeviceType());
                 }
-                return true;
+                return cachedAccessory;
             }
         }
         if(deviceInfo && deviceInfo.disabled) {
             this.log.debug('The device (%s, uid:%s) is disabled in config', deviceInfo.name, deviceInfo.deviceId);
-            return false;
+            return undefined;
         }
         const seed = NEW_UUID_COMBINATION(context);
         const uuid = this.api.hap.uuid.generate(seed);
@@ -227,7 +227,7 @@ export class Accessories<T extends AccessoryInterface> {
 
         this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ accessory ]);
         this.configureAccessory(accessory, services);
-        return true;
+        return accessory;
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
