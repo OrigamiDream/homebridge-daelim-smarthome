@@ -81,21 +81,21 @@ export class UiServer extends HomebridgePluginUiServer {
             room: ''
         };
         this.devices.push({
-            displayName: ELEVATOR_DISPLAY_NAME,
+            displayName: `${ELEVATOR_DISPLAY_NAME} ${UiServer.prettierDeviceType('elevator')}`,
             name: ELEVATOR_DISPLAY_NAME,
             deviceType: 'elevator',
             deviceId: ELEVATOR_DEVICE_ID,
             disabled: false
         });
         this.devices.push({
-            displayName: DOOR_DISPLAY_NAME,
+            displayName: `${DOOR_DISPLAY_NAME} ${UiServer.prettierDeviceType('door')}`,
             name: DOOR_DISPLAY_NAME,
             deviceType: 'door',
             deviceId: DOOR_DEVICE_ID,
             disabled: false
         });
         this.devices.push({
-            displayName: VEHICLE_DISPLAY_NAME,
+            displayName: `${VEHICLE_DISPLAY_NAME} ${UiServer.prettierDeviceType('vehicle')}`,
             name: VEHICLE_DISPLAY_NAME,
             deviceType: 'vehicle',
             deviceId: VEHICLE_DEVICE_ID,
@@ -103,7 +103,7 @@ export class UiServer extends HomebridgePluginUiServer {
         });
         for(const device of CAMERA_DEVICES) {
             this.devices.push({
-                displayName: device.displayName,
+                displayName: `${device.displayName} ${UiServer.prettierDeviceType('camera')}`,
                 name: device.displayName,
                 deviceType: 'camera',
                 deviceId: device.deviceID,
