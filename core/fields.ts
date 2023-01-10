@@ -320,15 +320,20 @@ export enum ApplicationLogSubTypes {
 
 }
 
-export type PushSubTypes = DevicePushTypes | EventPushTypes;
+export type PushSubTypes = DevicePushTypes | EnvironmentPushTypes | EventPushTypes;
 
 export enum PushTypes {
     DEVICES = 3,
+    ENVIRONMENTS = 4,
     EVENTS = 5
 }
 
 export enum DevicePushTypes {
     LIGHT_CHANGES = 5
+}
+
+export enum EnvironmentPushTypes {
+    ELECTRICITY_LEVEL = 22
 }
 
 export enum EventPushTypes {
