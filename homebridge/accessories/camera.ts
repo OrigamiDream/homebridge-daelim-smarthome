@@ -107,9 +107,9 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
     }
 
     createMotionTimer(accessory: PlatformAccessory) {
-        this.log.info("Creating a new motion detector timer");
+        this.log.debug("Creating a new motion detector timer");
         return setTimeout(() => {
-            this.log.info("Invalidating the motion detector timer");
+            this.log.debug("Invalidating the motion detector timer");
             const context = this.getAccessoryInterface(accessory);
             if(context.motionTimer) {
                 clearTimeout(context.motionTimer);
@@ -148,7 +148,6 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
             }, Types.INFO, InfoSubTypes.VISITOR_LIST_REQUEST, InfoSubTypes.VISITOR_LIST_RESPONSE, (_) => {
                 return true;
             }).then((histories) => {
-                this.log.info(JSON.stringify(histories));
                 return histories["list"][0]; // the first history
             }).then((history: any): VisitorOnCameraInfo => {
                 return {
@@ -240,7 +239,6 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 private readonly log: Logging,
                 private readonly context: CameraAccessoryInterface) {
         this.api.on(APIEvent.SHUTDOWN, () => {
-            this.log.info(`Device ${this.context.displayName} is being invalidated`);
             this.context.visitorInfo = undefined;
             if(this.context.motionTimer) {
                 clearTimeout(this.context.motionTimer);
@@ -285,13 +283,13 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
 
     private async createAlternativeSnapshot(): Promise<Buffer> {
         if(!this.alternativeSnapshot) {
-            this.log.info("Creating alternative snapshot buffer");
+            this.log.debug("Creating alternative snapshot buffer");
             const response = await axios.get(Utils.HOMEKIT_SECURE_VIDEO_IDLE_URL, {
                 responseType: "arraybuffer"
             });
             this.alternativeSnapshot = Buffer.from(response.data, "utf-8");
         } else {
-            this.log.info("Using cached alternative snapshot buffer");
+            this.log.debug("Using cached alternative snapshot buffer");
         }
         return this.alternativeSnapshot;
     }
@@ -336,7 +334,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             args.push("-loglevel error");
 
             const ffmpegArgs = args.join(" ");
-            this.log.info(`Snapshot command: ffmpeg ${ffmpegArgs}`);
+            this.log.debug(`Snapshot command: ffmpeg ${ffmpegArgs}`);
             const ffmpeg = spawn("ffmpeg", ffmpegArgs.split(/\s+/), {
                 env: process.env
             });
@@ -419,9 +417,9 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
         try {
             const cachedSnapshot = !!this.snapshotPromise;
 
-            this.log.info(`Snapshot requested: ${request.width} x ${request.height}`);
+            this.log.debug(`Snapshot requested: ${request.width} x ${request.height}`);
             const snapshot = await (this.snapshotPromise || this.fetchSnapshot(resolution.snapshotFilter));
-            this.log.info(`Sending snapshot: ${resolution.width > 0 ? resolution.width : "native"} x ${resolution.height > 0 ? resolution.height : "native"} ${cachedSnapshot ? " (cached)" : ""}`);
+            this.log.debug(`Sending snapshot: ${resolution.width > 0 ? resolution.width : "native"} x ${resolution.height > 0 ? resolution.height : "native"} ${cachedSnapshot ? " (cached)" : ""}`);
             const resized = await this.resizeSnapshot(snapshot, resolution.resizeFilter);
             callback(undefined, resized);
         } catch (err) {
