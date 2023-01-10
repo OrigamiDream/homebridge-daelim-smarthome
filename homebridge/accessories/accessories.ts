@@ -75,6 +75,10 @@ export class Accessories<T extends AccessoryInterface> {
         return this.serviceTypes;
     }
 
+    protected getAccessoryInterface(accessory: PlatformAccessory) {
+        return accessory.context as T;
+    }
+
     private getConfiguredDevices(): Device[] {
         const devices = this.config?.devices || [];
         return devices.filter(device => device.deviceType === this.getDeviceType());

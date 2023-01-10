@@ -62,6 +62,7 @@ export class Utils {
     public static FCM_SENDER_ID = "251248256994";
 
     public static COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/complexes.json";
+    public static HOMEKIT_SECURE_VIDEO_IDLE_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/visitor-hksv/assets/idle.png";
 
     static createSemanticVersion(major: number, minor: number, patch: number, beta: number = -1): SemanticVersion {
         return {

@@ -10,6 +10,7 @@ import {GasAccessories} from "./accessories/gas";
 import {ElevatorAccessories} from "./accessories/elevator";
 import {DoorAccessories} from "./accessories/door";
 import {VehicleAccessories} from "./accessories/vehicle";
+import {CameraAccessories} from "./accessories/camera";
 import fcm, {Credentials} from "push-receiver";
 
 export = (api: API) => {
@@ -38,6 +39,7 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
         this.accessories.push(new ElevatorAccessories(this.log, this.api, this.config));
         this.accessories.push(new DoorAccessories(this.log, this.api, this.config));
         this.accessories.push(new VehicleAccessories(this.log, this.api, this.config));
+        this.accessories.push(new CameraAccessories(this.log, this.api, this.config));
 
         api.on(APIEvent.DID_FINISH_LAUNCHING, async () => {
             const semaphore = new Semaphore();

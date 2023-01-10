@@ -156,6 +156,7 @@ export class Client {
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (_) => {
             await this.forceUpdatePushPreferences("door");
             await this.forceUpdatePushPreferences("car");
+            await this.forceUpdatePushPreferences("visitor"); // for camera
 
             // registering fcm push token
             this.sendUnreliableRequest({
