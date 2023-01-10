@@ -129,6 +129,7 @@ class ComplexFetcher extends FetcherBase {
                     name: complex['name'],
                     status: complex['status'],
                     serverIp: complex['ip'],
+                    directoryName: complex['danjiDirectoryName'],
                     geolocation: {
                         state: complex['dongStep1'],
                         city: complex['dongStep2'],

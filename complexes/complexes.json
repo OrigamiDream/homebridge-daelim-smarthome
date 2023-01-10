@@ -9,6 +9,7 @@
                     "name": "e편한세상 강동에코포레",
                     "status": "LIVE",
                     "serverIp": "49.238.210.243",
+                    "directoryName": "gangdongecofore",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "강동구",
@@ -21,6 +22,7 @@
                     "name": "e편한세상 금호(101~116)",
                     "status": "LIVE",
                     "serverIp": "118.32.191.233",
+                    "directoryName": "kumhopark",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "성동구",
@@ -33,6 +35,7 @@
                     "name": "e편한세상 금호(117)",
                     "status": "DEV",
                     "serverIp": "118.32.191.241",
+                    "directoryName": "kumhopark",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "성동구",
@@ -45,6 +48,7 @@
                     "name": "녹번역e편한세상캐슬",
                     "status": "LIVE",
                     "serverIp": "210.181.245.11",
+                    "directoryName": "nokbeon",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "은평구",
@@ -57,6 +61,7 @@
                     "name": "e편한세상 광진그랜드파크",
                     "status": "LIVE",
                     "serverIp": "121.126.79.99",
+                    "directoryName": "gwangjin",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "광진구",
@@ -69,6 +74,7 @@
                     "name": "e편한세상 독산더타워",
                     "status": "LIVE",
                     "serverIp": "210.219.202.75",
+                    "directoryName": "doksanthetower",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "금천구",
@@ -81,6 +87,7 @@
                     "name": "e편한세상 문래",
                     "status": "LIVE",
                     "serverIp": "210.180.59.142",
+                    "directoryName": "moonrae",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "영등포구",
@@ -93,6 +100,7 @@
                     "name": "e편한세상 부천심곡",
                     "status": "LIVE",
                     "serverIp": "49.254.26.123",
+                    "directoryName": "bucheonsimgok",
                     "geolocation": {
                         "state": "경기도",
                         "city": "부천시소사구",
@@ -105,6 +113,7 @@
                     "name": "e편한세상 서울대입구1단지",
                     "status": "LIVE",
                     "serverIp": "211.240.121.35",
+                    "directoryName": "seouldae",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "관악구",
@@ -117,6 +126,7 @@
                     "name": "e편한세상 서울대입구2단지",
                     "status": "LIVE",
                     "serverIp": "211.240.121.43",
+                    "directoryName": "seouldae",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "관악구",
@@ -129,6 +139,7 @@
                     "name": "e편한세상 서울대입구2차",
                     "status": "LIVE",
                     "serverIp": "49.238.215.195",
+                    "directoryName": "seouldae2",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "관악구",
@@ -141,6 +152,7 @@
                     "name": "e편한세상 송파파크센트럴",
                     "status": "LIVE",
                     "serverIp": "210.180.47.163",
+                    "directoryName": "songpapark",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "송파구",
@@ -153,6 +165,7 @@
                     "name": "e편한세상 신촌 1단지",
                     "status": "LIVE",
                     "serverIp": "211.174.222.171",
+                    "directoryName": "sinchon",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "서대문구",
@@ -165,6 +178,7 @@
                     "name": "e편한세상 신촌 2단지",
                     "status": "LIVE",
                     "serverIp": "211.174.227.11",
+                    "directoryName": "sinchon",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "서대문구",
@@ -177,6 +191,7 @@
                     "name": "e편한세상 신촌 3단지",
                     "status": "LIVE",
                     "serverIp": "211.174.213.43",
+                    "directoryName": "sinchon",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "서대문구",
@@ -189,6 +204,7 @@
                     "name": "e편한세상 신촌 4단지",
                     "status": "LIVE",
                     "serverIp": "211.112.10.3",
+                    "directoryName": "sinchon",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "서대문구",
@@ -201,6 +217,7 @@
                     "name": "e편한세상 영등포아델포레",
                     "status": "LIVE",
                     "serverIp": "210.219.250.115",
+                    "directoryName": "boramae2",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "영등포구",
@@ -213,6 +230,7 @@
                     "name": "e편한세상 염창",
                     "status": "LIVE",
                     "serverIp": "59.15.220.114",
+                    "directoryName": "yeomchang",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "강서구",
@@ -225,6 +243,7 @@
                     "name": "e편한세상 옥수파크힐스 1단지",
                     "status": "LIVE",
                     "serverIp": "125.129.33.144",
+                    "directoryName": "oksoopark",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "성동구",
@@ -237,6 +256,7 @@
                     "name": "e편한세상 옥수파크힐스 2단지",
                     "status": "LIVE",
                     "serverIp": "125.129.42.58",
+                    "directoryName": "oksoopark",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "성동구",
@@ -249,6 +269,7 @@
                     "name": "e편한세상 청계센트럴포레",
                     "status": "LIVE",
                     "serverIp": "203.239.185.227",
+                    "directoryName": "chunggye",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "동대문구",
@@ -261,6 +282,7 @@
                     "name": "e편한세상 화랑대",
                     "status": "LIVE",
                     "serverIp": "125.128.165.130",
+                    "directoryName": "hwarangdae",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "중랑구",
@@ -273,6 +295,7 @@
                     "name": "아크로리버파크",
                     "status": "LIVE",
                     "serverIp": "211.240.89.11",
+                    "directoryName": "banpo",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "서초구",
@@ -285,6 +308,7 @@
                     "name": "아크로타워스퀘어",
                     "status": "LIVE",
                     "serverIp": "211.56.234.180",
+                    "directoryName": "acrost",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "영등포구",
@@ -297,6 +321,7 @@
                     "name": "아크로리버뷰",
                     "status": "LIVE",
                     "serverIp": "175.209.82.107",
+                    "directoryName": "acroriverview",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "서초구",
@@ -309,6 +334,7 @@
                     "name": "아크로리버하임1블럭(101~107)",
                     "status": "LIVE",
                     "serverIp": "210.102.30.67",
+                    "directoryName": "acroriverheim",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "동작구",
@@ -321,6 +347,7 @@
                     "name": "아크로리버하임2블럭(108~120)",
                     "status": "LIVE",
                     "serverIp": "210.102.30.35",
+                    "directoryName": "acroriverheim",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "동작구",
@@ -333,6 +360,7 @@
                     "name": "e편한세상 반포 테스트",
                     "status": "DEV",
                     "serverIp": "121.168.107.206",
+                    "directoryName": "testBanpo",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "서초구",
@@ -350,6 +378,7 @@
                     "name": "e편한세상 광양",
                     "status": "LIVE",
                     "serverIp": "112.220.81.108",
+                    "directoryName": "guangyang",
                     "geolocation": {
                         "state": "전라남도",
                         "city": "광양시",
@@ -362,6 +391,7 @@
                     "name": "e편한세상 순천(1~10)",
                     "status": "LIVE",
                     "serverIp": "210.219.220.102",
+                    "directoryName": "sooncheon",
                     "geolocation": {
                         "state": "전라남도",
                         "city": "순천시",
@@ -374,6 +404,7 @@
                     "name": "e편한세상 순천(11~12)",
                     "status": "LIVE",
                     "serverIp": "210.118.30.246",
+                    "directoryName": "sooncheon",
                     "geolocation": {
                         "state": "전라남도",
                         "city": "순천시",
@@ -391,6 +422,7 @@
                     "name": "e편한세상 광안비치",
                     "status": "LIVE",
                     "serverIp": "58.231.245.164",
+                    "directoryName": "gwangan",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "수영구",
@@ -403,6 +435,7 @@
                     "name": "e편한세상 금정산",
                     "status": "LIVE",
                     "serverIp": "124.198.99.3",
+                    "directoryName": "kumjeongsan",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "북구",
@@ -415,6 +448,7 @@
                     "name": "e편한세상 동래명장1단지",
                     "status": "LIVE",
                     "serverIp": "49.239.153.35",
+                    "directoryName": "myoungjang",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "동래구",
@@ -427,6 +461,7 @@
                     "name": "e편한세상 동래명장2단지",
                     "status": "LIVE",
                     "serverIp": "49.239.153.43",
+                    "directoryName": "myoungjang",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "동래구",
@@ -439,6 +474,7 @@
                     "name": "e편한세상 동래아시아드",
                     "status": "LIVE",
                     "serverIp": "1.222.196.252",
+                    "directoryName": "oncheon",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "동래구",
@@ -451,6 +487,7 @@
                     "name": "e편한세상 명지",
                     "status": "LIVE",
                     "serverIp": "59.19.182.196",
+                    "directoryName": "myungji",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "강서구",
@@ -463,6 +500,7 @@
                     "name": "e편한세상 부산항",
                     "status": "LIVE",
                     "serverIp": "211.174.227.115",
+                    "directoryName": "busanhang",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "동구",
@@ -475,6 +513,7 @@
                     "name": "e편한세상 사하",
                     "status": "LIVE",
                     "serverIp": "59.20.46.110",
+                    "directoryName": "saha",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "사하구",
@@ -487,6 +526,7 @@
                     "name": "e편한세상 사하2차",
                     "status": "LIVE",
                     "serverIp": "211.232.128.212",
+                    "directoryName": "saha2",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "사하구",
@@ -499,6 +539,7 @@
                     "name": "e편한세상 연산더퍼스트",
                     "status": "LIVE",
                     "serverIp": "180.66.217.238",
+                    "directoryName": "yeonsan",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "연제구",
@@ -511,6 +552,7 @@
                     "name": "e편한세상오션테라스1단지",
                     "status": "LIVE",
                     "serverIp": "211.52.115.35",
+                    "directoryName": "oceanterrace",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "수영구",
@@ -523,6 +565,7 @@
                     "name": "e편한세상오션테라스2단지",
                     "status": "LIVE",
                     "serverIp": "203.239.147.147",
+                    "directoryName": "oceanterrace",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "수영구",
@@ -535,6 +578,7 @@
                     "name": "e편한세상오션테라스3단지",
                     "status": "LIVE",
                     "serverIp": "210.112.225.83",
+                    "directoryName": "oceanterrace",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "수영구",
@@ -547,6 +591,7 @@
                     "name": "e편한세상오션테라스4단지",
                     "status": "LIVE",
                     "serverIp": "210.219.199.171",
+                    "directoryName": "oceanterrace",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "수영구",
@@ -559,6 +604,7 @@
                     "name": "e편한세상 일광",
                     "status": "LIVE",
                     "serverIp": "113.131.86.134",
+                    "directoryName": "ilkwang",
                     "geolocation": {
                         "state": "부산광역시",
                         "city": "기장군",
@@ -576,6 +622,7 @@
                     "name": "e편한세상 광주역 1단지",
                     "status": "LIVE",
                     "serverIp": "125.132.139.61",
+                    "directoryName": "gwangju",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -588,6 +635,7 @@
                     "name": "e편한세상 광주역 2단지",
                     "status": "LIVE",
                     "serverIp": "125.132.139.56",
+                    "directoryName": "gwangju",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -600,6 +648,7 @@
                     "name": "e편한세상 광주역 3단지",
                     "status": "LIVE",
                     "serverIp": "125.132.139.10",
+                    "directoryName": "gwangju",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -612,6 +661,7 @@
                     "name": "e편한세상 광주역 4단지",
                     "status": "LIVE",
                     "serverIp": "125.132.139.5",
+                    "directoryName": "gwangju",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -624,6 +674,7 @@
                     "name": "e편한세상 광주역 5단지",
                     "status": "LIVE",
                     "serverIp": "125.132.139.20",
+                    "directoryName": "gwangju",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -636,6 +687,7 @@
                     "name": "e편한세상 광주역 6단지",
                     "status": "LIVE",
                     "serverIp": "125.132.139.15",
+                    "directoryName": "gwangju",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -648,6 +700,7 @@
                     "name": "e편한세상 녹양역",
                     "status": "LIVE",
                     "serverIp": "211.174.227.123",
+                    "directoryName": "nokyang",
                     "geolocation": {
                         "state": "경기도",
                         "city": "의정부시",
@@ -660,6 +713,7 @@
                     "name": "e편한세상 다산",
                     "status": "LIVE",
                     "serverIp": "49.254.19.70",
+                    "directoryName": "naturedasan",
                     "geolocation": {
                         "state": "경기도",
                         "city": "남양주시",
@@ -672,6 +726,7 @@
                     "name": "다산신도시자연앤e편한세상2차",
                     "status": "LIVE",
                     "serverIp": "210.181.246.132",
+                    "directoryName": "naturedasan3",
                     "geolocation": {
                         "state": "경기도",
                         "city": "남양주시",
@@ -684,6 +739,7 @@
                     "name": "자연앤이편한세상3차",
                     "status": "LIVE",
                     "serverIp": "211.174.191.51",
+                    "directoryName": "naturedasan3",
                     "geolocation": {
                         "state": "경기도",
                         "city": "남양주시",
@@ -696,6 +752,7 @@
                     "name": "다산e편한세상자이",
                     "status": "LIVE",
                     "serverIp": "13.125.160.103",
+                    "directoryName": "naturedasan2",
                     "geolocation": {
                         "state": "경기도",
                         "city": "남양주시",
@@ -708,6 +765,7 @@
                     "name": "e편한세상 동탄",
                     "status": "LIVE",
                     "serverIp": "106.245.140.116",
+                    "directoryName": "hwasungdongtan",
                     "geolocation": {
                         "state": "경기도",
                         "city": "화성시",
@@ -720,6 +778,7 @@
                     "name": "e편한세상 미사",
                     "status": "LIVE",
                     "serverIp": "183.100.50.248",
+                    "directoryName": "misa",
                     "geolocation": {
                         "state": "경기도",
                         "city": "하남시",
@@ -732,6 +791,7 @@
                     "name": "e편한세상 반월나노시티역",
                     "status": "LIVE",
                     "serverIp": "222.98.56.238",
+                    "directoryName": "hwaseong",
                     "geolocation": {
                         "state": "경기도",
                         "city": "화성시",
@@ -744,6 +804,7 @@
                     "name": "e편한세상 상록",
                     "status": "LIVE",
                     "serverIp": "210.112.230.35",
+                    "directoryName": "sangrok",
                     "geolocation": {
                         "state": "경기도",
                         "city": "안산시상록구",
@@ -756,6 +817,7 @@
                     "name": "e편한세상 선부1단지",
                     "status": "LIVE",
                     "serverIp": "58.236.246.19",
+                    "directoryName": "sunbu",
                     "geolocation": {
                         "state": "경기도",
                         "city": "안산시단원구",
@@ -768,6 +830,7 @@
                     "name": "e편한세상 선부2단지",
                     "status": "LIVE",
                     "serverIp": "58.236.198.51",
+                    "directoryName": "sunbu",
                     "geolocation": {
                         "state": "경기도",
                         "city": "안산시단원구",
@@ -780,6 +843,7 @@
                     "name": "e편한세상 선부역 어반스퀘어",
                     "status": "LIVE",
                     "serverIp": "210.118.15.83",
+                    "directoryName": "sunbusquare",
                     "geolocation": {
                         "state": "경기도",
                         "city": "안산시단원구",
@@ -792,6 +856,7 @@
                     "name": "e편한세상 수지",
                     "status": "LIVE",
                     "serverIp": "211.240.112.139",
+                    "directoryName": "suji",
                     "geolocation": {
                         "state": "경기도",
                         "city": "용인시수지구",
@@ -804,6 +869,7 @@
                     "name": "e편한세상수택센트럴파크",
                     "status": "LIVE",
                     "serverIp": "210.102.14.179",
+                    "directoryName": "gurisootack",
                     "geolocation": {
                         "state": "경기도",
                         "city": "구리시",
@@ -816,6 +882,7 @@
                     "name": "e편한세상 시티삼송1차",
                     "status": "LIVE",
                     "serverIp": "211.240.1.107",
+                    "directoryName": "citysamsong1",
                     "geolocation": {
                         "state": "경기도",
                         "city": "고양시덕양구",
@@ -828,6 +895,7 @@
                     "name": "e편한세상 시티삼송2차",
                     "status": "LIVE",
                     "serverIp": "211.174.227.83",
+                    "directoryName": "citysamsong1",
                     "geolocation": {
                         "state": "경기도",
                         "city": "고양시덕양구",
@@ -840,6 +908,7 @@
                     "name": "e편한세상 시티삼송3차",
                     "status": "LIVE",
                     "serverIp": "211.174.227.163",
+                    "directoryName": "citysamsong1",
                     "geolocation": {
                         "state": "경기도",
                         "city": "고양시덕양구",
@@ -852,6 +921,7 @@
                     "name": "e편한세상 시흥 센텀하임",
                     "status": "LIVE",
                     "serverIp": "49.239.153.27",
+                    "directoryName": "siheung",
                     "geolocation": {
                         "state": "경기도",
                         "city": "시흥시",
@@ -864,6 +934,7 @@
                     "name": "e편한세상 신곡파크비스타",
                     "status": "LIVE",
                     "serverIp": "211.174.227.203",
+                    "directoryName": "chudong1",
                     "geolocation": {
                         "state": "경기도",
                         "city": "의정부시",
@@ -876,6 +947,7 @@
                     "name": "e편한세상 신곡포레스타뷰",
                     "status": "LIVE",
                     "serverIp": "210.220.231.3",
+                    "directoryName": "chudong2",
                     "geolocation": {
                         "state": "경기도",
                         "city": "의정부시",
@@ -888,6 +960,7 @@
                     "name": "e편한세상 신봉담",
                     "status": "LIVE",
                     "serverIp": "210.220.200.187",
+                    "directoryName": "sinbongdam",
                     "geolocation": {
                         "state": "경기도",
                         "city": "화성시",
@@ -900,6 +973,7 @@
                     "name": "e편한세상 옥정어반센트럴",
                     "status": "LIVE",
                     "serverIp": "211.56.234.188",
+                    "directoryName": "yangju",
                     "geolocation": {
                         "state": "경기도",
                         "city": "양주시",
@@ -912,6 +986,7 @@
                     "name": "e편한세상옥정더퍼스트",
                     "status": "LIVE",
                     "serverIp": "210.181.246.243",
+                    "directoryName": "yangju3",
                     "geolocation": {
                         "state": "경기도",
                         "city": "양주시",
@@ -924,6 +999,7 @@
                     "name": "e편한세상 옥정메트로포레",
                     "status": "LIVE",
                     "serverIp": "210.118.0.163",
+                    "directoryName": "yangju4",
                     "geolocation": {
                         "state": "경기도",
                         "city": "양주시",
@@ -936,6 +1012,7 @@
                     "name": "e편한세상 옥정에듀써밋",
                     "status": "LIVE",
                     "serverIp": "211.232.170.76",
+                    "directoryName": "yangju2",
                     "geolocation": {
                         "state": "경기도",
                         "city": "양주시",
@@ -948,6 +1025,7 @@
                     "name": "e편한세상 온수역",
                     "status": "LIVE",
                     "serverIp": "210.118.9.35",
+                    "directoryName": "onsu",
                     "geolocation": {
                         "state": "경기도",
                         "city": "부천시소사구",
@@ -960,6 +1038,7 @@
                     "name": "e편한세상 영통2차 1단지",
                     "status": "LIVE",
                     "serverIp": "221.132.66.28",
+                    "directoryName": "yeongtong2",
                     "geolocation": {
                         "state": "경기도",
                         "city": "수원시영통구",
@@ -972,6 +1051,7 @@
                     "name": "e편한세상 영통2차 2단지",
                     "status": "LIVE",
                     "serverIp": "221.132.71.132",
+                    "directoryName": "yeongtong2",
                     "geolocation": {
                         "state": "경기도",
                         "city": "수원시영통구",
@@ -984,6 +1064,7 @@
                     "name": "e편한세상 오산세교",
                     "status": "LIVE",
                     "serverIp": "112.216.85.76",
+                    "directoryName": "osansegyo",
                     "geolocation": {
                         "state": "경기도",
                         "city": "오산시",
@@ -996,6 +1077,7 @@
                     "name": "e편한세상 오포3차",
                     "status": "LIVE",
                     "serverIp": "112.136.236.228",
+                    "directoryName": "opo",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1008,6 +1090,7 @@
                     "name": "e편한세상 오포4차",
                     "status": "LIVE",
                     "serverIp": "14.35.242.75",
+                    "directoryName": "opo4",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1020,6 +1103,7 @@
                     "name": "e편한세상 용인파크카운티",
                     "status": "LIVE",
                     "serverIp": "211.174.227.171",
+                    "directoryName": "yonginhansupcity",
                     "geolocation": {
                         "state": "경기도",
                         "city": "용인시처인구",
@@ -1032,6 +1116,7 @@
                     "name": "e편한세상 용인한숲시티2블럭",
                     "status": "LIVE",
                     "serverIp": "210.102.30.211",
+                    "directoryName": "yonginhansupcity",
                     "geolocation": {
                         "state": "경기도",
                         "city": "용인시처인구",
@@ -1044,6 +1129,7 @@
                     "name": "e편한세상 용인한숲시티3블럭",
                     "status": "LIVE",
                     "serverIp": "210.102.28.51",
+                    "directoryName": "yonginhansupcity",
                     "geolocation": {
                         "state": "경기도",
                         "city": "용인시처인구",
@@ -1056,6 +1142,7 @@
                     "name": "e편한세상 용인한숲시티4블럭",
                     "status": "LIVE",
                     "serverIp": "210.102.24.147",
+                    "directoryName": "yonginhansupcity",
                     "geolocation": {
                         "state": "경기도",
                         "city": "용인시처인구",
@@ -1068,6 +1155,7 @@
                     "name": "e편한세상 용인한숲시티5블럭",
                     "status": "LIVE",
                     "serverIp": "210.102.23.123",
+                    "directoryName": "yonginhansupcity",
                     "geolocation": {
                         "state": "경기도",
                         "city": "용인시처인구",
@@ -1080,6 +1168,7 @@
                     "name": "e편한세상 용인한숲시티6블럭",
                     "status": "LIVE",
                     "serverIp": "210.102.21.11",
+                    "directoryName": "yonginhansupcity",
                     "geolocation": {
                         "state": "경기도",
                         "city": "용인시처인구",
@@ -1092,6 +1181,7 @@
                     "name": "e편한세상 인창어반포레",
                     "status": "LIVE",
                     "serverIp": "210.219.223.219",
+                    "directoryName": "inchang",
                     "geolocation": {
                         "state": "경기도",
                         "city": "구리시",
@@ -1104,6 +1194,7 @@
                     "name": "e편한세상 일산 어반스카이",
                     "status": "LIVE",
                     "serverIp": "115.144.67.52",
+                    "directoryName": "ilsanurban",
                     "geolocation": {
                         "state": "경기도",
                         "city": "고양시일산서구",
@@ -1116,6 +1207,7 @@
                     "name": "e편한세상 일산 어반스카이 오피스텔",
                     "status": "LIVE",
                     "serverIp": "124.198.6.252",
+                    "directoryName": "ilsanurbanop",
                     "geolocation": {
                         "state": "경기도",
                         "city": "고양시일산서구",
@@ -1128,6 +1220,7 @@
                     "name": "e편한세상 초지역센트럴포레",
                     "status": "LIVE",
                     "serverIp": "121.126.136.155",
+                    "directoryName": "choji",
                     "geolocation": {
                         "state": "경기도",
                         "city": "안산시단원구",
@@ -1140,6 +1233,7 @@
                     "name": "e편한세상 캐널시티",
                     "status": "LIVE",
                     "serverIp": "121.172.68.195",
+                    "directoryName": "canalcity",
                     "geolocation": {
                         "state": "경기도",
                         "city": "김포시",
@@ -1152,6 +1246,7 @@
                     "name": "e편한세상 태전2차 1단지",
                     "status": "LIVE",
                     "serverIp": "211.240.113.27",
+                    "directoryName": "taejeon",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1164,6 +1259,7 @@
                     "name": "e편한세상 태전2차 2단지",
                     "status": "LIVE",
                     "serverIp": "211.240.115.107",
+                    "directoryName": "taejeon",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1176,6 +1272,7 @@
                     "name": "e편한세상 태전2차 3단지",
                     "status": "LIVE",
                     "serverIp": "211.240.116.99",
+                    "directoryName": "taejeon",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1188,6 +1285,7 @@
                     "name": "e편한세상 테라스 광교 3단지",
                     "status": "LIVE",
                     "serverIp": "210.180.41.148",
+                    "directoryName": "gwanggyo",
                     "geolocation": {
                         "state": "경기도",
                         "city": "수원시영통구",
@@ -1200,6 +1298,7 @@
                     "name": "e편한세상 테라스 광교 4단지",
                     "status": "LIVE",
                     "serverIp": "210.219.218.68",
+                    "directoryName": "gwanggyo",
                     "geolocation": {
                         "state": "경기도",
                         "city": "수원시영통구",
@@ -1212,6 +1311,7 @@
                     "name": "e편한세상 테라스오포2블록",
                     "status": "LIVE",
                     "serverIp": "210.102.17.147",
+                    "directoryName": "terraceopo",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1224,6 +1324,7 @@
                     "name": "e편한세상 테라스오포3블록",
                     "status": "LIVE",
                     "serverIp": "203.239.191.83",
+                    "directoryName": "terraceopo",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1236,6 +1337,7 @@
                     "name": "e편한세상 테라스오포4블록",
                     "status": "LIVE",
                     "serverIp": "203.239.190.91",
+                    "directoryName": "terraceopo",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1248,6 +1350,7 @@
                     "name": "e편한세상 테라스위례",
                     "status": "LIVE",
                     "serverIp": "210.219.238.108",
+                    "directoryName": "wirye",
                     "geolocation": {
                         "state": "경기도",
                         "city": "성남시수정구",
@@ -1260,6 +1363,7 @@
                     "name": "e편한세상 태재1단지",
                     "status": "LIVE",
                     "serverIp": "203.239.186.75",
+                    "directoryName": "taejae",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1272,6 +1376,7 @@
                     "name": "e편한세상 태재2단지",
                     "status": "LIVE",
                     "serverIp": "27.125.23.91",
+                    "directoryName": "taejae",
                     "geolocation": {
                         "state": "경기도",
                         "city": "광주시",
@@ -1284,6 +1389,7 @@
                     "name": "e편한세상 평택용이 1단지",
                     "status": "LIVE",
                     "serverIp": "211.248.91.40",
+                    "directoryName": "yongi",
                     "geolocation": {
                         "state": "경기도",
                         "city": "평택시",
@@ -1296,6 +1402,7 @@
                     "name": "e편한세상 평택용이 2단지",
                     "status": "LIVE",
                     "serverIp": "211.248.91.35",
+                    "directoryName": "yongi",
                     "geolocation": {
                         "state": "경기도",
                         "city": "평택시",
@@ -1308,6 +1415,7 @@
                     "name": "e편한세상 한강신도시2차",
                     "status": "LIVE",
                     "serverIp": "119.197.41.176",
+                    "directoryName": "kimpo2",
                     "geolocation": {
                         "state": "경기도",
                         "city": "김포시",
@@ -1325,6 +1433,7 @@
                     "name": "e편한세상 계양더프리미어",
                     "status": "LIVE",
                     "serverIp": "203.239.187.11",
+                    "directoryName": "gyeyang",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "계양구",
@@ -1337,6 +1446,7 @@
                     "name": "e편한세상 도화 5B",
                     "status": "LIVE",
                     "serverIp": "121.172.163.167",
+                    "directoryName": "dohwa5",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "남구",
@@ -1349,6 +1459,7 @@
                     "name": "e편한세상 도화 6-1B",
                     "status": "LIVE",
                     "serverIp": "220.126.100.147",
+                    "directoryName": "dohwa6",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "남구",
@@ -1361,6 +1472,7 @@
                     "name": "e편한세상 도화 6-2B",
                     "status": "LIVE",
                     "serverIp": "220.126.100.152",
+                    "directoryName": "dohwa6",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "남구",
@@ -1373,6 +1485,7 @@
                     "name": "e편한세상 서창",
                     "status": "LIVE",
                     "serverIp": "58.181.26.212",
+                    "directoryName": "seochang",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "남동구",
@@ -1385,6 +1498,7 @@
                     "name": "e편한세상 송도",
                     "status": "LIVE",
                     "serverIp": "210.112.242.123",
+                    "directoryName": "songdo",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "연수구",
@@ -1397,6 +1511,7 @@
                     "name": "e편한세상 시티인하대역",
                     "status": "LIVE",
                     "serverIp": "210.102.29.139",
+                    "directoryName": "cityinhadae",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "남구",
@@ -1409,6 +1524,7 @@
                     "name": "e편한세상 영종하늘도시",
                     "status": "LIVE",
                     "serverIp": "59.17.207.132",
+                    "directoryName": "yeongjonghanel1",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "중구",
@@ -1421,6 +1537,7 @@
                     "name": "e편한세상 영종국제도시오션하임",
                     "status": "LIVE",
                     "serverIp": "211.112.59.91",
+                    "directoryName": "yeongjonghanel2",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "중구",
@@ -1438,6 +1555,7 @@
                     "name": "e편한세상 구미교리",
                     "status": "LIVE",
                     "serverIp": "211.47.227.172",
+                    "directoryName": "gumi",
                     "geolocation": {
                         "state": "경상북도",
                         "city": "구미시",
@@ -1450,6 +1568,7 @@
                     "name": "e편한세상 구미파크밸리",
                     "status": "LIVE",
                     "serverIp": "59.151.198.252",
+                    "directoryName": "gumipark",
                     "geolocation": {
                         "state": "경상북도",
                         "city": "구미시",
@@ -1462,6 +1581,7 @@
                     "name": "e편한세상 금오파크",
                     "status": "LIVE",
                     "serverIp": "218.157.255.35",
+                    "directoryName": "kumopark",
                     "geolocation": {
                         "state": "경상북도",
                         "city": "구미시",
@@ -1474,6 +1594,7 @@
                     "name": "e편한세상 안동강변",
                     "status": "LIVE",
                     "serverIp": "49.254.112.3",
+                    "directoryName": "andonggangbyun",
                     "geolocation": {
                         "state": "경상북도",
                         "city": "안동시",
@@ -1486,6 +1607,7 @@
                     "name": "e편한세상 안동1단지",
                     "status": "LIVE",
                     "serverIp": "122.199.183.221",
+                    "directoryName": "andong",
                     "geolocation": {
                         "state": "경상북도",
                         "city": "안동시",
@@ -1498,6 +1620,7 @@
                     "name": "e편한세상 안동2단지",
                     "status": "LIVE",
                     "serverIp": "112.136.149.229",
+                    "directoryName": "andong",
                     "geolocation": {
                         "state": "경상북도",
                         "city": "안동시",
@@ -1510,6 +1633,7 @@
                     "name": "e편한세상 영천1단지",
                     "status": "LIVE",
                     "serverIp": "210.220.231.102",
+                    "directoryName": "youngcheon",
                     "geolocation": {
                         "state": "경상북도",
                         "city": "영천시",
@@ -1522,6 +1646,7 @@
                     "name": "e편한세상 영천2단지",
                     "status": "LIVE",
                     "serverIp": "211.112.5.78",
+                    "directoryName": "youngcheon",
                     "geolocation": {
                         "state": "경상북도",
                         "city": "영천시",
@@ -1539,6 +1664,7 @@
                     "name": "e편한세상 군산디오션시티",
                     "status": "LIVE",
                     "serverIp": "210.102.14.187",
+                    "directoryName": "doceancity",
                     "geolocation": {
                         "state": "전라북도",
                         "city": "군산시",
@@ -1551,6 +1677,7 @@
                     "name": "e편한세상 디오션시티2차",
                     "status": "LIVE",
                     "serverIp": "210.180.48.11",
+                    "directoryName": "doceancity2",
                     "geolocation": {
                         "state": "전라북도",
                         "city": "군산시",
@@ -1563,6 +1690,7 @@
                     "name": "e편한세상 우아",
                     "status": "LIVE",
                     "serverIp": "211.232.237.131",
+                    "directoryName": "wooah1",
                     "geolocation": {
                         "state": "전라북도",
                         "city": "전주시덕진구",
@@ -1580,6 +1708,7 @@
                     "name": "e편한세상 남산",
                     "status": "LIVE",
                     "serverIp": "211.195.13.230",
+                    "directoryName": "namsan",
                     "geolocation": {
                         "state": "대구광역시",
                         "city": "중구",
@@ -1592,6 +1721,7 @@
                     "name": "e편한세상 대구 금호",
                     "status": "LIVE",
                     "serverIp": "58.181.19.220",
+                    "directoryName": "kumho",
                     "geolocation": {
                         "state": "대구광역시",
                         "city": "북구",
@@ -1604,6 +1734,7 @@
                     "name": "e편한세상 대신",
                     "status": "LIVE",
                     "serverIp": "59.23.190.7",
+                    "directoryName": "daeshin",
                     "geolocation": {
                         "state": "대구광역시",
                         "city": "중구",
@@ -1616,6 +1747,7 @@
                     "name": "e편한세상 복현",
                     "status": "LIVE",
                     "serverIp": "203.239.187.59",
+                    "directoryName": "bockhyun",
                     "geolocation": {
                         "state": "대구광역시",
                         "city": "북구",
@@ -1633,6 +1765,7 @@
                     "name": "e편한세상 대전법동",
                     "status": "LIVE",
                     "serverIp": "210.219.229.70",
+                    "directoryName": "beopdong",
                     "geolocation": {
                         "state": "대전광역시",
                         "city": "대덕구",
@@ -1645,6 +1778,7 @@
                     "name": "e편한세상 대전에코포레",
                     "status": "LIVE",
                     "serverIp": "211.174.214.78",
+                    "directoryName": "daejeonecofore",
                     "geolocation": {
                         "state": "대전광역시",
                         "city": "동구",
@@ -1657,6 +1791,7 @@
                     "name": "e편한세상 둔산1단지",
                     "status": "LIVE",
                     "serverIp": "210.219.208.142",
+                    "directoryName": "doonsan",
                     "geolocation": {
                         "state": "대전광역시",
                         "city": "서구",
@@ -1669,6 +1804,7 @@
                     "name": "e편한세상 둔산2단지",
                     "status": "LIVE",
                     "serverIp": "203.239.147.158",
+                    "directoryName": "doonsan",
                     "geolocation": {
                         "state": "대전광역시",
                         "city": "서구",
@@ -1686,6 +1822,7 @@
                     "name": "e편한세상 동해",
                     "status": "LIVE",
                     "serverIp": "210.118.12.131",
+                    "directoryName": "donghae",
                     "geolocation": {
                         "state": "강원도",
                         "city": "동해시",
@@ -1698,6 +1835,7 @@
                     "name": "e편한세상 반곡",
                     "status": "LIVE",
                     "serverIp": "211.112.59.28",
+                    "directoryName": "bankok",
                     "geolocation": {
                         "state": "강원도",
                         "city": "원주시",
@@ -1710,6 +1848,7 @@
                     "name": "e편한세상 삼척교동",
                     "status": "LIVE",
                     "serverIp": "112.136.249.180",
+                    "directoryName": "samchuk",
                     "geolocation": {
                         "state": "강원도",
                         "city": "삼척시",
@@ -1722,6 +1861,7 @@
                     "name": "e편한세상 양양",
                     "status": "LIVE",
                     "serverIp": "121.187.160.169",
+                    "directoryName": "yangyang",
                     "geolocation": {
                         "state": "강원도",
                         "city": "양양군",
@@ -1734,6 +1874,7 @@
                     "name": "e편한세상 영랑호",
                     "status": "LIVE",
                     "serverIp": "58.181.36.236",
+                    "directoryName": "youngrangho",
                     "geolocation": {
                         "state": "강원도",
                         "city": "속초시",
@@ -1746,6 +1887,7 @@
                     "name": "e편한세상 원주태장",
                     "status": "LIVE",
                     "serverIp": "211.112.22.203",
+                    "directoryName": "taejang",
                     "geolocation": {
                         "state": "강원도",
                         "city": "원주시",
@@ -1758,6 +1900,7 @@
                     "name": "e편한세상춘천한숲시티",
                     "status": "LIVE",
                     "serverIp": "210.118.22.102",
+                    "directoryName": "chuncheonhansupcity",
                     "geolocation": {
                         "state": "강원도",
                         "city": "춘천시",
@@ -1775,6 +1918,7 @@
                     "name": "e편한세상 두정3차",
                     "status": "LIVE",
                     "serverIp": "121.185.79.146",
+                    "directoryName": "dujeong",
                     "geolocation": {
                         "state": "충청남도",
                         "city": "천안시서북구",
@@ -1787,6 +1931,7 @@
                     "name": "e편한세상 두정4차",
                     "status": "LIVE",
                     "serverIp": "211.112.59.220",
+                    "directoryName": "dujeong4",
                     "geolocation": {
                         "state": "충청남도",
                         "city": "천안시서북구",
@@ -1799,6 +1944,7 @@
                     "name": "e편한세상 보령",
                     "status": "LIVE",
                     "serverIp": "112.136.236.132",
+                    "directoryName": "boryeong",
                     "geolocation": {
                         "state": "충청남도",
                         "city": "보령시",
@@ -1811,6 +1957,7 @@
                     "name": "e편한세상 봉명아너리움",
                     "status": "LIVE",
                     "serverIp": "210.219.217.43",
+                    "directoryName": "bongmyung",
                     "geolocation": {
                         "state": "충청남도",
                         "city": "천안시동남구",
@@ -1823,6 +1970,7 @@
                     "name": "e편한세상 서산 테크노벨리",
                     "status": "LIVE",
                     "serverIp": "122.199.201.228",
+                    "directoryName": "seosantechno",
                     "geolocation": {
                         "state": "충청남도",
                         "city": "서산시",
@@ -1835,6 +1983,7 @@
                     "name": "e편한세상 서산예천",
                     "status": "LIVE",
                     "serverIp": "175.203.252.122",
+                    "directoryName": "yecheon",
                     "geolocation": {
                         "state": "충청남도",
                         "city": "서산시",
@@ -1847,6 +1996,7 @@
                     "name": "e편한세상 세종리버파크",
                     "status": "LIVE",
                     "serverIp": "121.152.221.182",
+                    "directoryName": "sejongriverpark",
                     "geolocation": {
                         "state": "세종특별자치시",
                         "city": "세종특별자치시",
@@ -1859,6 +2009,7 @@
                     "name": "e편한세상 스마일시티2차",
                     "status": "LIVE",
                     "serverIp": "221.132.65.76",
+                    "directoryName": "cheonan",
                     "geolocation": {
                         "state": "충청남도",
                         "city": "천안시서북구",
@@ -1871,6 +2022,7 @@
                     "name": "e편한세상 천안부성",
                     "status": "LIVE",
                     "serverIp": "203.130.83.85",
+                    "directoryName": "buseong",
                     "geolocation": {
                         "state": "충청남도",
                         "city": "천안시서북구",
@@ -1888,6 +2040,7 @@
                     "name": "e편한세상 밀양강",
                     "status": "LIVE",
                     "serverIp": "121.126.243.123",
+                    "directoryName": "milyangkang",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "밀양시",
@@ -1900,6 +2053,7 @@
                     "name": "e편한세상 밀양삼문",
                     "status": "LIVE",
                     "serverIp": "203.239.156.219",
+                    "directoryName": "sammun",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "밀양시",
@@ -1912,6 +2066,7 @@
                     "name": "e편한세상 봉황역",
                     "status": "LIVE",
                     "serverIp": "211.33.210.74",
+                    "directoryName": "bonghwang",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "김해시",
@@ -1924,6 +2079,7 @@
                     "name": "e편한세상 옥포 1단지",
                     "status": "LIVE",
                     "serverIp": "122.199.138.116",
+                    "directoryName": "okpo",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "거제시",
@@ -1936,6 +2092,7 @@
                     "name": "e편한세상 옥포 2단지",
                     "status": "LIVE",
                     "serverIp": "211.47.235.252",
+                    "directoryName": "okpo",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "거제시",
@@ -1948,6 +2105,7 @@
                     "name": "e편한세상 장유2차",
                     "status": "LIVE",
                     "serverIp": "27.125.12.27",
+                    "directoryName": "jangu2",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "김해시",
@@ -1960,6 +2118,7 @@
                     "name": "e편한세상 창원파크센트럴1단지",
                     "status": "LIVE",
                     "serverIp": "210.219.226.43",
+                    "directoryName": "changwon",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "창원시 마산회원구",
@@ -1972,6 +2131,7 @@
                     "name": "e편한세상 창원파크센트럴2단지",
                     "status": "LIVE",
                     "serverIp": "211.36.50.99",
+                    "directoryName": "changwon",
                     "geolocation": {
                         "state": "경상남도",
                         "city": "창원시 마산회원구",
@@ -1989,6 +2149,7 @@
                     "name": "세종e편한세상푸르지오",
                     "status": "LIVE",
                     "serverIp": "211.240.121.76",
+                    "directoryName": "sejongprugio",
                     "geolocation": {
                         "state": "세종특별자치시",
                         "city": "세종특별자치시",
@@ -2006,6 +2167,7 @@
                     "name": "e편한세상 울산온양",
                     "status": "LIVE",
                     "serverIp": "59.28.167.82",
+                    "directoryName": "onyang",
                     "geolocation": {
                         "state": "울산광역시",
                         "city": "울주군",
@@ -2023,6 +2185,7 @@
                     "name": "e편한세상 중문",
                     "status": "LIVE",
                     "serverIp": "211.240.10.203",
+                    "directoryName": "jungmoon",
                     "geolocation": {
                         "state": "제주특별자치도",
                         "city": "서귀포시",
@@ -2040,6 +2203,7 @@
                     "name": "e편한세상 충주",
                     "status": "LIVE",
                     "serverIp": "211.112.23.91",
+                    "directoryName": "chungju",
                     "geolocation": {
                         "state": "충청북도",
                         "city": "충주시",
@@ -2057,6 +2221,7 @@
                     "name": "e편한세상 CVNET모델하우스",
                     "status": "LIVE",
                     "serverIp": "119.194.107.91",
+                    "directoryName": "cvnethouse",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "서초구",
@@ -2069,6 +2234,7 @@
                     "name": "e편한세상 모델하우스",
                     "status": "DEV",
                     "serverIp": "220.79.251.67",
+                    "directoryName": "yeongjongmh",
                     "geolocation": {
                         "state": "인천광역시",
                         "city": "중구",
@@ -2081,6 +2247,7 @@
                     "name": "e편한세상서울대입구3단지(테스트)",
                     "status": "DEV",
                     "serverIp": "211.240.121.51",
+                    "directoryName": "seouldae",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "관악구",
@@ -2093,6 +2260,7 @@
                     "name": "e편한세상서울대입구4단지(테스트)",
                     "status": "DEV",
                     "serverIp": "211.240.121.59",
+                    "directoryName": "seouldae",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "관악구",
@@ -2105,6 +2273,7 @@
                     "name": "계영정보통신테스트단지",
                     "status": "LIVE",
                     "serverIp": "210.120.112.18",
+                    "directoryName": "gytest",
                     "geolocation": {
                         "state": "경기도",
                         "city": "안양시동안구",
@@ -2117,6 +2286,7 @@
                     "name": "대림 시연용",
                     "status": "DEV",
                     "serverIp": "223.171.35.162",
+                    "directoryName": "daelimmh",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "종로구",
@@ -2129,6 +2299,7 @@
                     "name": "대림코퍼기능테스트단지",
                     "status": "LIVE",
                     "serverIp": "223.171.35.162",
+                    "directoryName": "daelimmh",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "중구",
@@ -2141,6 +2312,7 @@
                     "name": "스마트홈 대림코퍼 시연용",
                     "status": "LIVE",
                     "serverIp": "223.171.66.42",
+                    "directoryName": "daelimcorpmh",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "중구",
@@ -2153,6 +2325,7 @@
                     "name": "신봉담 모델하우스",
                     "status": "DEV",
                     "serverIp": "172.20.200.200",
+                    "directoryName": "bongdammh",
                     "geolocation": {
                         "state": "경기도",
                         "city": "화성시",
@@ -2165,6 +2338,7 @@
                     "name": "아이엠 삼송(테스트)",
                     "status": "DEV",
                     "serverIp": "210.180.57.131",
+                    "directoryName": "iamsamsong",
                     "geolocation": {
                         "state": "경기도",
                         "city": "고양시덕양구",
@@ -2177,6 +2351,7 @@
                     "name": "코콤테스트1",
                     "status": "LIVE",
                     "serverIp": "222.108.131.137",
+                    "directoryName": "daelimcorpmh",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "중구",
@@ -2189,6 +2364,7 @@
                     "name": "코콤테스트2",
                     "status": "LIVE",
                     "serverIp": "222.108.131.139",
+                    "directoryName": "daelimcorpmh",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "중구",
@@ -2201,6 +2377,7 @@
                     "name": "코콤테스트3",
                     "status": "LIVE",
                     "serverIp": "58.142.5.97",
+                    "directoryName": "nokbeon",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "중구",
@@ -2213,6 +2390,7 @@
                     "name": "현대통신 리눅스테스트",
                     "status": "LIVE",
                     "serverIp": "13.125.160.103",
+                    "directoryName": "hdtest",
                     "geolocation": {
                         "state": "경기도",
                         "city": "남양주시",
@@ -2225,6 +2403,7 @@
                     "name": "현대통신 테스트단지",
                     "status": "LIVE",
                     "serverIp": "211.55.59.232",
+                    "directoryName": "hdtest",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "영등포구",
@@ -2237,6 +2416,7 @@
                     "name": "현대통신 테스트단지2",
                     "status": "LIVE",
                     "serverIp": "211.232.143.68",
+                    "directoryName": "hdtest",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "영등포구",
@@ -2249,6 +2429,7 @@
                     "name": "현대통신 테스트단지3",
                     "status": "LIVE",
                     "serverIp": "211.240.121.35",
+                    "directoryName": "seouldae",
                     "geolocation": {
                         "state": "서울특별시",
                         "city": "관악구",
