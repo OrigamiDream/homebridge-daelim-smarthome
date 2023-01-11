@@ -19,16 +19,22 @@ import {
     SnapshotRequest,
     SnapshotRequestCallback,
     SRTPCryptoSuites,
+    StartStreamRequest,
     StreamingRequest,
     StreamRequestCallback,
+    StreamRequestTypes,
     VideoInfo
 } from "homebridge";
 import {DaelimConfig} from "../../core/interfaces/daelim-config";
 import {EventPushTypes, InfoSubTypes, PushTypes, Types} from "../../core/fields";
 import pickPort, {pickPortOptions} from "pick-port";
-import {spawn} from "child_process";
+import {ChildProcessWithoutNullStreams, spawn} from "child_process";
 import axios from "axios";
 import {Utils} from "../../core/utils";
+import {Writable} from "stream";
+import readline from "readline";
+import {createSocket, Socket} from "dgram";
+import {setInterval} from "timers";
 
 enum CameraLocation {
     FRONT_DOOR = "door_record_duringlist",
@@ -51,6 +57,21 @@ interface CameraAccessoryInterface extends AccessoryInterface {
     visitorInfo?: VisitorOnCameraInfo
 }
 
+interface VideoConfig {
+    maxStreams?: 1 | 2 | 4 | 8
+    maxWidth?: 320 | 480 | 640 | 1280 | 1920 | 1600
+    maxHeight?: 180 | 240 | 270 | 360 | 480 | 720 | 960 | 1080 | 1200
+    codec?: "libx264" | "h264_omx" | "h264_videotoolbox" | "copy";
+    packetSize?: 188 | number | 1316
+    forceMax: boolean
+    videoFilter?: string
+    encoderOptions?: string
+    mapVideo?: string
+    mapAudio?: string
+    audio: boolean
+    returnAudioTarget?: string
+}
+
 interface CameraDevice {
     readonly cameraLocation: CameraLocation
     readonly deviceID: string
@@ -67,12 +88,28 @@ export const CAMERA_DEVICES: CameraDevice[] = [{
     displayName: "공동현관"
 }];
 export const CAMERA_TIMEOUT_DURATION = 2 * 60 * 1000; // 2 minutes
-export const CAMERA_VIDEO_FILTER = "";
 
 export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
 
+    private readonly videoConfig: VideoConfig;
+
     constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
         super(log, api, config, ["camera"], [api.hap.Service.MotionSensor]);
+
+        this.videoConfig = {
+            maxStreams: 2,
+            maxWidth: 1280,
+            maxHeight: 720,
+            codec: "libx264",
+            packetSize: 1316,
+            forceMax: true,
+            videoFilter: undefined,
+            encoderOptions: undefined,
+            mapVideo: undefined,
+            mapAudio: undefined,
+            audio: false,
+            returnAudioTarget: undefined
+        };
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
@@ -134,7 +171,7 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
                 visitorInfo: undefined,
             });
             if(accessory) {
-                const delegate = new VisitorOnCameraStreamingDelegate(this.api, this.api.hap, this.log, this.getAccessoryInterface(accessory));
+                const delegate = new VisitorOnCameraStreamingDelegate(this.api, this.api.hap, this.log, this.getAccessoryInterface(accessory), this.videoConfig);
                 accessory.configureController(delegate.controller);
             }
         }
@@ -168,8 +205,8 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
             const buffer = await this.client?.sendDeferredRequest({
                 index: visitorInfo.index,
                 read: "Y"
-            }, Types.INFO, InfoSubTypes.VISITOR_CHECK_REQUEST, InfoSubTypes.VISITOR_CHECK_RESPONSE, (_) => {
-                return true;
+            }, Types.INFO, InfoSubTypes.VISITOR_CHECK_REQUEST, InfoSubTypes.VISITOR_CHECK_RESPONSE, (response) => {
+                return parseInt(response["index"]) === visitorInfo.index;
             }).then((response) => {
                 const hex: string = response["image"];
                 const cleanHex = hex.replace(/[\r\n]/, "")
@@ -185,13 +222,14 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
                 this.log.warn("Failed to fetch the picture of visitor");
                 return;
             }
-            visitorInfo.snapshot = buffer;
             const accessory = this.findCameraAccessoryAt(visitorInfo.cameraLocation);
             if(accessory) {
                 const context = this.getAccessoryInterface(accessory);
                 if(context.motionTimer) {
                     clearTimeout(context.motionTimer);
                 }
+                visitorInfo.snapshot = await this.resizeSnapshotWithPadding(context.displayName, buffer);
+
                 context.visitorInfo = visitorInfo;
                 context.motionTimer = this.createMotionTimer(accessory);
                 context.motionOnCamera = true;
@@ -199,6 +237,36 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
 
                 this.refreshSensors(accessory);
             }
+        });
+    }
+
+    resizeSnapshotWithPadding(cameraName: string, snapshot: Buffer): Promise<Buffer> {
+        return new Promise<Buffer>((resolve, reject) => {
+            const args: string[] = [];
+            args.push("-i pipe:");
+            args.push("-frames:v 1");
+            args.push("-codec:v png"); // the alternative snapshot has PNG/rgba
+            args.push("-pix_fmt rgba");
+            args.push(`-filter:v scale=${this.videoConfig.maxWidth}:${this.videoConfig.maxHeight}:force_original_aspect_ratio=decrease,pad=${this.videoConfig.maxWidth}:${this.videoConfig.maxHeight}:x=(${this.videoConfig.maxWidth}-iw)/2:y=(${this.videoConfig.maxHeight}-ih)/2:color=black`);
+            args.push("-f image2 -");
+
+            const ffmpegArgs = args.join(" ");
+            this.log.debug(`[${cameraName}] Snapshot resize command: ffmpeg ${ffmpegArgs}`);
+            const ffmpeg = spawn("ffmpeg", ffmpegArgs.split(/\s+/), {
+                env: process.env
+            });
+
+            let buffer = Buffer.alloc(0);
+            ffmpeg.stdout.on("data", (data) => {
+                buffer = Buffer.concat([buffer, data]);
+            });
+            ffmpeg.on("error", (error: Error) => {
+                reject(`FFmpeg process creation failed: ${error.message}`);
+            });
+            ffmpeg.on("close", () => {
+                resolve(buffer);
+            });
+            ffmpeg.stdin.end(snapshot);
         });
     }
 }
@@ -228,17 +296,34 @@ interface ResolutionInfo {
     resizeFilter?: string
 }
 
+interface ActiveSession {
+    mainProcess?: FFmpegProcess;
+    returnProcess?: FFmpegProcess;
+    timeout?: NodeJS.Timeout;
+    feedInterval?: NodeJS.Timeout;
+    socket?: Socket;
+}
+
 class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
 
+    private readonly cameraName: string;
     readonly controller: CameraController;
+
     private snapshotPromise?: Promise<Buffer>;
     private alternativeSnapshot?: Buffer;
+    private pendingSessions: Map<string, SessionInfo> = new Map();
+    private ongoingSessions: Map<string, ActiveSession> = new Map();
 
     constructor(private readonly api: API,
                 private readonly hap: HAP,
                 private readonly log: Logging,
-                private readonly context: CameraAccessoryInterface) {
+                private readonly context: CameraAccessoryInterface,
+                private readonly videoConfig: VideoConfig) {
+        this.cameraName = this.context.displayName;
         this.api.on(APIEvent.SHUTDOWN, () => {
+            for(const session in this.ongoingSessions) {
+                this.stopStream(session);
+            }
             this.context.visitorInfo = undefined;
             if(this.context.motionTimer) {
                 clearTimeout(this.context.motionTimer);
@@ -246,7 +331,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             this.context.motionTimer = undefined;
         });
         const options: CameraControllerOptions = {
-            cameraStreamCount: 2, // Maximum number of simultaneous stream watch
+            cameraStreamCount: this.videoConfig.maxStreams || 2, // Maximum number of simultaneous stream watch
             delegate: this,
             streamingOptions: {
                 supportedCryptoSuites: [hap.SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80],
@@ -270,7 +355,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                     }
                 },
                 audio: {
-                    twoWayAudio: false,
+                    twoWayAudio: !!this.videoConfig.returnAudioTarget,
                     codecs: [{
                         type: AudioStreamingCodecType.AAC_ELD,
                         samplerate: AudioStreamingSamplerate.KHZ_16
@@ -279,28 +364,36 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             }
         }
         this.controller = new hap.CameraController(options);
+        setTimeout(async () => {
+            await this.createAlternativeSnapshot();
+        });
     }
 
     private async createAlternativeSnapshot(): Promise<Buffer> {
         if(!this.alternativeSnapshot) {
-            this.log.debug("Creating alternative snapshot buffer");
+            this.log.debug(`[${this.cameraName}] Creating alternative snapshot buffer`);
             const response = await axios.get(Utils.HOMEKIT_SECURE_VIDEO_IDLE_URL, {
                 responseType: "arraybuffer"
             });
             this.alternativeSnapshot = Buffer.from(response.data, "utf-8");
-        } else {
-            this.log.debug("Using cached alternative snapshot buffer");
         }
         return this.alternativeSnapshot;
     }
 
-    private determineResolution(request: SnapshotRequest | VideoInfo): ResolutionInfo {
+    private determineResolution(request: SnapshotRequest | VideoInfo, isSnapshot: boolean): ResolutionInfo {
         const resInfo: ResolutionInfo = {
             width: request.width,
             height: request.height
         };
-
-        const filters: Array<string> = CAMERA_VIDEO_FILTER.split(",") || [];
+        if(!isSnapshot) {
+            if(this.videoConfig.maxWidth !== undefined && (this.videoConfig.forceMax || request.width > this.videoConfig.maxWidth)) {
+                resInfo.width = this.videoConfig.maxWidth;
+            }
+            if(this.videoConfig.maxHeight !== undefined && (this.videoConfig.forceMax || request.height > this.videoConfig.maxHeight)) {
+                resInfo.height = this.videoConfig.maxHeight;
+            }
+        }
+        const filters: Array<string> = this.videoConfig.videoFilter?.split(",") || [];
         const noneFilter = filters.indexOf("none");
         if(noneFilter >= 0) {
             filters.splice(noneFilter, 1);
@@ -334,7 +427,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             args.push("-loglevel error");
 
             const ffmpegArgs = args.join(" ");
-            this.log.debug(`Snapshot command: ffmpeg ${ffmpegArgs}`);
+            this.log.debug(`[${this.cameraName}] Snapshot command: ffmpeg ${ffmpegArgs}`);
             const ffmpeg = spawn("ffmpeg", ffmpegArgs.split(/\s+/), {
                 env: process.env
             });
@@ -344,7 +437,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 snapshotBuffer = Buffer.concat([snapshotBuffer, data]);
             });
             ffmpeg.on("error", (error: Error) => {
-                reject("FFmpeg process creation failed: " + error.message);
+                reject(`FFmpeg process creation failed: ${error.message}`);
             })
             ffmpeg.stderr.on("data", (data) => {
                 data.toString().split("\n").forEach((line: string) => {
@@ -357,7 +450,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 if(snapshotBuffer.length > 0) {
                     resolve(snapshotBuffer);
                 } else {
-                    reject("Failed to fetch snapshot.");
+                    reject(`Failed to fetch snapshot`);
                 }
 
                 setTimeout(() => {
@@ -365,7 +458,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 }, 3 * 1000); // Expire cached snapshot after 3 seconds
 
                 const runtime = (Date.now() - startTime) / 1000;
-                let message = "Fetching snapshot took " + runtime + " seconds.";
+                let message = `[${this.cameraName}] Fetching snapshot took ${runtime} seconds.`;
                 if(runtime < 5) {
                     this.log.debug(message);
                 } else {
@@ -393,7 +486,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             args.push("-f image2 -");
 
             const ffmpegArgs = args.join(" ");
-            this.log.debug(`Resize command: ffmpeg ${ffmpegArgs}`);
+            this.log.debug(`[${this.cameraName}] Resize command: ffmpeg ${ffmpegArgs}`);
             const ffmpeg = spawn("ffmpeg", ffmpegArgs.split(/\s+/), {
                 env: process.env
             });
@@ -413,13 +506,13 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
     }
 
     async handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback): Promise<void> {
-        const resolution = this.determineResolution(request);
+        const resolution = this.determineResolution(request, true);
         try {
             const cachedSnapshot = !!this.snapshotPromise;
 
-            this.log.debug(`Snapshot requested: ${request.width} x ${request.height}`);
+            this.log.debug(`[${this.cameraName}] Snapshot requested: ${request.width} x ${request.height}`);
             const snapshot = await (this.snapshotPromise || this.fetchSnapshot(resolution.snapshotFilter));
-            this.log.debug(`Sending snapshot: ${resolution.width > 0 ? resolution.width : "native"} x ${resolution.height > 0 ? resolution.height : "native"} ${cachedSnapshot ? " (cached)" : ""}`);
+            this.log.debug(`[${this.cameraName}] Sending snapshot: ${resolution.width > 0 ? resolution.width : "native"} x ${resolution.height > 0 ? resolution.height : "native"} ${cachedSnapshot ? " (cached)" : ""}`);
             const resized = await this.resizeSnapshot(snapshot, resolution.resizeFilter);
             callback(undefined, resized);
         } catch (err) {
@@ -428,9 +521,195 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
         }
     }
 
+    private startStream(request: StartStreamRequest, callback: StreamRequestCallback): void {
+        const sessionInfo = this.pendingSessions.get(request.sessionID);
+        if(sessionInfo) {
+            const codec = this.videoConfig.codec || "libx264";
+            const mtu = this.videoConfig.packetSize || 1316; // request.video.mtu is not used
+            let encoderOptions = this.videoConfig.encoderOptions;
+            if(!encoderOptions && codec === "libx264") {
+                encoderOptions = "-preset ultrafast -tune zerolatency";
+            }
+
+            const resolution = this.determineResolution(request.video, false);
+            let fps = request.video.fps;
+            let videoBitrate = request.video.max_bit_rate;
+            if(codec === "copy") {
+                resolution.width = 0;
+                resolution.height = 0;
+                resolution.videoFilter = undefined;
+                fps = 0;
+                videoBitrate = 0;
+            }
+
+            this.log.debug(`[${this.cameraName}] Video stream requested: ${request.video.width} x ${request.video.height}, ${request.video.fps} fps, ${request.video.max_bit_rate} kbps`);
+            this.log.info(`[${this.cameraName}] Starting video stream: ${resolution.width > 0 ? resolution.width : "native"} x ${resolution.height > 0 ? resolution.height : "native"}, ${fps > 0 ? fps : "native"} fps, ${videoBitrate > 0 ? videoBitrate : "???"} kbps ${this.videoConfig.audio ? "(" + request.audio.codec + ")" : ""}`);
+
+            const args: string[] = [];
+
+            // Video
+            args.push("-i pipe:");
+            args.push(this.videoConfig.mapVideo ? `-map ${this.videoConfig.mapVideo}` : "-an -sn -dn");
+            args.push(`-codec:v ${codec}`);
+            args.push("-pix_fmt yuv420p");
+            args.push("-color_range mpeg");
+            if(fps > 0) {
+                args.push(`-r ${fps}`);
+            }
+            args.push("-f rawvideo");
+            if(encoderOptions) {
+                args.push(encoderOptions);
+            }
+            if(resolution.videoFilter) {
+                args.push(`-filter:v ${resolution.videoFilter}`);
+            }
+            if(videoBitrate > 0) {
+                args.push(`-b:v ${videoBitrate}k`);
+            }
+            args.push(`-payload_type ${request.video.pt}`);
+
+            // Video Stream
+            args.push(`-ssrc ${sessionInfo.videoSSRC}`);
+            args.push("-f rtp");
+            args.push("-srtp_out_suite AES_CM_128_HMAC_SHA1_80");
+            args.push(`-srtp_out_params ${sessionInfo.videoSRTP.toString("base64")}`);
+            args.push(`srtp://${sessionInfo.address}:${sessionInfo.videoPort}?rtcpport=${sessionInfo.videoPort}&pkt_size=${mtu}`);
+
+            if(this.videoConfig.audio) {
+                if(request.audio.codec === AudioStreamingCodecType.OPUS || request.audio.codec === AudioStreamingCodecType.AAC_ELD) {
+                    // Audio
+                    args.push(this.videoConfig.mapAudio ? `-map ${this.videoConfig.mapAudio}` : "-vn -sn -dn");
+                    if(request.audio.codec === AudioStreamingCodecType.OPUS) {
+                        args.push("-codec:a libopus");
+                        args.push("-application lowdelay");
+                    } else {
+                        args.push("-codec:a libfdk_aac");
+                        args.push("-profile:a aac_eld");
+                    }
+                    args.push("-flags +global_header");
+                    args.push("-f null");
+                    args.push(`-ar ${request.audio.sample_rate}k`);
+                    args.push(`-b:a ${request.audio.max_bit_rate}k`);
+                    args.push(`-ac ${request.audio.channel}`);
+                    args.push(`-payload_type ${request.audio.pt}`);
+
+                    // Audio Stream
+                    args.push(`-ssrc ${sessionInfo.audioSSRC}`);
+                    args.push("-f rtp");
+                    args.push("-srtp_out_suite AES_CM_128_HMAC_SHA1_80");
+                    args.push(`-srtp_out_params ${sessionInfo.audioSRTP.toString("base64")}`);
+                    args.push(`srtp://${sessionInfo.address}:${sessionInfo.audioPort}?rtcpport=${sessionInfo.audioPort}&pkt_size=188`);
+                } else {
+                    this.log.error(`[${this.cameraName}] Unsupported audio codec requested: ${request.audio.codec}`);
+                }
+            }
+
+            args.push(`-loglevel level`);
+            args.push("-progress pipe:1");
+            const ffmpegArgs = args.join(" ");
+
+            const activeSession: ActiveSession = {};
+            activeSession.socket = createSocket(sessionInfo.ipv6 ? "udp6" : "udp4");
+            activeSession.socket.on("error", (err: Error) => {
+                this.log.error(`[${this.cameraName}] Socket error: ${err.message}`);
+                this.stopStream(request.sessionID);
+            });
+            activeSession.socket.on("message", () => {
+                if(activeSession.timeout) {
+                    clearTimeout(activeSession.timeout);
+                }
+                activeSession.timeout = setTimeout(() => {
+                    this.log.info(`[${this.cameraName}] Device appears to be inactive. Stopping stream.`);
+                    this.controller.forceStopStreamingSession(request.sessionID);
+                    this.stopStream(request.sessionID);
+                }, request.video.rtcp_interval * 5 * 1000);
+            });
+            activeSession.socket.bind(sessionInfo.videoReturnPort);
+
+            activeSession.mainProcess = new FFmpegProcess(this.cameraName, request.sessionID, ffmpegArgs, this.log, this, callback);
+            if(this.videoConfig.returnAudioTarget) {
+                const returnArgs: string[] = [];
+                returnArgs.push("-hide_banner");
+                returnArgs.push("-protocol_whitelist pipe,udp,rtp,file,crypto");
+                returnArgs.push("-f sdp");
+                returnArgs.push("-c:a libfdk_aac");
+                returnArgs.push("-i pipe:");
+                returnArgs.push(this.videoConfig.returnAudioTarget);
+                returnArgs.push("-loglevel level");
+                const ffmpegReturnArgs = returnArgs.join(" ");
+                const ipVer = sessionInfo.ipv6 ? "IP6" : "IP4";
+
+                const sdpReturnAudio: string[] = [];
+                sdpReturnAudio.push("v=0");
+                sdpReturnAudio.push(`o=- 0 0 IN ${ipVer} ${sessionInfo.address}`);
+                sdpReturnAudio.push("s=Talk");
+                sdpReturnAudio.push(`c=IN ${ipVer} ${sessionInfo.address}`);
+                sdpReturnAudio.push("t=0 0");
+                sdpReturnAudio.push(`m=audio ${sessionInfo.audioReturnPort} RTP/AVP 110`);
+                sdpReturnAudio.push("b=AS:24");
+                sdpReturnAudio.push("a=rtpmap:110 MPEG4-GENERIC/16000/1");
+                sdpReturnAudio.push("a=rtcp-mux");
+                sdpReturnAudio.push("a=fmtp:100 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3,indexdeltalength=3; config=F8F0212C00BC00");
+                sdpReturnAudio.push(`a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${sessionInfo.audioSRTP.toString("base64")}`);
+                activeSession.returnProcess = new FFmpegProcess(`${this.cameraName}] [Two-way`, request.sessionID, ffmpegReturnArgs, this.log, this);
+                activeSession.returnProcess.stdin.end(sdpReturnAudio.join("\r\n") + "\r\n");
+            }
+            activeSession.feedInterval = setInterval(async () => {
+                const buffer = this.context.visitorInfo?.snapshot || await this.createAlternativeSnapshot();
+                activeSession.mainProcess?.stdin.write(buffer);
+            }, 1000 / 30); // 30 fps
+
+            this.ongoingSessions.set(request.sessionID, activeSession);
+            this.pendingSessions.delete(request.sessionID);
+        } else {
+            this.log.error(`[${this.cameraName}] Error finding session information`);
+            callback(new Error("Error finding session information"));
+        }
+    }
+
+    public stopStream(sessionId: string): void {
+        const session = this.ongoingSessions.get(sessionId);
+        if(session) {
+            if(session.timeout) {
+                clearTimeout(session.timeout);
+            }
+            if(session.feedInterval) {
+                clearInterval(session.feedInterval);
+            }
+            try {
+                session.socket?.close();
+            } catch(err) {
+                this.log.error(`[${this.cameraName}] Error occurred closing socket: ${err}`);
+            }
+            try {
+                session.mainProcess?.stop();
+            } catch(err) {
+                this.log.error(`[${this.cameraName}] Error occurred terminating main FFmpeg process: ${err}`);
+            }
+            try {
+                session.returnProcess?.stop();
+            } catch(err) {
+                this.log.error(`[${this.cameraName}] Error occurred terminating two-way FFmpeg process: ${err}`);
+            }
+        }
+        this.ongoingSessions.delete(sessionId);
+        this.log.info(`[${this.cameraName}] Stopped video stream`);
+    }
+
     handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback): void {
-        this.log.info("handleStreamRequest");
-        callback();
+        switch (request.type) {
+            case StreamRequestTypes.START:
+                this.startStream(request, callback);
+                break;
+            case StreamRequestTypes.STOP:
+                this.stopStream(request.sessionID);
+                callback();
+                break;
+            case StreamRequestTypes.RECONFIGURE:
+                this.log.debug(`[${this.cameraName}] Received request to reconfigure: ${request.video.width} x ${request.video.height}, ${request.video.fps} fps, ${request.video.max_bit_rate} kbps (Ignored)`);
+                callback();
+                break;
+        }
     }
 
     async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback): Promise<void> {
@@ -478,8 +757,141 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 srtp_salt: request.audio.srtp_salt
             }
         };
-        this.log.info("prepareStream (video %d -> ret:%d, audio %d -> ret:%d)", sessionInfo.videoPort, sessionInfo.videoReturnPort, sessionInfo.audioPort, sessionInfo.audioReturnPort);
+        this.pendingSessions.set(request.sessionID, sessionInfo);
         callback(undefined, response);
     }
 
+}
+
+interface FFmpegProgress {
+    frame: number;
+    fps: number;
+    streamQ: number;
+    bitrate: number;
+    totalSize: number;
+    outTimeMicroseconds: number;
+    outTime: string;
+    duplicateFrames: number;
+    dropFrames: number;
+    speed: number;
+    progress: string;
+}
+
+export class FFmpegProcess {
+    private readonly process: ChildProcessWithoutNullStreams;
+    private killTimeout?: NodeJS.Timeout;
+    readonly stdin: Writable;
+
+    constructor(cameraName: string, sessionId: string, ffmpegArgs: string, log: Logging, delegate: VisitorOnCameraStreamingDelegate, callback?: StreamRequestCallback) {
+        log.debug(`Stream command: ffmpeg ${ffmpegArgs}`);
+
+        let started = false;
+        const startTime = Date.now();
+        this.process = spawn("ffmpeg", ffmpegArgs.split(/\s+/), {
+            env: process.env
+        });
+        this.stdin = this.process.stdin;
+
+        this.process.stdout.on("data", (data) => {
+            const progress = this.parseProgress(data);
+            if(progress) {
+                if(!started && progress.frame > 0) {
+                    started = true;
+                    const runtime = (Date.now() - startTime) / 1000;
+                    const message = `[${cameraName}] Getting the first frames took ${runtime} seconds.`;
+                    if(runtime < 5) {
+                        log.debug(message);
+                    } else if(runtime < 22) {
+                        log.warn(message);
+                    } else {
+                        log.error(message);
+                    }
+                }
+            }
+        });
+        const stderr = readline.createInterface({
+            input: this.process.stderr,
+            terminal: false
+        });
+        stderr.on("line", (line: string) => {
+            if(callback) {
+                callback();
+                callback = undefined;
+            }
+            if(line.match(/(panic|fatal|error)/)) {
+                log.error(`[${cameraName}] ${line}`);
+            } else {
+                log.debug(`[${cameraName}] ${line}`);
+            }
+        });
+        this.process.on("error", (error: Error) => {
+            log.error(`[${cameraName}] FFmpeg process creation failed: ${error.message}`);
+            if(callback) {
+                callback(new Error("FFmpeg process creation failed"));
+            }
+            delegate.stopStream(sessionId);
+        });
+        this.process.on("exit", (code: number, signal: NodeJS.Signals) => {
+            if(this.killTimeout) {
+                clearTimeout(this.killTimeout);
+            }
+            const message = `FFmpeg exited with code: ${code} and signal: ${signal}`;
+            if(this.killTimeout && code === 0) {
+                log.debug(`[${cameraName}] ${message} (Expected)`);
+            } else if(code === null || code === 255) {
+                if(this.process.killed) {
+                    log.debug(`[${cameraName}] ${message} (Forced)`);
+                } else {
+                    log.error(`[${cameraName}] ${message} (Unexpected)`);
+                }
+            } else {
+                log.error(`[${cameraName}] ${message} (Error)`);
+                delegate.stopStream(sessionId);
+                if(!started && callback) {
+                    callback(new Error(message));
+                } else {
+                    delegate.controller.forceStopStreamingSession(sessionId);
+                }
+            }
+        });
+    }
+
+    parseProgress(data: Uint8Array): FFmpegProgress | undefined {
+        const input = data.toString();
+        if(input.indexOf("frame=") === 0) {
+            try {
+                const progress = new Map<string, string>();
+                input.split(/\r?\n/).forEach((line) => {
+                    const split = line.split("=", 2);
+                    progress.set(split[0], split[1]);
+                });
+
+                return {
+                    frame: parseInt(progress.get("frame")!),
+                    fps: parseFloat(progress.get("fps")!),
+                    streamQ: parseFloat(progress.get("stream_0_0q")!),
+                    bitrate: parseFloat(progress.get("bitrate")!),
+                    totalSize: parseInt(progress.get("total_size")!),
+                    outTimeMicroseconds: parseInt(progress.get("out_time_us")!),
+                    outTime: progress.get("out_time")!.trim(),
+                    duplicateFrames: parseInt(progress.get("dup_frames")!),
+                    dropFrames: parseInt(progress.get("drop_frames")!),
+                    speed: parseFloat(progress.get("speed")!),
+                    progress: progress.get("progress")!.trim()
+                };
+            } catch {
+                return undefined;
+            }
+        } else {
+            return undefined;
+        }
+    }
+
+    public stop(): void {
+        this.process.stdin.end();
+        this.killTimeout = setTimeout(() => {
+            this.process.stdin.destroy();
+            this.process.kill();
+        }, 2 * 1000);
+    }
 }
