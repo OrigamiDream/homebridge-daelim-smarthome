@@ -9,6 +9,8 @@ import {
     CameraStreamingDelegate,
     CharacteristicEventTypes,
     CharacteristicGetCallback,
+    CharacteristicSetCallback,
+    CharacteristicValue,
     HAP,
     Logging,
     PlatformAccessory,
@@ -55,6 +57,10 @@ interface CameraAccessoryInterface extends AccessoryInterface {
     motionTimer?: NodeJS.Timeout
     motionOnCamera: boolean
     visitorInfo?: VisitorOnCameraInfo
+    recordingActive: boolean
+    eventSnapshotsActive: boolean
+    cameraActive: boolean
+    periodicSnapshotsActive: boolean
 }
 
 interface VideoConfig {
@@ -94,7 +100,11 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
     private readonly videoConfig: VideoConfig;
 
     constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
-        super(log, api, config, ["camera"], [api.hap.Service.MotionSensor]);
+        super(log, api, config, ["camera"], [
+            api.hap.Service.MotionSensor,
+            api.hap.Service.CameraOperatingMode,
+            api.hap.Service.CameraEventRecordingManagement
+        ]);
 
         this.videoConfig = {
             maxStreams: 2,
@@ -120,11 +130,68 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
         super.configureAccessory(accessory, services);
-        const service = this.ensureServiceAvailability(this.api.hap.Service.MotionSensor, services);
-        service.getCharacteristic(this.api.hap.Characteristic.MotionDetected)
+
+        // MotionSensor
+        const motionService = this.ensureServiceAvailability(this.api.hap.Service.MotionSensor, services);
+        motionService.getCharacteristic(this.api.hap.Characteristic.MotionDetected)
             .on(CharacteristicEventTypes.GET, async (callback: CharacteristicGetCallback) => {
-                this.client?.checkKeepAlive();
                 callback(undefined, this.getAccessoryInterface(accessory).motionOnCamera);
+            });
+
+        // CameraEventRecordingManagement
+        const recordingService = this.ensureServiceAvailability(this.api.hap.Service.CameraEventRecordingManagement, services);
+        recordingService.getCharacteristic(this.api.hap.Characteristic.Active)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                callback(undefined, context.recordingActive ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
+            })
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                context.recordingActive = value === this.api.hap.Characteristic.Active.ACTIVE;
+                callback(undefined);
+            });
+        recordingService.getCharacteristic(this.api.hap.Characteristic.RecordingAudioActive)
+            .setProps({
+                validValues: [this.api.hap.Characteristic.RecordingAudioActive.DISABLE]
+            })
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                callback(undefined, this.api.hap.Characteristic.RecordingAudioActive.DISABLE);
+            })
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                callback(new Error("Setting RecordingAudioActive characteristic is not possible."));
+            });
+
+        // CameraOperatingMode
+        const operatingServie = this.ensureServiceAvailability(this.api.hap.Service.CameraOperatingMode, services);
+        operatingServie.getCharacteristic(this.api.hap.Characteristic.EventSnapshotsActive)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                callback(undefined, context.eventSnapshotsActive ? this.api.hap.Characteristic.EventSnapshotsActive.ENABLE : this.api.hap.Characteristic.EventSnapshotsActive.DISABLE);
+            })
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                context.eventSnapshotsActive = value === this.api.hap.Characteristic.EventSnapshotsActive.ENABLE;
+                callback(undefined);
+            });
+        operatingServie.getCharacteristic(this.api.hap.Characteristic.HomeKitCameraActive)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                callback(undefined, context.cameraActive ? this.api.hap.Characteristic.HomeKitCameraActive.ON : this.api.hap.Characteristic.HomeKitCameraActive.OFF);
+            })
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                context.cameraActive = value === this.api.hap.Characteristic.HomeKitCameraActive.ON;
+                callback(undefined);
+            });
+        operatingServie.getCharacteristic(this.api.hap.Characteristic.PeriodicSnapshotsActive)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                callback(undefined, context.periodicSnapshotsActive ? this.api.hap.Characteristic.PeriodicSnapshotsActive.ENABLE : this.api.hap.Characteristic.PeriodicSnapshotsActive.DISABLE);
+            })
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                context.periodicSnapshotsActive = value === this.api.hap.Characteristic.PeriodicSnapshotsActive.ENABLE;
+                callback(undefined);
             });
     }
 
@@ -169,6 +236,10 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
                 motionTimer: undefined,
                 motionOnCamera: false,
                 visitorInfo: undefined,
+                recordingActive: true,
+                eventSnapshotsActive: true,
+                cameraActive: true,
+                periodicSnapshotsActive: true
             });
             if(accessory) {
                 const delegate = new VisitorOnCameraStreamingDelegate(this.api, this.api.hap, this.log, this.getAccessoryInterface(accessory), this.videoConfig);
