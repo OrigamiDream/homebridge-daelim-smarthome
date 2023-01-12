@@ -25,7 +25,7 @@ export class HeaterAccessories extends Accessories<HeaterAccessoryInterface> {
     public static MINIMUM_TEMPERATURE = 5;
     public static MAXIMUM_TEMPERATURE = 40;
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+    constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["heating", "heater"], [api.hap.Service.HeaterCooler]);
     }
 

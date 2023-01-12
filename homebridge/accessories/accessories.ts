@@ -52,7 +52,7 @@ export class Accessories<T extends AccessoryInterface> {
      */
     constructor(protected readonly log: Logging,
                 protected readonly api: API,
-                protected readonly config: DaelimConfig | undefined,
+                protected readonly config: DaelimConfig,
                 protected readonly accessoryTypes: string[],
                 protected readonly serviceTypes: ServiceType[],
                 protected readonly deviceInfoKeys: string[] = []) {
@@ -80,7 +80,7 @@ export class Accessories<T extends AccessoryInterface> {
     }
 
     private getConfiguredDevices(): Device[] {
-        const devices = this.config?.devices || [];
+        const devices = this.config.devices || [];
         return devices.filter(device => device.deviceType === this.getDeviceType());
     }
 
@@ -241,7 +241,7 @@ export class Accessories<T extends AccessoryInterface> {
             await this.identify(accessory);
             this.log.info("%s identified!", accessory.displayName);
         });
-        if(this.config?.complex) {
+        if(this.config.complex) {
             const accessoryInfo = this.ensureServiceAvailability(this.api.hap.Service.AccessoryInformation, services);
             accessoryInfo.setCharacteristic(this.api.hap.Characteristic.Manufacturer, Utils.MANUFACTURER_NAME);
             accessoryInfo.setCharacteristic(this.api.hap.Characteristic.Model, `${this.config.complex}-${accessory.context.displayName}`);

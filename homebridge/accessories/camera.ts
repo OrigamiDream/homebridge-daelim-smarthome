@@ -82,7 +82,7 @@ export const CAMERA_TIMEOUT_DURATION = 3 * 60 * 1000; // 2 minutes
 
 export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+    constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["camera"], [
             api.hap.Service.MotionSensor,
             api.hap.Service.CameraOperatingMode,

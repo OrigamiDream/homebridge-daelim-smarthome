@@ -34,7 +34,7 @@ export const DOOR_TIMEOUT_DURATION = 5 * 1000; // 5 seconds
 
 export class DoorAccessories extends Accessories<DoorAccessoryInterface> {
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+    constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["door"], [api.hap.Service.MotionSensor]);
     }
 

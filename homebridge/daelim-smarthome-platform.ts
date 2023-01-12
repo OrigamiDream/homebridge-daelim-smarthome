@@ -31,22 +31,22 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
         this.api = api;
 
         this.config = this.configureCredentials(config);
-
-        this.accessories.push(new LightbulbAccessories(this.log, this.api, this.config));
-        this.accessories.push(new OutletAccessories(this.log, this.api, this.config));
-        this.accessories.push(new HeaterAccessories(this.log, this.api, this.config));
-        this.accessories.push(new GasAccessories(this.log, this.api, this.config));
-        this.accessories.push(new ElevatorAccessories(this.log, this.api, this.config));
-        this.accessories.push(new DoorAccessories(this.log, this.api, this.config));
-        this.accessories.push(new VehicleAccessories(this.log, this.api, this.config));
-        this.accessories.push(new CameraAccessories(this.log, this.api, this.config));
+        if(this.config) {
+            this.accessories.push(new LightbulbAccessories(this.log, this.api, this.config));
+            this.accessories.push(new OutletAccessories(this.log, this.api, this.config));
+            this.accessories.push(new HeaterAccessories(this.log, this.api, this.config));
+            this.accessories.push(new GasAccessories(this.log, this.api, this.config));
+            this.accessories.push(new ElevatorAccessories(this.log, this.api, this.config));
+            this.accessories.push(new DoorAccessories(this.log, this.api, this.config));
+            this.accessories.push(new VehicleAccessories(this.log, this.api, this.config));
+            this.accessories.push(new CameraAccessories(this.log, this.api, this.config));
+        }
 
         api.on(APIEvent.DID_FINISH_LAUNCHING, async () => {
             const semaphore = new Semaphore();
             semaphore.removeSemaphore(); // remove all orphan semaphores
 
             await this.createSmartHomeService();
-            log.info("DL E&C Smart Home did finished launching");
         });
     }
 
@@ -58,13 +58,13 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
             }
         }
         return {
-            region: config['region'],
-            complex: config['complex'],
-            username: config['username'],
-            password: config['password'],
-            uuid: config['uuid'],
+            region: config["region"],
+            complex: config["complex"],
+            username: config["username"],
+            password: config["password"],
+            uuid: config["uuid"],
             version: Utils.currentSemanticVersion(),
-            devices: config['devices'] || []
+            devices: config["devices"] || []
         };
     }
 
@@ -84,7 +84,7 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
 
     async createSmartHomeService() {
         if(!this.config?.uuid) {
-            this.log.warn("Config parameters are not set. No accessories.");
+            this.log.warn("The plugin hasn't been configured. No available devices.");
             return;
         }
 

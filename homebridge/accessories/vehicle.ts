@@ -11,7 +11,7 @@ import {DaelimConfig} from "../../core/interfaces/daelim-config";
 import {EventPushTypes, PushTypes} from "../../core/fields";
 
 interface VehicleAccessoryInterface extends AccessoryInterface {
-    timeoutId: number
+    motionTimer: number
     vehicleGettingIn: boolean
 }
 
@@ -21,7 +21,7 @@ export const VEHICLE_TIMEOUT_DURATION = 5 * 1000; // 5 seconds
 
 export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+    constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["vehicle"], [api.hap.Service.MotionSensor]);
     }
 
@@ -41,20 +41,19 @@ export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
             });
     }
 
-    invalidateVehicleState() {
-        const accessory = this.findAccessoryWithDeviceID(VEHICLE_DEVICE_ID);
-        if(accessory) {
-            if(accessory.context.timeoutId !== -1) {
-                clearTimeout(accessory.context.timeoutId);
+    createMotionTimer(accessory: PlatformAccessory) {
+        return setTimeout(() => {
+            if(accessory.context.motionTimer !== -1) {
+                clearTimeout(accessory.context.motionTimer);
             }
-            accessory.context.timeoutId = -1;
+            accessory.context.motionTimer = -1;
             accessory.context.vehicleGettingIn = false;
 
-            this.updateVehicleCharacteristic(accessory);
-        }
+            this.refreshSensors(accessory);
+        }, VEHICLE_TIMEOUT_DURATION);
     }
 
-    updateVehicleCharacteristic(accessory: PlatformAccessory) {
+    refreshSensors(accessory: PlatformAccessory) {
         this.findService(accessory, this.api.hap.Service.MotionSensor, (service) => {
             service.setCharacteristic(this.api.hap.Characteristic.MotionDetected, accessory.context.vehicleGettingIn);
         });
@@ -65,7 +64,7 @@ export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
             deviceID: VEHICLE_DEVICE_ID,
             displayName: VEHICLE_DISPLAY_NAME,
             init: false,
-            timeoutId: -1,
+            motionTimer: -1,
             vehicleGettingIn: false
         });
     }
@@ -75,16 +74,14 @@ export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
         this.client?.registerPushEventListener(PushTypes.EVENTS, EventPushTypes.CAR_GETTING_IN, (_) => {
             const accessory = this.findAccessoryWithDeviceID(VEHICLE_DEVICE_ID);
             if(accessory) {
-                if(accessory.context.timeoutId !== -1) {
-                    clearTimeout(accessory.context.timeoutId);
+                if(accessory.context.motionTimer !== -1) {
+                    clearTimeout(accessory.context.motionTimer);
                 }
-                accessory.context.timeoutId = setTimeout(() => {
-                    this.invalidateVehicleState();
-                }, VEHICLE_TIMEOUT_DURATION);
+                accessory.context.motionTimer = this.createMotionTimer(accessory);
                 accessory.context.vehicleGettingIn = true;
                 accessory.context.init = true;
 
-                this.updateVehicleCharacteristic(accessory);
+                this.refreshSensors(accessory);
             }
         });
     }

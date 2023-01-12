@@ -25,14 +25,14 @@ export const ELEVATOR_TIMEOUT_DURATION = 30 * 1000; // 30 seconds
 
 export class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface> {
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+    constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["elevator"], [api.hap.Service.Switch]);
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
         await super.identify(accessory);
 
-        this.log.warn("Elevator Calling accessory does not support identification due to it is public utility");
+        this.log.warn("Identifying Elevator accessories is not possible.");
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
