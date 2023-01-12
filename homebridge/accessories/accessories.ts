@@ -84,7 +84,7 @@ export class Accessories<T extends AccessoryInterface> {
         return devices.filter(device => device.deviceType === this.getDeviceType());
     }
 
-    private findDeviceInfo(deviceId: string, name: string): Device | undefined {
+    protected findDeviceInfo(deviceId: string, name: string): Device | undefined {
         const devices = this.getConfiguredDevices();
         for(const device of devices) {
             if(device.deviceId === deviceId && device.name === name) {

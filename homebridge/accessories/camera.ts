@@ -27,7 +27,7 @@ import {
     StreamRequestTypes,
     VideoInfo
 } from "homebridge";
-import {DaelimConfig} from "../../core/interfaces/daelim-config";
+import {CameraConfig, DaelimConfig, defaultCameraConfig} from "../../core/interfaces/daelim-config";
 import {EventPushTypes, InfoSubTypes, PushTypes, Types} from "../../core/fields";
 import pickPort, {pickPortOptions} from "pick-port";
 import {ChildProcessWithoutNullStreams, spawn} from "child_process";
@@ -63,21 +63,6 @@ interface CameraAccessoryInterface extends AccessoryInterface {
     periodicSnapshotsActive: boolean
 }
 
-interface VideoConfig {
-    maxStreams?: 1 | 2 | 4 | 8
-    maxWidth?: 320 | 480 | 640 | 1280 | 1920 | 1600
-    maxHeight?: 180 | 240 | 270 | 360 | 480 | 720 | 960 | 1080 | 1200
-    codec?: "libx264" | "h264_omx" | "h264_videotoolbox" | "copy";
-    packetSize?: 188 | number | 1316
-    forceMax: boolean
-    videoFilter?: string
-    encoderOptions?: string
-    mapVideo?: string
-    mapAudio?: string
-    audio: boolean
-    returnAudioTarget?: string
-}
-
 interface CameraDevice {
     readonly cameraLocation: CameraLocation
     readonly deviceID: string
@@ -93,11 +78,9 @@ export const CAMERA_DEVICES: CameraDevice[] = [{
     deviceID: "CE-CAM0",
     displayName: "공동현관"
 }];
-export const CAMERA_TIMEOUT_DURATION = 2 * 60 * 1000; // 2 minutes
+export const CAMERA_TIMEOUT_DURATION = 3 * 60 * 1000; // 2 minutes
 
 export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
-
-    private readonly videoConfig: VideoConfig;
 
     constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
         super(log, api, config, ["camera"], [
@@ -105,21 +88,6 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
             api.hap.Service.CameraOperatingMode,
             api.hap.Service.CameraEventRecordingManagement
         ]);
-
-        this.videoConfig = {
-            maxStreams: 2,
-            maxWidth: 1280,
-            maxHeight: 720,
-            codec: "libx264",
-            packetSize: 1316,
-            forceMax: true,
-            videoFilter: undefined,
-            encoderOptions: undefined,
-            mapVideo: undefined,
-            mapAudio: undefined,
-            audio: false,
-            returnAudioTarget: undefined
-        };
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
@@ -227,12 +195,12 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
     }
 
     registerAccessories() {
-        for(const deviceInfo of CAMERA_DEVICES) {
+        for(const cameraDevice of CAMERA_DEVICES) {
             const accessory = this.addAccessory({
-                deviceID: deviceInfo.deviceID,
-                displayName: deviceInfo.displayName,
+                deviceID: cameraDevice.deviceID,
+                displayName: cameraDevice.displayName,
                 init: false,
-                cameraLocation: deviceInfo.cameraLocation,
+                cameraLocation: cameraDevice.cameraLocation,
                 motionTimer: undefined,
                 motionOnCamera: false,
                 visitorInfo: undefined,
@@ -242,7 +210,9 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
                 periodicSnapshotsActive: true
             });
             if(accessory) {
-                const delegate = new VisitorOnCameraStreamingDelegate(this.api, this.api.hap, this.log, this.getAccessoryInterface(accessory), this.videoConfig);
+                const deviceInfo = this.findDeviceInfo(accessory.context.deviceID, accessory.context.displayName);
+                const config = deviceInfo?.camera || defaultCameraConfig();
+                const delegate = new VisitorOnCameraStreamingDelegate(this.api, this.api.hap, this.log, this.getAccessoryInterface(accessory), config);
                 accessory.configureController(delegate.controller);
             }
         }
@@ -299,7 +269,7 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
                 if(context.motionTimer) {
                     clearTimeout(context.motionTimer);
                 }
-                visitorInfo.snapshot = await this.resizeSnapshotWithPadding(context.displayName, buffer);
+                visitorInfo.snapshot = await this.reformatSnapshot(context.displayName, buffer);
 
                 context.visitorInfo = visitorInfo;
                 context.motionTimer = this.createMotionTimer(accessory);
@@ -311,14 +281,13 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
         });
     }
 
-    resizeSnapshotWithPadding(cameraName: string, snapshot: Buffer): Promise<Buffer> {
+    reformatSnapshot(cameraName: string, snapshot: Buffer): Promise<Buffer> {
         return new Promise<Buffer>((resolve, reject) => {
             const args: string[] = [];
             args.push("-i pipe:");
             args.push("-frames:v 1");
             args.push("-codec:v png"); // the alternative snapshot has PNG/rgba
             args.push("-pix_fmt rgba");
-            args.push(`-filter:v scale=${this.videoConfig.maxWidth}:${this.videoConfig.maxHeight}:force_original_aspect_ratio=decrease,pad=${this.videoConfig.maxWidth}:${this.videoConfig.maxHeight}:x=(${this.videoConfig.maxWidth}-iw)/2:y=(${this.videoConfig.maxHeight}-ih)/2:color=black`);
             args.push("-f image2 -");
 
             const ffmpegArgs = args.join(" ");
@@ -389,7 +358,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 private readonly hap: HAP,
                 private readonly log: Logging,
                 private readonly context: CameraAccessoryInterface,
-                private readonly videoConfig: VideoConfig) {
+                private readonly cameraConfig: CameraConfig) {
         this.cameraName = this.context.displayName;
         this.api.on(APIEvent.SHUTDOWN, () => {
             for(const session in this.ongoingSessions) {
@@ -402,7 +371,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             this.context.motionTimer = undefined;
         });
         const options: CameraControllerOptions = {
-            cameraStreamCount: this.videoConfig.maxStreams || 2, // Maximum number of simultaneous stream watch
+            cameraStreamCount: this.cameraConfig.maxStreams || 2, // Maximum number of simultaneous stream watch
             delegate: this,
             streamingOptions: {
                 supportedCryptoSuites: [hap.SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80],
@@ -426,7 +395,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                     }
                 },
                 audio: {
-                    twoWayAudio: !!this.videoConfig.returnAudioTarget,
+                    twoWayAudio: !!this.cameraConfig.returnAudioTarget,
                     codecs: [{
                         type: AudioStreamingCodecType.AAC_ELD,
                         samplerate: AudioStreamingSamplerate.KHZ_16
@@ -457,22 +426,23 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             height: request.height
         };
         if(!isSnapshot) {
-            if(this.videoConfig.maxWidth !== undefined && (this.videoConfig.forceMax || request.width > this.videoConfig.maxWidth)) {
-                resInfo.width = this.videoConfig.maxWidth;
+            if(this.cameraConfig.maxWidth !== undefined && (this.cameraConfig.forceMax || request.width > this.cameraConfig.maxWidth)) {
+                resInfo.width = this.cameraConfig.maxWidth;
             }
-            if(this.videoConfig.maxHeight !== undefined && (this.videoConfig.forceMax || request.height > this.videoConfig.maxHeight)) {
-                resInfo.height = this.videoConfig.maxHeight;
+            if(this.cameraConfig.maxHeight !== undefined && (this.cameraConfig.forceMax || request.height > this.cameraConfig.maxHeight)) {
+                resInfo.height = this.cameraConfig.maxHeight;
             }
         }
-        const filters: Array<string> = this.videoConfig.videoFilter?.split(",") || [];
+        const filters: Array<string> = this.cameraConfig.videoFilter?.split(",") || [];
         const noneFilter = filters.indexOf("none");
         if(noneFilter >= 0) {
             filters.splice(noneFilter, 1);
         }
         resInfo.snapshotFilter = filters.join(",");
         if(noneFilter < 0 && (resInfo.width > 0 || resInfo.height > 0)) {
-            resInfo.resizeFilter = "scale=" + (resInfo.width > 0 ? "'min(" + resInfo.width + ",iw)'" : "iw") + ":" + (resInfo.height > 0 ? "'min(" + resInfo.height + ",ih)'" : "ih") + ":force_original_aspect_ratio=decrease";
+            resInfo.resizeFilter = "scale=" + (resInfo.width > 0 ? "'max(" + resInfo.width + ",iw)'" : "iw") + ":" + (resInfo.height > 0 ? "'max(" + resInfo.height + ",ih)'" : "ih") + ":force_original_aspect_ratio=decrease";
             filters.push(resInfo.resizeFilter);
+            filters.push(`pad=${resInfo.width > 0 ? resInfo.width : "iw"}:${resInfo.height > 0 ? resInfo.height : "ih"}:x=(${resInfo.width > 0 ? resInfo.width : "iw"}-iw)/2:y=(${resInfo.height > 0 ? resInfo.height : "ih"}-ih)/2:color=black`);
             filters.push("scale=trunc(iw/2)*2:trunc(ih/2)*2"); // Force to fit encoder restrictions
         }
 
@@ -595,9 +565,9 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
     private startStream(request: StartStreamRequest, callback: StreamRequestCallback): void {
         const sessionInfo = this.pendingSessions.get(request.sessionID);
         if(sessionInfo) {
-            const codec = this.videoConfig.codec || "libx264";
-            const mtu = this.videoConfig.packetSize || 1316; // request.video.mtu is not used
-            let encoderOptions = this.videoConfig.encoderOptions;
+            const codec = this.cameraConfig.codec || "libx264";
+            const mtu = this.cameraConfig.packetSize || 1316; // request.video.mtu is not used
+            let encoderOptions = this.cameraConfig.encoderOptions;
             if(!encoderOptions && codec === "libx264") {
                 encoderOptions = "-preset ultrafast -tune zerolatency";
             }
@@ -614,13 +584,13 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             }
 
             this.log.debug(`[${this.cameraName}] Video stream requested: ${request.video.width} x ${request.video.height}, ${request.video.fps} fps, ${request.video.max_bit_rate} kbps`);
-            this.log.info(`[${this.cameraName}] Starting video stream: ${resolution.width > 0 ? resolution.width : "native"} x ${resolution.height > 0 ? resolution.height : "native"}, ${fps > 0 ? fps : "native"} fps, ${videoBitrate > 0 ? videoBitrate : "???"} kbps ${this.videoConfig.audio ? "(" + request.audio.codec + ")" : ""}`);
+            this.log.info(`[${this.cameraName}] Starting video stream: ${resolution.width > 0 ? resolution.width : "native"} x ${resolution.height > 0 ? resolution.height : "native"}, ${fps > 0 ? fps : "native"} fps, ${videoBitrate > 0 ? videoBitrate : "???"} kbps ${this.cameraConfig.audio ? "(" + request.audio.codec + ")" : ""}`);
 
             const args: string[] = [];
 
             // Video
             args.push("-i pipe:");
-            args.push(this.videoConfig.mapVideo ? `-map ${this.videoConfig.mapVideo}` : "-an -sn -dn");
+            args.push(this.cameraConfig.mapVideo ? `-map ${this.cameraConfig.mapVideo}` : "-an -sn -dn");
             args.push(`-codec:v ${codec}`);
             args.push("-pix_fmt yuv420p");
             args.push("-color_range mpeg");
@@ -646,10 +616,10 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             args.push(`-srtp_out_params ${sessionInfo.videoSRTP.toString("base64")}`);
             args.push(`srtp://${sessionInfo.address}:${sessionInfo.videoPort}?rtcpport=${sessionInfo.videoPort}&pkt_size=${mtu}`);
 
-            if(this.videoConfig.audio) {
+            if(this.cameraConfig.audio) {
                 if(request.audio.codec === AudioStreamingCodecType.OPUS || request.audio.codec === AudioStreamingCodecType.AAC_ELD) {
                     // Audio
-                    args.push(this.videoConfig.mapAudio ? `-map ${this.videoConfig.mapAudio}` : "-vn -sn -dn");
+                    args.push(this.cameraConfig.mapAudio ? `-map ${this.cameraConfig.mapAudio}` : "-vn -sn -dn");
                     if(request.audio.codec === AudioStreamingCodecType.OPUS) {
                         args.push("-codec:a libopus");
                         args.push("-application lowdelay");
@@ -698,14 +668,14 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             activeSession.socket.bind(sessionInfo.videoReturnPort);
 
             activeSession.mainProcess = new FFmpegProcess(this.cameraName, request.sessionID, ffmpegArgs, this.log, this, callback);
-            if(this.videoConfig.returnAudioTarget) {
+            if(this.cameraConfig.returnAudioTarget) {
                 const returnArgs: string[] = [];
                 returnArgs.push("-hide_banner");
                 returnArgs.push("-protocol_whitelist pipe,udp,rtp,file,crypto");
                 returnArgs.push("-f sdp");
                 returnArgs.push("-c:a libfdk_aac");
                 returnArgs.push("-i pipe:");
-                returnArgs.push(this.videoConfig.returnAudioTarget);
+                returnArgs.push(this.cameraConfig.returnAudioTarget);
                 returnArgs.push("-loglevel level");
                 const ffmpegReturnArgs = returnArgs.join(" ");
                 const ipVer = sessionInfo.ipv6 ? "IP6" : "IP4";

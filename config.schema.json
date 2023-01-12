@@ -68,6 +68,73 @@
             "disabled": {
               "title": "기기 비활성화",
               "type": "boolean"
+            },
+            "camera": {
+              "title": "HomeKit Secure Video 설정",
+              "type": "object",
+              "properties": {
+                "maxStreams": {
+                  "title": "동시 시청 가능한 최대 기기 수",
+                  "type": "integer",
+                  "placeholder": 2,
+                  "minimum": 1,
+                  "description": "한 카메라에서 한번에 동시 스트리밍 가능한 최대 기기 수."
+                },
+                "maxWidth": {
+                  "title": "영상 최대 너비",
+                  "type": "integer",
+                  "placeholder": 1280,
+                  "multipleOf": 2,
+                  "minimum": 0,
+                  "description": "HomeKit에 스트리밍 될 영상의 최대 너비. 0으로 설정 시 HomeKit에서 요청하는 사이즈로 설정됩니다."
+                },
+                "maxHeight": {
+                  "title": "영상 최대 높이",
+                  "type": "integer",
+                  "placeholder": 720,
+                  "multipleOf": 2,
+                  "minimum": 0,
+                  "description": "HomeKit에 스트리밍 될 영상의 최대 높이. 0으로 설정 시 HomeKit에서 요청하는 사이즈로 설정됩니다."
+                },
+                "forceMax": {
+                  "title": "최대값 강제",
+                  "type": "boolean",
+                  "description": "활성화 시 HomeKit에서 요청한 값에 상관없이 이 고급 설정에서 설정된 최대값으로 덮어쓰기합니다."
+                },
+                "codec": {
+                  "title": "영상 코덱",
+                  "type": "string",
+                  "placeholder": "libx264",
+                  "typeahead": {
+                    "source": [
+                      "libx264",
+                      "h264_omx",
+                      "h264_videotoolbox",
+                      "copy"
+                    ]
+                  },
+                  "description": "HomeKit으로 전송될 영상의 코덱. H.264를 기반으로 둔 코덱이어야 합니다. 사용자 환경에서 하드웨어 가속이 가능한 옵션으로 변경할 수 있습니다."
+                },
+                "packetSize": {
+                  "title": "패킷 사이즈",
+                  "type": "number",
+                  "placeholder": 1316,
+                  "multipleOf": 188,
+                  "minimum": 188,
+                  "description": "영상 상태가 고르지 못할 경우 더 작은 값을 사용하세요."
+                },
+                "videoFilter": {
+                  "title": "영상 필터",
+                  "type": "string",
+                  "description": "FFmpeg에 호환되는 쉼표로 구분된 추가적인 영상 필터. 'none'이 포함될 시 기본 설정된 내부 영상 필터는 비활성화 됩니다."
+                },
+                "encoderOptions": {
+                  "title": "인코더 옵션",
+                  "type": "string",
+                  "placeholder": "-preset ultrafast -tune zerolatency",
+                  "description": "영상 인코더에 전달될 옵션."
+                }
+              }
             }
           }
         }
@@ -78,9 +145,30 @@
     "key": "devices",
     "type": "tabarray",
     "title": "{{ value.displayName }}",
+    "description": "등록 가능한 기기의 이름 및 활성화 여부를 설정할 수 있습니다.",
     "items": [
       "devices[].displayName",
-      "devices[].disabled"
+      "devices[].disabled",
+      {
+        "key": "devices[0]",
+        "type": "fieldest",
+        "title": "HomeKit Secure Video 설정",
+        "expandable": true,
+        "expanded": false,
+        "items": [
+          "devices[].camera.maxStreams",
+          "devices[].camera.maxWidth",
+          "devices[].camera.maxHeight",
+          "devices[].camera.forceMax",
+          "devices[].camera.codec",
+          "devices[].camera.packetSize",
+          "devices[].camera.videoFilter",
+          "devices[].camera.encoderOptions"
+        ],
+        "condition": {
+          "functionBody": "return model.devices && model.devices[arrayIndices] && ['camera'].includes(model.devices[arrayIndices].deviceType)"
+        }
+      }
     ]
   }]
 }
