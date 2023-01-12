@@ -16,6 +16,10 @@ e편한세상 및 아크로 계열 아파트 단지를 위한 공식 [Homebridge
 3. 콘센트
 4. 가스 (단방향)
 5. 엘레베이터 호출 (도착알림 없음)
+6. 세대현관 및 공동현관 출입 모션 센서
+7. 입차 모션 센서
+8. HomeKit Secure Video를 통한 세대현관 및 공동현관 방문자 표시
+9. 세대현관 및 공동현관 방문자 알림
 
 ###### DL건설에서 새로 출시한 [스마트 eLife](https://apps.apple.com/kr/app/%EC%8A%A4%EB%A7%88%ED%8A%B8-elife/id1551248421) 앱과의 프로토콜 호환성을 확인할 수 없습니다.<br>해당하는 신축 아파트단지 거주민이 계시다면 해당하는 [이슈(#6)](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/6) 에 관련 정보 공유 부탁드립니다.
 
@@ -30,6 +34,14 @@ e편한세상 및 아크로 계열 아파트 단지를 위한 공식 [Homebridge
 
 1. 가장 마지막 버전의 Homebridge-ui가 설치되어 있다면 검색 페이지에서 `homebridge-daelim-smarthome`을 검색하여 설치할 수 있습니다.
 2. 설치 후 플러그인 구성 지침에 따르세요.
+
+### Terminal에서 설치
+
+<small>Node.js 환경을 필요로합니다.</small>
+
+```
+sudo npm install -g --unsafe-perm homebridge-daelim-smarthome
+```
 
 ### 직접 빌드하여 Terminal에서 설치
 
