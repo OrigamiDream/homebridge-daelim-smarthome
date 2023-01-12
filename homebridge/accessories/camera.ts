@@ -29,6 +29,7 @@ import {
 } from "homebridge";
 import {CameraConfig, DaelimConfig, defaultCameraConfig} from "../../core/interfaces/daelim-config";
 import {EventPushTypes, InfoSubTypes, PushTypes, Types} from "../../core/fields";
+import ffmpegPath from "ffmpeg-for-homebridge";
 import pickPort, {pickPortOptions} from "pick-port";
 import {ChildProcessWithoutNullStreams, spawn} from "child_process";
 import axios from "axios";
@@ -82,12 +83,15 @@ export const CAMERA_TIMEOUT_DURATION = 3 * 60 * 1000; // 2 minutes
 
 export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
 
+    private readonly processor: string;
+
     constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["camera"], [
             api.hap.Service.MotionSensor,
             api.hap.Service.CameraOperatingMode,
             api.hap.Service.CameraEventRecordingManagement
         ]);
+        this.processor = ffmpegPath || "ffmpeg";
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
@@ -212,7 +216,7 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
             if(accessory) {
                 const deviceInfo = this.findDeviceInfo(accessory.context.deviceID, accessory.context.displayName);
                 const config = deviceInfo?.camera || defaultCameraConfig();
-                const delegate = new VisitorOnCameraStreamingDelegate(this.api, this.api.hap, this.log, this.getAccessoryInterface(accessory), config);
+                const delegate = new VisitorOnCameraStreamingDelegate(this.api, this.api.hap, this.log, this.getAccessoryInterface(accessory), config, this.processor);
                 accessory.configureController(delegate.controller);
             }
         }
@@ -291,8 +295,8 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
             args.push("-f image2 -");
 
             const ffmpegArgs = args.join(" ");
-            this.log.debug(`[${cameraName}] Snapshot resize command: ffmpeg ${ffmpegArgs}`);
-            const ffmpeg = spawn("ffmpeg", ffmpegArgs.split(/\s+/), {
+            this.log.debug(`[${cameraName}] Snapshot resize command: ${this.processor} ${ffmpegArgs}`);
+            const ffmpeg = spawn(this.processor, ffmpegArgs.split(/\s+/), {
                 env: process.env
             });
 
@@ -358,7 +362,8 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 private readonly hap: HAP,
                 private readonly log: Logging,
                 private readonly context: CameraAccessoryInterface,
-                private readonly cameraConfig: CameraConfig) {
+                private readonly cameraConfig: CameraConfig,
+                private readonly processor: string) {
         this.cameraName = this.context.displayName;
         this.api.on(APIEvent.SHUTDOWN, () => {
             for(const session in this.ongoingSessions) {
@@ -468,8 +473,8 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             args.push("-loglevel error");
 
             const ffmpegArgs = args.join(" ");
-            this.log.debug(`[${this.cameraName}] Snapshot command: ffmpeg ${ffmpegArgs}`);
-            const ffmpeg = spawn("ffmpeg", ffmpegArgs.split(/\s+/), {
+            this.log.debug(`[${this.cameraName}] Snapshot command: ${this.processor} ${ffmpegArgs}`);
+            const ffmpeg = spawn(this.processor, ffmpegArgs.split(/\s+/), {
                 env: process.env
             });
 
@@ -527,8 +532,8 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             args.push("-f image2 -");
 
             const ffmpegArgs = args.join(" ");
-            this.log.debug(`[${this.cameraName}] Resize command: ffmpeg ${ffmpegArgs}`);
-            const ffmpeg = spawn("ffmpeg", ffmpegArgs.split(/\s+/), {
+            this.log.debug(`[${this.cameraName}] Resize command: ${this.processor} ${ffmpegArgs}`);
+            const ffmpeg = spawn(this.processor, ffmpegArgs.split(/\s+/), {
                 env: process.env
             });
 
@@ -667,7 +672,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             });
             activeSession.socket.bind(sessionInfo.videoReturnPort);
 
-            activeSession.mainProcess = new FFmpegProcess(this.cameraName, request.sessionID, ffmpegArgs, this.log, this, callback);
+            activeSession.mainProcess = new FFmpegProcess(this.cameraName, request.sessionID, this.processor, ffmpegArgs, this.log, this, callback);
             if(this.cameraConfig.returnAudioTarget) {
                 const returnArgs: string[] = [];
                 returnArgs.push("-hide_banner");
@@ -692,7 +697,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 sdpReturnAudio.push("a=rtcp-mux");
                 sdpReturnAudio.push("a=fmtp:100 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3,indexdeltalength=3; config=F8F0212C00BC00");
                 sdpReturnAudio.push(`a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${sessionInfo.audioSRTP.toString("base64")}`);
-                activeSession.returnProcess = new FFmpegProcess(`${this.cameraName}] [Two-way`, request.sessionID, ffmpegReturnArgs, this.log, this);
+                activeSession.returnProcess = new FFmpegProcess(`${this.cameraName}] [Two-way`, request.sessionID, this.processor, ffmpegReturnArgs, this.log, this);
                 activeSession.returnProcess.stdin.end(sdpReturnAudio.join("\r\n") + "\r\n");
             }
             activeSession.feedInterval = setInterval(async () => {
@@ -823,12 +828,12 @@ export class FFmpegProcess {
     private killTimeout?: NodeJS.Timeout;
     readonly stdin: Writable;
 
-    constructor(cameraName: string, sessionId: string, ffmpegArgs: string, log: Logging, delegate: VisitorOnCameraStreamingDelegate, callback?: StreamRequestCallback) {
-        log.debug(`Stream command: ffmpeg ${ffmpegArgs}`);
+    constructor(cameraName: string, sessionId: string, processor: string, ffmpegArgs: string, log: Logging, delegate: VisitorOnCameraStreamingDelegate, callback?: StreamRequestCallback) {
+        log.debug(`Stream command: ${processor} ${ffmpegArgs}`);
 
         let started = false;
         const startTime = Date.now();
-        this.process = spawn("ffmpeg", ffmpegArgs.split(/\s+/), {
+        this.process = spawn(processor, ffmpegArgs.split(/\s+/), {
             env: process.env
         });
         this.stdin = this.process.stdin;

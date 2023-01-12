@@ -47,6 +47,7 @@
   "dependencies": {
     "@homebridge/plugin-ui-utils": "^0.0.19",
     "axios": "^0.22.0",
+    "ffmpeg-for-homebridge": "^0.1.4",
     "node-fetch": "^2.6.1",
     "pick-port": "^1.0.1",
     "push-receiver": "^2.1.1",
