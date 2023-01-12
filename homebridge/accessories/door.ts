@@ -11,12 +11,25 @@ import {DaelimConfig} from "../../core/interfaces/daelim-config";
 import {EventPushTypes, PushTypes} from "../../core/fields";
 
 interface DoorAccessoryInterface extends AccessoryInterface {
-    timeoutId: number
+    motionTimer: number
     changesDetected: boolean
 }
 
-export const DOOR_DEVICE_ID = "FD-000000";
-export const DOOR_DISPLAY_NAME = "현관문";
+interface DoorDevice {
+    readonly deviceID: string
+    readonly displayName: string
+    readonly isCommunal: boolean
+}
+
+export const DOOR_DEVICES: DoorDevice[] = [{
+    deviceID: "FD-000000",
+    displayName: "세대현관",
+    isCommunal: false
+}, {
+    deviceID: "CE-000000",
+    displayName: "공동현관",
+    isCommunal: true
+}];
 export const DOOR_TIMEOUT_DURATION = 5 * 1000; // 5 seconds
 
 export class DoorAccessories extends Accessories<DoorAccessoryInterface> {
@@ -40,52 +53,60 @@ export class DoorAccessories extends Accessories<DoorAccessoryInterface> {
                 callback(undefined, accessory.context.changesDetected);
             });
     }
-
-    invalidateDoorState() {
-        const accessory = this.findAccessoryWithDeviceID(DOOR_DEVICE_ID);
-        if(accessory) {
-            if(accessory.context.timeoutId !== -1) {
-                clearTimeout(accessory.context.timeoutId);
+    
+    createMotionTimer(accessory: PlatformAccessory) {
+        return setTimeout(() => {
+            if(accessory.context.motionTimer !== -1) {
+                clearTimeout(accessory.context.motionTimer);
             }
-            accessory.context.timeoutId = -1;
+            accessory.context.motionTimer = -1;
             accessory.context.changesDetected = false;
 
-            this.updateDoorCharacteristic(accessory);
-        }
+            this.refreshSensors(accessory);
+        }, DOOR_TIMEOUT_DURATION);
     }
 
-    updateDoorCharacteristic(accessory: PlatformAccessory) {
+    findDoorAccessoryOf(isCommunal: boolean): PlatformAccessory | undefined {
+        const devices = DOOR_DEVICES.filter((device) => device.isCommunal === isCommunal);
+        if(!devices || !devices.length) {
+            return undefined;
+        }
+        const device = devices[0];
+        return this.findAccessoryWithDeviceID(device.deviceID);
+    }
+
+    refreshSensors(accessory: PlatformAccessory) {
         this.findService(accessory, this.api.hap.Service.MotionSensor, (service) => {
             service.setCharacteristic(this.api.hap.Characteristic.MotionDetected, accessory.context.changesDetected);
         });
     }
 
     registerAccessories() {
-        this.addAccessory({
-            deviceID: DOOR_DEVICE_ID,
-            displayName: DOOR_DISPLAY_NAME,
-            init: false,
-            timeoutId: -1,
-            changesDetected: false
-        });
+        for(const doorDevice of DOOR_DEVICES) {
+            this.addAccessory({
+                deviceID: doorDevice.deviceID,
+                displayName: doorDevice.displayName,
+                init: false,
+                motionTimer: -1,
+                changesDetected: false
+            });
+        }
     }
 
     registerListeners() {
         // NOTE: Door should not call `super.registerListeners()` because this device does not lazy initialization
-        this.client?.registerPushEventListener(PushTypes.EVENTS, EventPushTypes.FRONT_DOOR_CHANGES, (_) => {
-            const accessory = this.findAccessoryWithDeviceID(DOOR_DEVICE_ID);
+        this.client?.registerPushEventListener(PushTypes.EVENTS, EventPushTypes.FRONT_DOOR_CHANGES, (data) => {
+            const accessory = this.findDoorAccessoryOf(data.message.indexOf("공동현관") !== -1);
             if(accessory) {
                 // if push event have come within timeout duration, renew the timeout to keep device state
-                if(accessory.context.timeoutId !== -1) {
-                    clearTimeout(accessory.context.timeoutId);
+                if(accessory.context.motionTimer !== -1) {
+                    clearTimeout(accessory.context.motionTimer);
                 }
-                accessory.context.timeoutId = setTimeout(() => {
-                    this.invalidateDoorState();
-                }, DOOR_TIMEOUT_DURATION);
+                accessory.context.motionTimer = this.createMotionTimer(accessory);
                 accessory.context.changesDetected = true;
                 accessory.context.init = true;
 
-                this.updateDoorCharacteristic(accessory);
+                this.refreshSensors(accessory);
             }
         });
     }

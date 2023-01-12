@@ -4,11 +4,11 @@ import {Semaphore, Utils} from "../core/utils";
 import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "../core/fields";
 import * as crypto from 'crypto';
 import {Device} from "../core/interfaces/daelim-config";
-import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME} from "../homebridge/accessories/elevator";
-import {DOOR_DEVICE_ID, DOOR_DISPLAY_NAME} from "../homebridge/accessories/door";
-import {VEHICLE_DEVICE_ID, VEHICLE_DISPLAY_NAME} from "../homebridge/accessories/vehicle";
 import Timeout = NodeJS.Timeout;
+import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME} from "../homebridge/accessories/elevator";
+import {VEHICLE_DEVICE_ID, VEHICLE_DISPLAY_NAME} from "../homebridge/accessories/vehicle";
 import {CAMERA_DEVICES} from "../homebridge/accessories/camera";
+import {DOOR_DEVICES} from "../homebridge/accessories/door";
 
 interface ClientAuthorization {
     certification: string,
@@ -81,21 +81,23 @@ export class UiServer extends HomebridgePluginUiServer {
             room: ''
         };
         this.devices.push({
-            displayName: `${ELEVATOR_DISPLAY_NAME} ${UiServer.prettierDeviceType('elevator')}`,
+            displayName: UiServer.getFriendlyName(ELEVATOR_DISPLAY_NAME, 'elevator'),
             name: ELEVATOR_DISPLAY_NAME,
             deviceType: 'elevator',
             deviceId: ELEVATOR_DEVICE_ID,
             disabled: false
         });
+        for(const device of DOOR_DEVICES) {
+            this.devices.push({
+                displayName: UiServer.getFriendlyName(device.displayName, 'door'),
+                name: device.displayName,
+                deviceType: 'door',
+                deviceId: device.deviceID,
+                disabled: false
+            });
+        }
         this.devices.push({
-            displayName: `${DOOR_DISPLAY_NAME} ${UiServer.prettierDeviceType('door')}`,
-            name: DOOR_DISPLAY_NAME,
-            deviceType: 'door',
-            deviceId: DOOR_DEVICE_ID,
-            disabled: false
-        });
-        this.devices.push({
-            displayName: `${VEHICLE_DISPLAY_NAME} ${UiServer.prettierDeviceType('vehicle')}`,
+            displayName: UiServer.getFriendlyName(VEHICLE_DISPLAY_NAME, 'vehicle'),
             name: VEHICLE_DISPLAY_NAME,
             deviceType: 'vehicle',
             deviceId: VEHICLE_DEVICE_ID,
@@ -103,7 +105,7 @@ export class UiServer extends HomebridgePluginUiServer {
         });
         for(const device of CAMERA_DEVICES) {
             this.devices.push({
-                displayName: `${device.displayName} ${UiServer.prettierDeviceType('camera')}`,
+                displayName: UiServer.getFriendlyName(device.displayName, 'camera'),
                 name: device.displayName,
                 deviceType: 'camera',
                 deviceId: device.deviceID,
@@ -212,23 +214,19 @@ export class UiServer extends HomebridgePluginUiServer {
             .toUpperCase();
     }
 
-    private static prettierDeviceType(deviceType: string): string {
-        const nameMap: { [key: string]: string } = {
+    private static getFriendlyName(displayName: string, deviceType: string): string {
+        const suffixMap: { [key: string]: string } = {
             'light': '전등',
             'heating': '난방',
             'wallsocket': '콘센트',
             'fan': '환풍기',
-            'camera': '인터폰',
-            'elevator': '', // elevator does not need pretty name
-            'door': '', // door does not need pretty name
-            'vehicle': '', // vehicle does not need pretty name
-            'gas': ''  // gas does not need pretty name
+            'camera': '인터폰'
         }
-        const name = nameMap[deviceType];
-        if(name === undefined) {
-            return '기기'
+        const suffix = suffixMap[deviceType];
+        if(suffix === undefined) {
+            return displayName;
         }
-        return name;
+        return `${displayName} ${suffix}`.trim();
     }
 
     private getAuthorizationPIN(): string {
@@ -353,7 +351,7 @@ export class UiServer extends HomebridgePluginUiServer {
             for(const enqueuedAccessory of filtered) {
                 const deviceType = enqueuedAccessory.deviceType;
                 this.devices.push({
-                    displayName: `${enqueuedAccessory.name} ${UiServer.prettierDeviceType(deviceType)}`,
+                    displayName: UiServer.getFriendlyName(enqueuedAccessory.name, deviceType),
                     name: enqueuedAccessory.name,
                     deviceType: deviceType,
                     deviceId: enqueuedAccessory.uid,
