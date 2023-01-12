@@ -17,5 +17,28 @@ export interface Device {
     name: string,
     deviceType: string,
     deviceId: string,
-    disabled: boolean
+    disabled: boolean,
+    camera?: CameraConfig
+}
+
+export interface CameraConfig {
+    maxStreams?: number
+    maxWidth?: number
+    maxHeight?: number
+    codec?: "libx264" | "h264_omx" | "h264_videotoolbox" | "copy";
+    packetSize?: number
+    forceMax: boolean
+    videoFilter?: string
+    encoderOptions?: string
+    mapVideo?: string
+    mapAudio?: string
+    audio: boolean
+    returnAudioTarget?: string
+}
+
+export function defaultCameraConfig(): CameraConfig {
+    return {
+        forceMax: false,
+        audio: false
+    };
 }

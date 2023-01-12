@@ -6,10 +6,16 @@ import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
 import {Errors, LoginSubTypes, PushSubTypes, PushTypes, SettingSubTypes, SubTypes, Types} from "./fields";
 import {Complex} from "./interfaces/complex";
 import {setInterval} from "timers";
-import {FirebaseCredentials, PushData} from "./interfaces/firebase";
 import Timeout = NodeJS.Timeout;
+import fcm, {Credentials} from "push-receiver";
 
-const fcm = require("push-receiver");
+export interface PushData {
+    readonly from: string
+    readonly priority: string
+    readonly title: string
+    readonly message: string
+    readonly reserved: string
+}
 
 export type PushEventCallback = (data: PushData) => void;
 
@@ -46,7 +52,7 @@ export class Client {
 
     constructor(private readonly log: Logging,
                 private readonly config: DaelimConfig,
-                private readonly credentials: FirebaseCredentials) {
+                private readonly credentials: Credentials) {
         this.config = config;
         this.authorization = {
             certification: '00000000',
@@ -150,6 +156,7 @@ export class Client {
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (_) => {
             await this.forceUpdatePushPreferences("door");
             await this.forceUpdatePushPreferences("car");
+            await this.forceUpdatePushPreferences("visitor"); // for camera
 
             // registering fcm push token
             this.sendUnreliableRequest({

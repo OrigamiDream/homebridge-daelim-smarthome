@@ -8,6 +8,7 @@ import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME} from "../homebridge/accessori
 import {DOOR_DEVICE_ID, DOOR_DISPLAY_NAME} from "../homebridge/accessories/door";
 import {VEHICLE_DEVICE_ID, VEHICLE_DISPLAY_NAME} from "../homebridge/accessories/vehicle";
 import Timeout = NodeJS.Timeout;
+import {CAMERA_DEVICES} from "../homebridge/accessories/camera";
 
 interface ClientAuthorization {
     certification: string,
@@ -80,26 +81,35 @@ export class UiServer extends HomebridgePluginUiServer {
             room: ''
         };
         this.devices.push({
-            displayName: ELEVATOR_DISPLAY_NAME,
+            displayName: `${ELEVATOR_DISPLAY_NAME} ${UiServer.prettierDeviceType('elevator')}`,
             name: ELEVATOR_DISPLAY_NAME,
             deviceType: 'elevator',
             deviceId: ELEVATOR_DEVICE_ID,
             disabled: false
         });
         this.devices.push({
-            displayName: DOOR_DISPLAY_NAME,
+            displayName: `${DOOR_DISPLAY_NAME} ${UiServer.prettierDeviceType('door')}`,
             name: DOOR_DISPLAY_NAME,
             deviceType: 'door',
             deviceId: DOOR_DEVICE_ID,
             disabled: false
         });
         this.devices.push({
-            displayName: VEHICLE_DISPLAY_NAME,
+            displayName: `${VEHICLE_DISPLAY_NAME} ${UiServer.prettierDeviceType('vehicle')}`,
             name: VEHICLE_DISPLAY_NAME,
             deviceType: 'vehicle',
             deviceId: VEHICLE_DEVICE_ID,
             disabled: false
         });
+        for(const device of CAMERA_DEVICES) {
+            this.devices.push({
+                displayName: `${device.displayName} ${UiServer.prettierDeviceType('camera')}`,
+                name: device.displayName,
+                deviceType: 'camera',
+                deviceId: device.deviceID,
+                disabled: false
+            });
+        }
 
         this.onRequest('/choose-region', this.chooseRegion.bind(this));
         this.onRequest('/choose-complex', this.chooseComplex.bind(this));
@@ -208,6 +218,7 @@ export class UiServer extends HomebridgePluginUiServer {
             'heating': '난방',
             'wallsocket': '콘센트',
             'fan': '환풍기',
+            'camera': '인터폰',
             'elevator': '', // elevator does not need pretty name
             'door': '', // door does not need pretty name
             'vehicle': '', // vehicle does not need pretty name
