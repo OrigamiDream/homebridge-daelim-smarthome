@@ -38,6 +38,8 @@ import {Writable} from "stream";
 import readline from "readline";
 import {createSocket, Socket} from "dgram";
 import {setInterval} from "timers";
+import * as fs from "fs";
+import * as crypto from "crypto";
 
 enum CameraLocation {
     FRONT_DOOR = "door_record_duringlist",
@@ -80,6 +82,7 @@ export const CAMERA_DEVICES: CameraDevice[] = [{
     displayName: "공동현관"
 }];
 export const CAMERA_TIMEOUT_DURATION = 3 * 60 * 1000; // 3 minutes
+export const CAMERA_TRANSITION_DURATION = 0.5; // 0.5 seconds
 
 export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
 
@@ -356,6 +359,11 @@ interface StreamingProgress {
     dropped: number;
 }
 
+interface TransitionSnapshot {
+    index: number;
+    snapshot: Buffer;
+}
+
 class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
 
     private readonly cameraName: string;
@@ -363,6 +371,10 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
 
     private snapshotPromise?: Promise<Buffer>;
     private alternativeSnapshot?: Buffer;
+    private cachedSnapshot?: Buffer;
+    private enqueuedSnapshots: Buffer[] = [];
+    private transition: boolean = false;
+    private transitionReady: boolean = false;
     private pendingSessions: Map<string, SessionInfo> = new Map();
     private ongoingSessions: Map<string, ActiveSession> = new Map();
 
@@ -527,6 +539,105 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             ffmpeg.stdin.end(snapshot);
         });
         return this.snapshotPromise;
+    }
+
+    private createRandomCharacterGenerator(characterSet: string, length: number) {
+        return () => {
+            let code = '';
+            for(let i = 0; i < length; i++) {
+                const randomIndex = crypto.randomBytes(1)[0] % characterSet.length;
+                code += characterSet[randomIndex];
+            }
+            return code;
+        };
+    }
+
+    enqueueTransitionSnapshots(resInfo: ResolutionInfo, background: Buffer, overlay: Buffer) {
+        // create binary files like named pipes
+        const generator = this.createRandomCharacterGenerator("0123456789abcdef", 10);
+        let dirPath: string;
+        do {
+            dirPath = `./${generator()}`;
+        } while(fs.existsSync(dirPath));
+        fs.mkdirSync(dirPath);
+
+        const backgroundPath = `${dirPath}/${generator()}.png`;
+        const overlayPath = `${dirPath}/${generator()}.png`;
+        fs.writeFileSync(backgroundPath, background, "binary");
+        fs.writeFileSync(overlayPath, overlay, "binary");
+
+        const startTime = Date.now();
+        const duration = CAMERA_TRANSITION_DURATION * 30;
+        const queues: Promise<TransitionSnapshot>[] = [];
+        for(let i = 0; i < duration; i++) {
+            const opacity = i / duration;
+
+            const args: string[] = [];
+            args.push(`-i ${overlayPath}`);
+            args.push(`-i ${backgroundPath}`);
+            args.push("-frames:v 1");
+
+            const filters: string[] = [];
+            filters.push("scale=" + (resInfo.width > 0 ? "'max(" + resInfo.width + ",iw)'" : "iw") + ":" + (resInfo.height > 0 ? "'max(" + resInfo.height + ",ih)'" : "ih") + ":force_original_aspect_ratio=decrease");
+            filters.push(`pad=${resInfo.width > 0 ? resInfo.width : "iw"}:${resInfo.height > 0 ? resInfo.height : "ih"}:x=(${resInfo.width > 0 ? resInfo.width : "iw"}-iw)/2:y=(${resInfo.height > 0 ? resInfo.height : "ih"}-ih)/2:color=black`);
+            filters.push("scale=trunc(iw/2)*2:trunc(ih/2)*2");
+
+            const v0 = `format=rgba,colorchannelmixer=aa=${opacity.toFixed(5)},${filters.join(",")}[over]`;
+            const v1 = `${filters.join(",")}[bg]`;
+
+            const complex = [];
+            complex.push(`[0:v]${v0}`);
+            complex.push(`[1:v]${v1}`);
+            complex.push("[bg][over]overlay");
+
+            args.push(`-filter_complex ${complex.join(";")}`);
+            args.push("-codec:v png");
+            args.push("-pix_fmt rgba");
+            args.push("-f image2 -");
+
+            const ffmpegArgs = args.join(" ");
+            if(i === 0) {
+                this.log.debug(`[${this.cameraName}] Transition snapshot command (x${duration}): ${this.processor} ${ffmpegArgs}`);
+            }
+            queues.push(this.transitionSnapshotOverlay(i, ffmpegArgs));
+        }
+        Promise.all(queues).then((results) => {
+            results.sort((a, b) => a.index - b.index);
+            for(const result of results) {
+                this.enqueuedSnapshots.push(result.snapshot);
+            }
+            this.transitionReady = true;
+            const runtime = (Date.now() - startTime) / 1000;
+
+            fs.rmSync(dirPath, {
+                recursive: true,
+                force: true
+            });
+            this.log.debug(`[${this.cameraName}] Enqueuing ${duration} transition snapshot took ${runtime} seconds.`);
+        });
+    }
+
+    transitionSnapshotOverlay(index: number, ffmpegArgs: string): Promise<TransitionSnapshot> {
+        return new Promise<TransitionSnapshot>((resolve, reject) => {
+            const ffmpeg = spawn(this.processor, ffmpegArgs.split(/\s+/), {
+                env: process.env
+            });
+
+            let buffer = Buffer.alloc(0);
+            ffmpeg.stdout.on("data", (data) => {
+                buffer = Buffer.concat([buffer, data]);
+            });
+            ffmpeg.on("error", (error: Error) => {
+                reject(`FFmpeg process creation failed: ${error.message}`);
+            })
+            ffmpeg.on("close", () => {
+                resolve({
+                    index: index,
+                    snapshot: buffer
+                });
+            });
+            ffmpeg.stdin.end();
+        });
     }
 
     resizeSnapshot(snapshot: Buffer, resizeFilter?: string): Promise<Buffer> {
@@ -727,7 +838,30 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 activeSession.bufferLock = true;
 
                 let buffer = this.context.visitorInfo?.snapshot || await this.createAlternativeSnapshot();
-                activeSession.mainProcess?.stdin.write(buffer);
+                if(!this.cachedSnapshot) {
+                    this.cachedSnapshot = buffer; // initialize state
+                } else if(!this.cachedSnapshot.equals(buffer) && !this.transition && this.enqueuedSnapshots.length === 0) {
+                    // buffer has just been changed
+                    this.enqueueTransitionSnapshots(resolution, this.cachedSnapshot, buffer);
+                    this.transition = true;
+                }
+
+                const duration = CAMERA_TRANSITION_DURATION * 30;
+                if(this.transition && !this.transitionReady && this.enqueuedSnapshots.length < duration) {
+                    buffer = this.cachedSnapshot; // new buffer won't be allowed to be used until the transition completed.
+                } else if(this.transitionReady) {
+                    // consume the transition buffers
+                    buffer = this.enqueuedSnapshots.splice(0, 1)[0];
+                    if(this.enqueuedSnapshots.length === 0) {
+                        // all transition buffers have been consumed
+                        this.log.debug(`[${this.cameraName}] All transition snapshots have been consumed`);
+                        this.transition = false;
+                        this.transitionReady = false;
+                        this.cachedSnapshot = undefined;
+                    }
+                }
+
+                activeSession.mainProcess?.stdin.write(Buffer.from(buffer));
                 activeSession.progress.written += 1;
 
                 activeSession.bufferLock = false;
