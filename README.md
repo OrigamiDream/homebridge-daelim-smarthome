@@ -10,7 +10,7 @@
 
 e편한세상 및 아크로 계열 아파트 단지를 위한 공식 [Homebridge](https://github.com/homebridge/homebridge) 플러그인
 
-다음의 액세서리를 지원합니다.
+다음의 기능들을 지원합니다.
 1. 전등
 2. 난방
 3. 콘센트
