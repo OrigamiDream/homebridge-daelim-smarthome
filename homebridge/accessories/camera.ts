@@ -79,7 +79,7 @@ export const CAMERA_DEVICES: CameraDevice[] = [{
     deviceID: "CE-CAM0",
     displayName: "공동현관"
 }];
-export const CAMERA_TIMEOUT_DURATION = 3 * 60 * 1000; // 2 minutes
+export const CAMERA_TIMEOUT_DURATION = 3 * 60 * 1000; // 3 minutes
 
 export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
 
@@ -345,7 +345,15 @@ interface ActiveSession {
     returnProcess?: FFmpegProcess;
     timeout?: NodeJS.Timeout;
     feedInterval?: NodeJS.Timeout;
+    progressInterval?: NodeJS.Timeout;
+    bufferLock: boolean;
+    progress: StreamingProgress;
     socket?: Socket;
+}
+
+interface StreamingProgress {
+    written: number;
+    dropped: number;
 }
 
 class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
@@ -654,7 +662,13 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             args.push("-progress pipe:1");
             const ffmpegArgs = args.join(" ");
 
-            const activeSession: ActiveSession = {};
+            const activeSession: ActiveSession = {
+                bufferLock: false,
+                progress: {
+                    written: 0,
+                    dropped: 0
+                }
+            };
             activeSession.socket = createSocket(sessionInfo.ipv6 ? "udp6" : "udp4");
             activeSession.socket.on("error", (err: Error) => {
                 this.log.error(`[${this.cameraName}] Socket error: ${err.message}`);
@@ -700,9 +714,23 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 activeSession.returnProcess = new FFmpegProcess(`${this.cameraName}] [Two-way`, request.sessionID, this.processor, ffmpegReturnArgs, this.log, this);
                 activeSession.returnProcess.stdin.end(sdpReturnAudio.join("\r\n") + "\r\n");
             }
+            activeSession.progressInterval = setInterval(() => {
+                this.log.debug("Stream feeding progress: frame buffer written %d, dropped: %d", activeSession.progress.written, activeSession.progress.dropped);
+                activeSession.progress.written = 0;
+                activeSession.progress.dropped = 0;
+            }, 1000); // 1 seconds
             activeSession.feedInterval = setInterval(async () => {
-                const buffer = this.context.visitorInfo?.snapshot || await this.createAlternativeSnapshot();
+                if(activeSession.bufferLock) {
+                    activeSession.progress.dropped += 1;
+                    return;
+                }
+                activeSession.bufferLock = true;
+
+                let buffer = this.context.visitorInfo?.snapshot || await this.createAlternativeSnapshot();
                 activeSession.mainProcess?.stdin.write(buffer);
+                activeSession.progress.written += 1;
+
+                activeSession.bufferLock = false;
             }, 1000 / 30); // 30 fps
 
             this.ongoingSessions.set(request.sessionID, activeSession);
@@ -721,6 +749,9 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
             }
             if(session.feedInterval) {
                 clearInterval(session.feedInterval);
+            }
+            if(session.progressInterval) {
+                clearInterval(session.progressInterval);
             }
             try {
                 session.socket?.close();
