@@ -97,6 +97,9 @@ export class NetworkHandler {
         if("pw" in deepcopy) {
             deepcopy["pw"] = "********";
         }
+        if("image" in deepcopy) {
+            deepcopy["image"] = "[OBFUSCATED]";
+        }
         this.log.debug(`===> ${JSON.stringify(deepcopy)}`);
         return this.socket?.write(Buffer.from(Packet.create(body, pin, type, subType, 1, 3).getBytes()));
     }
