@@ -30,9 +30,9 @@ e편한세상 및 아크로 계열 아파트 단지를 위한 공식 [Homebridge
 
 ## 설치
 
-### Homebridge-ui를 이용한 설치
+### Homebridge Config UI X를 이용한 설치
 
-1. 가장 마지막 버전의 Homebridge-ui가 설치되어 있다면 검색 페이지에서 `homebridge-daelim-smarthome`을 검색하여 설치할 수 있습니다.
+1. 가장 마지막 버전의 Homebridge Config UI X가 설치되어 있다면 검색 페이지에서 `homebridge-daelim-smarthome`을 검색하여 설치할 수 있습니다.
 2. 설치 후 플러그인 구성 지침에 따르세요.
 
 ### Terminal에서 설치
