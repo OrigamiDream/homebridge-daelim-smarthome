@@ -81,7 +81,7 @@ export const CAMERA_DEVICES: CameraDevice[] = [{
     deviceID: "CE-CAM0",
     displayName: "공동현관"
 }];
-export const CAMERA_TIMEOUT_DURATION = 3 * 60 * 1000; // 3 minutes
+export const CAMERA_TIMEOUT_DURATION = 3 * 60; // 3 minutes
 export const CAMERA_TRANSITION_DURATION = 0.5; // 0.5 seconds
 
 export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
@@ -197,7 +197,7 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
             context.motionOnCamera = false;
 
             this.refreshSensors(accessory);
-        }, device?.duration?.camera || CAMERA_TIMEOUT_DURATION);
+        }, (device?.duration?.camera || CAMERA_TIMEOUT_DURATION) * 1000);
     }
 
     registerAccessories() {
