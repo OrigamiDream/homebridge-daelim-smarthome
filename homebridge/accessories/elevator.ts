@@ -21,7 +21,7 @@ interface ElevatorAccessoryInterface extends AccessoryInterface {
 
 export const ELEVATOR_DEVICE_ID = "EV-000000";
 export const ELEVATOR_DISPLAY_NAME = "엘레베이터";
-export const ELEVATOR_TIMEOUT_DURATION = 30 * 1000; // 30 seconds
+export const ELEVATOR_TIMEOUT_DURATION = 30; // 30 seconds
 
 export class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface> {
 
@@ -81,9 +81,10 @@ export class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface>
         if(accessory.context.timeoutId !== -1) {
             clearTimeout(accessory.context.timeoutId);
         }
+        const device = this.findDeviceInfoFromAccessory(accessory);
         accessory.context.timeoutId = setTimeout(() => {
             this.invalidateElevatorContextState();
-        }, ELEVATOR_TIMEOUT_DURATION);
+        }, (device?.duration?.elevator || ELEVATOR_TIMEOUT_DURATION) * 1000);
     }
 
     invalidateElevatorContextState() {

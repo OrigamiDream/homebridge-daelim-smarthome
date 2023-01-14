@@ -30,7 +30,7 @@ export const DOOR_DEVICES: DoorDevice[] = [{
     displayName: "공동현관",
     isCommunal: true
 }];
-export const DOOR_TIMEOUT_DURATION = 5 * 1000; // 5 seconds
+export const DOOR_TIMEOUT_DURATION = 5; // 5 seconds
 
 export class DoorAccessories extends Accessories<DoorAccessoryInterface> {
 
@@ -55,6 +55,7 @@ export class DoorAccessories extends Accessories<DoorAccessoryInterface> {
     }
     
     createMotionTimer(accessory: PlatformAccessory) {
+        const device = this.findDeviceInfoFromAccessory(accessory);
         return setTimeout(() => {
             if(accessory.context.motionTimer !== -1) {
                 clearTimeout(accessory.context.motionTimer);
@@ -63,7 +64,7 @@ export class DoorAccessories extends Accessories<DoorAccessoryInterface> {
             accessory.context.changesDetected = false;
 
             this.refreshSensors(accessory);
-        }, DOOR_TIMEOUT_DURATION);
+        }, (device?.duration?.door || DOOR_TIMEOUT_DURATION) * 1000);
     }
 
     findDoorAccessoryOf(isCommunal: boolean): PlatformAccessory | undefined {

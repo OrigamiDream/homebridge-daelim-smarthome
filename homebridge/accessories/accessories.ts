@@ -94,6 +94,11 @@ export class Accessories<T extends AccessoryInterface> {
         return undefined;
     }
 
+    protected findDeviceInfoFromAccessory(accessory: PlatformAccessory): Device | undefined {
+        const context = this.getAccessoryInterface(accessory);
+        return this.findDeviceInfo(context.deviceID, context.displayName);
+    }
+
     protected findAccessoryWithDeviceID(deviceID: string): PlatformAccessory | undefined {
         for(let accessory of this.accessories) {
             if(accessory.context.deviceID === deviceID) {

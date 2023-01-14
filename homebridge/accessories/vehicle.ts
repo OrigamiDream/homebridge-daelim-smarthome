@@ -17,7 +17,7 @@ interface VehicleAccessoryInterface extends AccessoryInterface {
 
 export const VEHICLE_DEVICE_ID = "VH-000000";
 export const VEHICLE_DISPLAY_NAME = "주차차단기";
-export const VEHICLE_TIMEOUT_DURATION = 5 * 1000; // 5 seconds
+export const VEHICLE_TIMEOUT_DURATION = 5; // 5 seconds
 
 export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
 
@@ -42,6 +42,7 @@ export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
     }
 
     createMotionTimer(accessory: PlatformAccessory) {
+        const device = this.findDeviceInfoFromAccessory(accessory);
         return setTimeout(() => {
             if(accessory.context.motionTimer !== -1) {
                 clearTimeout(accessory.context.motionTimer);
@@ -50,7 +51,7 @@ export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
             accessory.context.vehicleGettingIn = false;
 
             this.refreshSensors(accessory);
-        }, VEHICLE_TIMEOUT_DURATION);
+        }, (device?.duration?.vehicle || VEHICLE_TIMEOUT_DURATION) * 1000);
     }
 
     refreshSensors(accessory: PlatformAccessory) {
