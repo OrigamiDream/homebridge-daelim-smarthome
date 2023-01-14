@@ -81,9 +81,10 @@ export class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface>
         if(accessory.context.timeoutId !== -1) {
             clearTimeout(accessory.context.timeoutId);
         }
+        const device = this.findDeviceInfoFromAccessory(accessory);
         accessory.context.timeoutId = setTimeout(() => {
             this.invalidateElevatorContextState();
-        }, ELEVATOR_TIMEOUT_DURATION);
+        }, device?.duration?.elevator || ELEVATOR_TIMEOUT_DURATION);
     }
 
     invalidateElevatorContextState() {

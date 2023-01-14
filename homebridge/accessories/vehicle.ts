@@ -42,6 +42,7 @@ export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
     }
 
     createMotionTimer(accessory: PlatformAccessory) {
+        const device = this.findDeviceInfoFromAccessory(accessory);
         return setTimeout(() => {
             if(accessory.context.motionTimer !== -1) {
                 clearTimeout(accessory.context.motionTimer);
@@ -50,7 +51,7 @@ export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
             accessory.context.vehicleGettingIn = false;
 
             this.refreshSensors(accessory);
-        }, VEHICLE_TIMEOUT_DURATION);
+        }, device?.duration?.vehicle || VEHICLE_TIMEOUT_DURATION);
     }
 
     refreshSensors(accessory: PlatformAccessory) {

@@ -186,9 +186,8 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
     }
 
     createMotionTimer(accessory: PlatformAccessory) {
-        this.log.debug("Creating a new motion detector timer");
+        const device = this.findDeviceInfoFromAccessory(accessory);
         return setTimeout(() => {
-            this.log.debug("Invalidating the motion detector timer");
             const context = this.getAccessoryInterface(accessory);
             if(context.motionTimer) {
                 clearTimeout(context.motionTimer);
@@ -198,7 +197,7 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
             context.motionOnCamera = false;
 
             this.refreshSensors(accessory);
-        }, CAMERA_TIMEOUT_DURATION);
+        }, device?.duration?.camera || CAMERA_TIMEOUT_DURATION);
     }
 
     registerAccessories() {

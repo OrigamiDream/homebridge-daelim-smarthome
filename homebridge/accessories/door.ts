@@ -55,6 +55,7 @@ export class DoorAccessories extends Accessories<DoorAccessoryInterface> {
     }
     
     createMotionTimer(accessory: PlatformAccessory) {
+        const device = this.findDeviceInfoFromAccessory(accessory);
         return setTimeout(() => {
             if(accessory.context.motionTimer !== -1) {
                 clearTimeout(accessory.context.motionTimer);
@@ -63,7 +64,7 @@ export class DoorAccessories extends Accessories<DoorAccessoryInterface> {
             accessory.context.changesDetected = false;
 
             this.refreshSensors(accessory);
-        }, DOOR_TIMEOUT_DURATION);
+        }, device?.duration?.door || DOOR_TIMEOUT_DURATION);
     }
 
     findDoorAccessoryOf(isCommunal: boolean): PlatformAccessory | undefined {
