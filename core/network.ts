@@ -89,10 +89,7 @@ export class NetworkHandler {
         });
     }
 
-    sendUnreliableRequest(body: object, pin: string, type: Types, subType: SubTypes): boolean {
-        if(!this.isConnected || !this.socket) {
-            return false;
-        }
+    private obfuscatePersonalInformation(body: any) {
         const deepcopy = JSON.parse(JSON.stringify(body));
         if("pw" in deepcopy) {
             deepcopy["pw"] = "********";
@@ -100,7 +97,14 @@ export class NetworkHandler {
         if("image" in deepcopy) {
             deepcopy["image"] = "[OBFUSCATED]";
         }
-        this.log.debug(`===> ${JSON.stringify(deepcopy)}`);
+        return deepcopy;
+    }
+
+    sendUnreliableRequest(body: object, pin: string, type: Types, subType: SubTypes): boolean {
+        if(!this.isConnected || !this.socket) {
+            return false;
+        }
+        this.log.debug(`===> ${JSON.stringify(this.obfuscatePersonalInformation(body))}`);
         return this.socket?.write(Buffer.from(Packet.create(body, pin, type, subType, 1, 3).getBytes()));
     }
 
@@ -213,7 +217,7 @@ export class NetworkHandler {
         }
         if(packet !== undefined) {
             const header = packet.getHeader();
-            this.log.debug(`<=== HEAD(${header.toString()}) :: ${JSON.stringify(packet.getJSONBody())}`);
+            this.log.debug(`<=== HEAD(${header.toString()}) :: ${JSON.stringify(this.obfuscatePersonalInformation(packet.getJSONBody()))}`);
             if(header.getError() === Errors.SUCCESS) {
                 if(this.deferredRequests.length > 0) {
                     let timedOut = 0;
