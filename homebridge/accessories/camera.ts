@@ -249,6 +249,10 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
                 this.log.warn("Failed to get recent visitors info");
                 return;
             }
+            if(!visitorInfo.isNew) {
+                this.log.warn("The fetched visitors info is not newly added (old)");
+                return;
+            }
             const buffer = await this.client?.sendDeferredRequest({
                 index: visitorInfo.index,
                 read: "Y"
