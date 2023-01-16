@@ -353,6 +353,10 @@ interface ActiveSession {
     feedInterval?: NodeJS.Timeout;
     progressInterval?: NodeJS.Timeout;
     bufferLock: boolean;
+    cachedSnapshot?: Buffer;
+    enqueuedSnapshots: Buffer[];
+    transition: boolean;
+    transitionReady: boolean;
     progress: StreamingProgress;
     socket?: Socket;
 }
@@ -374,10 +378,6 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
 
     private snapshotPromise?: Promise<Buffer>;
     private alternativeSnapshot?: Buffer;
-    private cachedSnapshot?: Buffer;
-    private enqueuedSnapshots: Buffer[] = [];
-    private transition: boolean = false;
-    private transitionReady: boolean = false;
     private pendingSessions: Map<string, SessionInfo> = new Map();
     private ongoingSessions: Map<string, ActiveSession> = new Map();
 
@@ -555,7 +555,7 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
         };
     }
 
-    enqueueTransitionSnapshots(resInfo: ResolutionInfo, background: Buffer, overlay: Buffer) {
+    enqueueTransitionSnapshots(activeSession: ActiveSession, resInfo: ResolutionInfo, background: Buffer, overlay: Buffer) {
         // create binary files like named pipes
         const generator = this.createRandomCharacterGenerator("0123456789abcdef", 10);
         let dirPath: string;
@@ -607,9 +607,9 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
         Promise.all(queues).then((results) => {
             results.sort((a, b) => a.index - b.index);
             for(const result of results) {
-                this.enqueuedSnapshots.push(result.snapshot);
+                activeSession.enqueuedSnapshots.push(result.snapshot);
             }
-            this.transitionReady = true;
+            activeSession.transitionReady = true;
             const runtime = (Date.now() - startTime) / 1000;
 
             fs.rmSync(dirPath, {
@@ -781,7 +781,10 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 progress: {
                     written: 0,
                     dropped: 0
-                }
+                },
+                enqueuedSnapshots: [],
+                transition: false,
+                transitionReady: false
             };
             activeSession.socket = createSocket(sessionInfo.ipv6 ? "udp6" : "udp4");
             activeSession.socket.on("error", (err: Error) => {
@@ -841,26 +844,26 @@ class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
                 activeSession.bufferLock = true;
 
                 let buffer = this.context.visitorInfo?.snapshot || await this.createAlternativeSnapshot();
-                if(!this.cachedSnapshot) {
-                    this.cachedSnapshot = buffer; // initialize state
-                } else if(!this.cachedSnapshot.equals(buffer) && !this.transition && this.enqueuedSnapshots.length === 0) {
+                if(!activeSession.cachedSnapshot) {
+                    activeSession.cachedSnapshot = buffer; // initialize state
+                } else if(!activeSession.cachedSnapshot.equals(buffer) && !activeSession.transition && activeSession.enqueuedSnapshots.length === 0) {
                     // buffer has just been changed
-                    this.enqueueTransitionSnapshots(resolution, this.cachedSnapshot, buffer);
-                    this.transition = true;
+                    this.enqueueTransitionSnapshots(activeSession, resolution, activeSession.cachedSnapshot, buffer);
+                    activeSession.transition = true;
                 }
 
                 const duration = CAMERA_TRANSITION_DURATION * 30;
-                if(this.transition && !this.transitionReady && this.enqueuedSnapshots.length < duration) {
-                    buffer = this.cachedSnapshot; // new buffer won't be allowed to be used until the transition completed.
-                } else if(this.transitionReady) {
+                if(activeSession.transition && !activeSession.transitionReady && activeSession.enqueuedSnapshots.length < duration) {
+                    buffer = activeSession.cachedSnapshot; // new buffer won't be allowed to be used until the transition completed.
+                } else if(activeSession.transitionReady) {
                     // consume the transition buffers
-                    buffer = this.enqueuedSnapshots.splice(0, 1)[0];
-                    if(this.enqueuedSnapshots.length === 0) {
+                    buffer = activeSession.enqueuedSnapshots.splice(0, 1)[0];
+                    if(activeSession.enqueuedSnapshots.length === 0) {
                         // all transition buffers have been consumed
                         this.log.debug(`[${this.cameraName}] All transition snapshots have been consumed`);
-                        this.transition = false;
-                        this.transitionReady = false;
-                        this.cachedSnapshot = undefined;
+                        activeSession.transition = false;
+                        activeSession.transitionReady = false;
+                        activeSession.cachedSnapshot = undefined;
                     }
                 }
 
