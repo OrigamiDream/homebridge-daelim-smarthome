@@ -20,7 +20,7 @@ interface OutletAccessoryInterface extends AccessoryInterface {
 
 export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+    constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["wallsocket", "outlet"], [api.hap.Service.Outlet]);
     }
 

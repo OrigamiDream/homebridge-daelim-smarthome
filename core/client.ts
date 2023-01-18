@@ -1,10 +1,23 @@
 import readlineSync from 'readline-sync';
 import {DaelimConfig} from "./interfaces/daelim-config";
-import {Utils} from "./utils";
+import {Semaphore, Utils} from "./utils";
 import {Logging} from "homebridge";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
-import {Errors, LoginSubTypes, SubTypes, Types} from "./fields";
+import {Errors, LoginSubTypes, PushSubTypes, PushTypes, SettingSubTypes, SubTypes, Types} from "./fields";
 import {Complex} from "./interfaces/complex";
+import {setInterval} from "timers";
+import Timeout = NodeJS.Timeout;
+import fcm, {Credentials} from "push-receiver";
+
+export interface PushData {
+    readonly from: string
+    readonly priority: string
+    readonly title: string
+    readonly message: string
+    readonly reserved: string
+}
+
+export type PushEventCallback = (data: PushData) => void;
 
 interface ClientAuthorization {
     certification: string,
@@ -16,22 +29,30 @@ interface ClientAddress {
     room: string
 }
 
+interface PushEventListener {
+    type: PushTypes
+    subType: PushSubTypes
+    callback: PushEventCallback
+}
+
 export class Client {
 
     public static MMF_SERVER_PORT = 25301;
 
-    private readonly log: Logging
-    private readonly config: DaelimConfig;
     private readonly authorization: ClientAuthorization;
     private readonly address: ClientAddress;
+    private readonly semaphore = new Semaphore();
     private complex?: Complex;
     private handler?: NetworkHandler;
     private isLoggedIn = false;
     private isRefreshing = false;
     private lastKeepAliveTimestamp: number;
+    private enqueuedEstablishment?: Timeout;
+    private readonly pushEventListeners: PushEventListener[] = [];
 
-    constructor(log: Logging, config: DaelimConfig) {
-        this.log = log;
+    constructor(private readonly log: Logging,
+                private readonly config: DaelimConfig,
+                private readonly credentials: Credentials) {
         this.config = config;
         this.authorization = {
             certification: '00000000',
@@ -65,6 +86,24 @@ export class Client {
         return pin;
     }
 
+    private async forceUpdatePushPreferences(name: string, state: string = "on") {
+        await this.sendDeferredRequest({
+            type: "setting",
+            item: [{
+                name: name,
+                arg1: state
+            }]
+        }, Types.SETTING, SettingSubTypes.PUSH_SETTING_REQUEST, SettingSubTypes.PUSH_SETTING_RESPONSE, (body) => {
+            const items = body['item'] || [];
+            for(const item of items) {
+                if(item['name'] === name) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
     sendUnreliableRequest(body: any, type: Types, subType: SubTypes) {
         if(this.handler !== undefined) {
             this.handler.sendUnreliableRequest(body, this.getAuthorizationPIN(), type, subType);
@@ -90,6 +129,14 @@ export class Client {
         }
     }
 
+    registerPushEventListener(type: PushTypes, subType: PushSubTypes, callback: PushEventCallback) {
+        this.pushEventListeners.push({
+            type: type,
+            subType: subType,
+            callback: callback
+        });
+    }
+
     registerListeners() {
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.CERTIFICATION_PIN_RESPONSE, (body) => {
             this.authorization.certification = body['certpin'];
@@ -106,7 +153,19 @@ export class Client {
             this.authorization.login = body['loginpin'];
             this.sendUnreliableRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
         });
-        this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (_) => {
+        this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (_) => {
+            await this.forceUpdatePushPreferences("door");
+            await this.forceUpdatePushPreferences("car");
+            await this.forceUpdatePushPreferences("visitor"); // for camera
+
+            // registering fcm push token
+            this.sendUnreliableRequest({
+                dong: this.address.complex,
+                ho: this.address.room,
+                pushID: this.credentials.fcm.token,
+                phoneType: "android"
+            }, Types.LOGIN, LoginSubTypes.PUSH_REQUEST);
+
             this.isLoggedIn = true;
             if(this.handler?.flushAllEnqueuedBuffers(this.getAuthorizationPIN())) {
                 this.log("Flushed entire enqueued request buffers");
@@ -180,6 +239,23 @@ export class Client {
     }
 
     async prepareService() {
+        fcm.listen({ ...this.credentials, persistentIds: [] }, (data: any) => {
+            const orig = data.notification;
+            const pushData: PushData = {
+                from: orig.from,
+                priority: orig.priority,
+                title: orig.data.title,
+                message: orig.data.message,
+                reserved: orig.data.data3
+            };
+            this.log.debug(`<=== PUSH(Type: ${orig.data.data1}, Sub Type: ${orig.data.data2}) :: ${JSON.stringify(pushData)}`);
+            for(const eventListener of this.pushEventListeners) {
+                if(eventListener.type === parseInt(orig.data.data1) && eventListener.subType == parseInt(orig.data.data2)) {
+                    eventListener.callback(pushData);
+                }
+            }
+        });
+
         this.log('Looking for complex info...');
         this.complex = await Utils.findMatchedComplex(this.config.region, this.config.complex);
         this.log(`Complex info about (${this.config.complex}) has found.`);
@@ -192,12 +268,36 @@ export class Client {
                 return;
             }
             this.isLoggedIn = false;
+            if(this.semaphore.isLocked()) {
+                this.enqueueEstablishment();
+                return;
+            }
             this.log("Connection broken. Reconnect to the server...");
             this.handler?.handle();
         };
     }
 
+    enqueueEstablishment() {
+        if(this.enqueuedEstablishment) {
+            return;
+        }
+        this.enqueuedEstablishment = setInterval(() => {
+            if(this.semaphore.isLocked()) {
+                this.log.debug("Establishing connection failed due to semaphore from ui-server");
+                return;
+            }
+            clearInterval(this.enqueuedEstablishment);
+            this.enqueuedEstablishment = undefined;
+
+            this.handler?.handle();
+        }, 5000);
+    }
+
     refresh() {
+        if(this.semaphore.isLocked()) {
+            this.enqueueEstablishment();
+            return;
+        }
         this.log.debug("Refreshing MMF client service...");
         this.isRefreshing = true;
         this.handler?.handle();
@@ -215,9 +315,6 @@ export class Client {
         if(this.handler === undefined) {
             return;
         }
-        this.registerListeners();
-        this.registerErrorListeners();
-
         this.handler.handle();
     }
 

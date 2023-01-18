@@ -89,15 +89,22 @@ export class NetworkHandler {
         });
     }
 
-    sendUnreliableRequest(body: object, pin: string, type: Types, subType: SubTypes): boolean {
-        if(!this.isConnected || !this.socket) {
-            return false;
-        }
+    private obfuscatePersonalInformation(body: any) {
         const deepcopy = JSON.parse(JSON.stringify(body));
         if("pw" in deepcopy) {
             deepcopy["pw"] = "********";
         }
-        this.log.debug(`===> ${JSON.stringify(deepcopy)}`);
+        if("image" in deepcopy) {
+            deepcopy["image"] = "[OBFUSCATED]";
+        }
+        return deepcopy;
+    }
+
+    sendUnreliableRequest(body: object, pin: string, type: Types, subType: SubTypes): boolean {
+        if(!this.isConnected || !this.socket) {
+            return false;
+        }
+        this.log.debug(`===> ${JSON.stringify(this.obfuscatePersonalInformation(body))}`);
         return this.socket?.write(Buffer.from(Packet.create(body, pin, type, subType, 1, 3).getBytes()));
     }
 
@@ -151,10 +158,10 @@ export class NetworkHandler {
                 this.onConnected();
             }
         });
-        this.socket.on('data', (data) => {
+        this.socket.on('data', async (data) => {
             this.appendBuffer(data);
             do {
-            } while(this.handleResponse());
+            } while(await this.handleResponse());
         });
         this.socket.on('end', () => {
             this.log.info('Disconnected from MMF server');
@@ -196,7 +203,7 @@ export class NetworkHandler {
         this.readBuffers = temp.buffer;
     }
 
-    private handleResponse(): boolean {
+    private async handleResponse(): Promise<boolean> {
         const rawData = new Uint8Array(this.readBuffers);
         const chunk = Chunk.parse(rawData);
         if(chunk === undefined) {
@@ -210,7 +217,7 @@ export class NetworkHandler {
         }
         if(packet !== undefined) {
             const header = packet.getHeader();
-            this.log.debug(`<=== HEAD(${header.toString()}) :: ${JSON.stringify(packet.getJSONBody())}`);
+            this.log.debug(`<=== HEAD(${header.toString()}) :: ${JSON.stringify(this.obfuscatePersonalInformation(packet.getJSONBody()))}`);
             if(header.getError() === Errors.SUCCESS) {
                 if(this.deferredRequests.length > 0) {
                     let timedOut = 0;
@@ -239,14 +246,14 @@ export class NetworkHandler {
                 }
                 for(const listener of this.listeners) {
                     if(listener.type === header.getType() && listener.subType == header.getSubType()) {
-                        listener.callback(packet.getJSONBody());
+                        await listener.callback(packet.getJSONBody());
                     }
                 }
             } else {
                 let found = false;
                 for(const listener of this.errorListeners) {
                     if(listener.error === header.getError()) {
-                        listener.callback();
+                        await listener.callback();
                         found = true;
                     }
                 }

@@ -15,6 +15,7 @@ import {
     Types
 } from "./fields";
 import {Complex, ComplexInfo} from "./interfaces/complex";
+import * as fs from "fs";
 
 export interface SemanticVersion {
     major: number,
@@ -25,13 +26,43 @@ export interface SemanticVersion {
     isNewerThan(spec: SemanticVersion): boolean,
 }
 
+export class Semaphore {
+
+    public static readonly FILENAME = 'daelim-semaphore';
+
+    private getFilePath() {
+        return `${process.cwd()}/${Semaphore.FILENAME}`;
+    }
+
+    public createSemaphore() {
+        if(this.isLocked()) {
+            return;
+        }
+        fs.openSync(this.getFilePath(), 'w');
+    }
+
+    public removeSemaphore() {
+        if(!this.isLocked()) {
+            return;
+        }
+        fs.unlinkSync(this.getFilePath());
+    }
+
+    public isLocked() {
+        return fs.existsSync(this.getFilePath());
+    }
+
+}
+
 export class Utils {
 
     public static PLUGIN_NAME = "homebridge-daelim-smarthome";
     public static PLATFORM_NAME = "DaelimSmartHomePlatform";
     public static MANUFACTURER_NAME = "DL E&C Co.,Ltd.";
+    public static FCM_SENDER_ID = "251248256994";
 
     public static COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/complexes.json";
+    public static HOMEKIT_SECURE_VIDEO_IDLE_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/assets/hksv_camera_idle.png";
 
     static createSemanticVersion(major: number, minor: number, patch: number, beta: number = -1): SemanticVersion {
         return {

@@ -19,20 +19,20 @@ interface ElevatorAccessoryInterface extends AccessoryInterface {
 
 }
 
-const ELEVATOR_DEVICE_ID = "EV-000000";
-const ELEVATOR_DISPLAY_NAME = "엘레베이터";
-const ELEVATOR_TIMEOUT_DURATION = 30 * 1000; // 30 seconds
+export const ELEVATOR_DEVICE_ID = "EV-000000";
+export const ELEVATOR_DISPLAY_NAME = "엘레베이터";
+export const ELEVATOR_TIMEOUT_DURATION = 30; // 30 seconds
 
 export class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface> {
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+    constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["elevator"], [api.hap.Service.Switch]);
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
         await super.identify(accessory);
 
-        this.log.warn("Elevator Calling accessory does not support identification due to it is public utility");
+        this.log.warn("Identifying Elevator accessories is not possible.");
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
@@ -81,9 +81,10 @@ export class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface>
         if(accessory.context.timeoutId !== -1) {
             clearTimeout(accessory.context.timeoutId);
         }
+        const device = this.findDeviceInfoFromAccessory(accessory);
         accessory.context.timeoutId = setTimeout(() => {
             this.invalidateElevatorContextState();
-        }, ELEVATOR_TIMEOUT_DURATION);
+        }, (device?.duration?.elevator || ELEVATOR_TIMEOUT_DURATION) * 1000);
     }
 
     invalidateElevatorContextState() {

@@ -20,7 +20,7 @@ interface GasAccessoryInterface extends AccessoryInterface {
 
 export class GasAccessories extends Accessories<GasAccessoryInterface> {
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+    constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["gas"], [api.hap.Service.Valve]);
     }
 

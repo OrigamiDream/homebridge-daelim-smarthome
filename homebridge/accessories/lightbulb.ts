@@ -79,7 +79,7 @@ const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
 
 export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
 
-    constructor(log: Logging, api: API, config: DaelimConfig | undefined) {
+    constructor(log: Logging, api: API, config: DaelimConfig) {
         super(log, api, config, ["light", "lightbulb"], [api.hap.Service.Lightbulb], ["dimming"]);
     }
 
