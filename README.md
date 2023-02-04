@@ -21,7 +21,7 @@ e편한세상 및 아크로 계열 아파트 단지를 위한 공식 [Homebridge
 8. HomeKit Secure Video를 통한 세대현관 및 공동현관 방문자 표시
 9. 세대현관 및 공동현관 방문자 알림
 
-###### DL건설에서 새로 출시한 [스마트 eLife](https://apps.apple.com/kr/app/%EC%8A%A4%EB%A7%88%ED%8A%B8-elife/id1551248421) 앱과의 프로토콜 호환성을 확인할 수 없습니다.<br>해당하는 신축 아파트단지 거주민이 계시다면 해당하는 [이슈(#6)](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/6) 에 관련 정보 공유 부탁드립니다.
+###### DL건설에서 새로 출시한 [스마트 eLife](https://apps.apple.com/kr/app/%EC%8A%A4%EB%A7%88%ED%8A%B8-elife/id1551248421) 앱과 호환되지 않습니다.<br>해당 아파트 거주민 중 개발을 도와주실 의향이 있으시다면 [새 이슈 작성](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/new)을 해 주시기 바랍니다.
 
 
 ## 설치 요구사항
