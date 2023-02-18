@@ -7,6 +7,7 @@ import {Accessories, AccessoryInterface} from "./accessories/accessories";
 import {OutletAccessories} from "./accessories/outlet";
 import {HeaterAccessories} from "./accessories/heater";
 import {GasAccessories} from "./accessories/gas";
+import {FanAccessories} from "./accessories/fan";
 import {ElevatorAccessories} from "./accessories/elevator";
 import {DoorAccessories} from "./accessories/door";
 import {VehicleAccessories} from "./accessories/vehicle";
@@ -36,6 +37,7 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
             this.accessories.push(new OutletAccessories(this.log, this.api, this.config));
             this.accessories.push(new HeaterAccessories(this.log, this.api, this.config));
             this.accessories.push(new GasAccessories(this.log, this.api, this.config));
+            this.accessories.push(new FanAccessories(this.log, this.api, this.config));
             this.accessories.push(new ElevatorAccessories(this.log, this.api, this.config));
             this.accessories.push(new DoorAccessories(this.log, this.api, this.config));
             this.accessories.push(new VehicleAccessories(this.log, this.api, this.config));
