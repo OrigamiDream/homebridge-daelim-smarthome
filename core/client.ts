@@ -8,6 +8,7 @@ import {Complex} from "./interfaces/complex";
 import {setInterval} from "timers";
 import Timeout = NodeJS.Timeout;
 import fcm, {Credentials} from "push-receiver";
+import {MenuItem} from "./interfaces/menu";
 
 export interface PushData {
     readonly from: string
@@ -43,6 +44,7 @@ export class Client {
     private readonly address: ClientAddress;
     private readonly semaphore = new Semaphore();
     private complex?: Complex;
+    private menuItems?: MenuItem[];
     private handler?: NetworkHandler;
     private isLoggedIn = false;
     private isRefreshing = false;
@@ -258,6 +260,7 @@ export class Client {
 
         this.log('Looking for complex info...');
         this.complex = await Utils.findMatchedComplex(this.config.region, this.config.complex);
+        this.menuItems = await Utils.fetchSupportedMenus(this.complex);
         this.log(`Complex info about (${this.config.complex}) has found.`);
         this.handler = new NetworkHandler(this.log, this.complex);
         this.handler.onConnected = () => {
@@ -309,6 +312,19 @@ export class Client {
 
     isNetworkRefreshing() {
         return this.isRefreshing;
+    }
+
+    isDeviceSupported(deviceMenuName: string): boolean {
+        if(!this.menuItems) {
+            this.log.warn("Failed to get list of supported of menu items");
+            return false;
+        }
+        for(const item of this.menuItems) {
+            if(item.menuName === deviceMenuName && item.supported) {
+                return true;
+            }
+        }
+        return false;
     }
 
     startService() {

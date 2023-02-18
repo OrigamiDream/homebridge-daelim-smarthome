@@ -5,10 +5,11 @@ import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "../core/fi
 import * as crypto from 'crypto';
 import {Device} from "../core/interfaces/daelim-config";
 import Timeout = NodeJS.Timeout;
-import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME} from "../homebridge/accessories/elevator";
+import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME, ELEVATOR_MENU_NAME} from "../homebridge/accessories/elevator";
 import {VEHICLE_DEVICE_ID, VEHICLE_DISPLAY_NAME} from "../homebridge/accessories/vehicle";
 import {CAMERA_DEVICES} from "../homebridge/accessories/camera";
 import {DOOR_DEVICES} from "../homebridge/accessories/door";
+import {MenuItem} from "../core/interfaces/menu";
 
 interface ClientAuthorization {
     certification: string,
@@ -80,13 +81,38 @@ export class UiServer extends HomebridgePluginUiServer {
             complex: '',
             room: ''
         };
-        this.devices.push({
-            displayName: UiServer.getFriendlyName(ELEVATOR_DISPLAY_NAME, 'elevator'),
-            name: ELEVATOR_DISPLAY_NAME,
-            deviceType: 'elevator',
-            deviceId: ELEVATOR_DEVICE_ID,
-            disabled: false
-        });
+
+        this.onRequest('/choose-region', this.chooseRegion.bind(this));
+        this.onRequest('/choose-complex', this.chooseComplex.bind(this));
+        this.onRequest('/sign-in', this.handleSignIn.bind(this));
+        this.onRequest('/passcode', this.handleWallPadPasscode.bind(this));
+        this.onRequest('/invalidate', this.invalidate.bind(this));
+
+        this.ready();
+    }
+
+    isDeviceSupportedIn(menuItems: MenuItem[], deviceMenuName: string): boolean {
+        if(!menuItems || !menuItems.length) {
+            return false;
+        }
+        for(const item of menuItems) {
+            if(item.menuName === deviceMenuName && item.supported) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    prepareDefaultDevices(menuItems: MenuItem[]) {
+        if(this.isDeviceSupportedIn(menuItems, ELEVATOR_MENU_NAME)) {
+            this.devices.push({
+                displayName: UiServer.getFriendlyName(ELEVATOR_DISPLAY_NAME, 'elevator'),
+                name: ELEVATOR_DISPLAY_NAME,
+                deviceType: 'elevator',
+                deviceId: ELEVATOR_DEVICE_ID,
+                disabled: false
+            });
+        }
         for(const device of DOOR_DEVICES) {
             this.devices.push({
                 displayName: UiServer.getFriendlyName(device.displayName, 'door'),
@@ -112,14 +138,6 @@ export class UiServer extends HomebridgePluginUiServer {
                 disabled: false
             });
         }
-
-        this.onRequest('/choose-region', this.chooseRegion.bind(this));
-        this.onRequest('/choose-complex', this.chooseComplex.bind(this));
-        this.onRequest('/sign-in', this.handleSignIn.bind(this));
-        this.onRequest('/passcode', this.handleWallPadPasscode.bind(this));
-        this.onRequest('/invalidate', this.invalidate.bind(this));
-
-        this.ready();
     }
 
     invalidateAuthorizations() {
@@ -267,6 +285,8 @@ export class UiServer extends HomebridgePluginUiServer {
 
     async createService() {
         const complex = await Utils.findMatchedComplex(this.region || "", this.complex || "");
+        const menuItems = await Utils.fetchSupportedMenus(complex);
+        this.prepareDefaultDevices(menuItems);
         this.handler = new NetworkHandler(this.log, complex);
         this.handler.onConnected = () => {
             if(!this.username || !this.password) {
@@ -308,8 +328,8 @@ export class UiServer extends HomebridgePluginUiServer {
             const controlInfo = body['controlinfo'];
             const keys = Object.keys(controlInfo);
             for(const key of keys) {
-                // TODO: 'fan' accessory doesn't yet support
-                if(key === 'fan') {
+                if(key === 'fan' && !this.isDeviceSupportedIn(menuItems, "환기")) {
+                    // possibility of fan support in contents info but not in menu items
                     continue;
                 }
                 const devices = controlInfo[key]
