@@ -88,6 +88,15 @@ export class Client {
         return pin;
     }
 
+    doesComplexMatch(directoryNames: string[]): boolean {
+        for(const directoryName of directoryNames) {
+            if(this.complex?.directoryName === directoryName) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private async forceUpdatePushPreferences(name: string, state: string = "on") {
         await this.sendDeferredRequest({
             type: "setting",

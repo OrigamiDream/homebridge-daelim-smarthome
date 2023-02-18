@@ -14,6 +14,7 @@ export interface Complex {
     name: string
     status: string
     serverIp: string
+    directoryName: string
     geolocation: ComplexGeoLocation
 }
 

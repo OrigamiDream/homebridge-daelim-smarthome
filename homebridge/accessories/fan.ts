@@ -28,6 +28,16 @@ interface FanAccessoryInterface extends AccessoryInterface {
     rotationSpeed: FanRotationSpeed
 }
 
+const FAN_SPEED_SUPPORTED_COMPLEXES = [
+    'naturedasan3', // 다산신도시자연앤e편한세상2차, 자연앤이편한세상3차
+    'yangju4', // e편한세상 옥정메트로포레
+    'sooncheon', // e편한세상 순천(1~10), e편한세상 순천(11~12)
+    'changwon', // e편한세상 창원파크센트럴1단지, e편한세상 창원파크센트럴2단지
+    'sunbusquare', // e편한세상 선부역 어반스퀘어
+    'inchang', // e편한세상 인창어반포레
+    'youngcheon' // e편한세상 영천1단지, e편한세상 영천2단지
+]
+
 export class FanAccessories extends Accessories<FanAccessoryInterface> {
 
     constructor(log: Logging, api: API, config: DaelimConfig) {
@@ -71,30 +81,54 @@ export class FanAccessories extends Accessories<FanAccessoryInterface> {
                 }
                 callback(undefined, accessory.context.active ? 1 : 0);
             });
-        service.getCharacteristic(this.api.hap.Characteristic.RotationSpeed)
-            .setProps({
-                format: Formats.FLOAT,
-                minValue: 0,
-                maxValue: 100, // Up to level 3
-                minStep: FAN_ROTATION_SPEED_UNIT
-            })
-            .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                const ctx = accessory.context as FanAccessoryInterface;
-                const speedIndex = Math.max(0, Math.min(3, parseInt(((value as number) / FAN_ROTATION_SPEED_UNIT).toFixed(0))));
-                const oldRotationSpeed = ctx.rotationSpeed;
-                const newRotationSpeed = `0${speedIndex}` as FanRotationSpeed;
-                if(oldRotationSpeed === newRotationSpeed) {
-                    callback(undefined);
-                    return;
-                }
-                if(!ctx.active) {
-                    // turn on the fan
+        if(this.client?.doesComplexMatch(FAN_SPEED_SUPPORTED_COMPLEXES)) {
+            service.getCharacteristic(this.api.hap.Characteristic.RotationSpeed)
+                .setProps({
+                    format: Formats.FLOAT,
+                    minValue: 0,
+                    maxValue: 100, // Up to level 3
+                    minStep: FAN_ROTATION_SPEED_UNIT
+                })
+                .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                    const ctx = accessory.context as FanAccessoryInterface;
+                    const speedIndex = Math.max(0, Math.min(3, parseInt(((value as number) / FAN_ROTATION_SPEED_UNIT).toFixed(0))));
+                    const oldRotationSpeed = ctx.rotationSpeed;
+                    const newRotationSpeed = `0${speedIndex}` as FanRotationSpeed;
+                    if(oldRotationSpeed === newRotationSpeed) {
+                        callback(undefined);
+                        return;
+                    }
+                    if(!ctx.active) {
+                        // turn on the fan
+                        const response = await this.client?.sendDeferredRequest({
+                            type: 'invoke',
+                            item: [{
+                                device: 'fan',
+                                uid: ctx.deviceID,
+                                arg1: "on"
+                            }]
+                        }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
+                            return this.matchesAccessoryDeviceID(accessory, body);
+                        }).catch(_ => {
+                            return undefined;
+                        });
+                        if(response === undefined) {
+                            callback(new Error('TIMED OUT'));
+                            return;
+                        }
+                    } else if(newRotationSpeed === FanRotationSpeed.OFF) {
+                        callback(undefined);
+                        return;
+                    }
+                    // set the fan rotation speed
                     const response = await this.client?.sendDeferredRequest({
                         type: 'invoke',
                         item: [{
                             device: 'fan',
                             uid: ctx.deviceID,
-                            arg1: "on"
+                            arg1: "on",
+                            arg2: newRotationSpeed,
+                            arg3: ""
                         }]
                     }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
                         return this.matchesAccessoryDeviceID(accessory, body);
@@ -105,39 +139,17 @@ export class FanAccessories extends Accessories<FanAccessoryInterface> {
                         callback(new Error('TIMED OUT'));
                         return;
                     }
-                } else if(newRotationSpeed === FanRotationSpeed.OFF) {
+                    this.refreshFanState(response['item'] || []);
                     callback(undefined);
-                    return;
-                }
-                // set the fan rotation speed
-                const response = await this.client?.sendDeferredRequest({
-                    type: 'invoke',
-                    item: [{
-                        device: 'fan',
-                        uid: ctx.deviceID,
-                        arg1: "on",
-                        arg2: newRotationSpeed,
-                        arg3: ""
-                    }]
-                }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
-                    return this.matchesAccessoryDeviceID(accessory, body);
-                }).catch(_ => {
-                    return undefined;
+                })
+                .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                    if(!this.checkAccessoryAvailability(accessory, callback)) {
+                        return;
+                    }
+                    const ctx = accessory.context as FanAccessoryInterface;
+                    callback(undefined, this.getRotationSpeedPercentage(ctx));
                 });
-                if(response === undefined) {
-                    callback(new Error('TIMED OUT'));
-                    return;
-                }
-                this.refreshFanState(response['item'] || []);
-                callback(undefined);
-            })
-            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                if(!this.checkAccessoryAvailability(accessory, callback)) {
-                    return;
-                }
-                const ctx = accessory.context as FanAccessoryInterface;
-                callback(undefined, this.getRotationSpeedPercentage(ctx));
-            });
+        }
     }
 
     refreshFanState(items: any[], force: boolean = false) {
@@ -161,7 +173,9 @@ export class FanAccessories extends Accessories<FanAccessoryInterface> {
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.Fan, (service) => {
                         service.setCharacteristic(this.api.hap.Characteristic.On, ctx.active ? 1 : 0);
-                        service.setCharacteristic(this.api.hap.Characteristic.RotationSpeed, this.getRotationSpeedPercentage(ctx));
+                        if(this.client?.doesComplexMatch(FAN_SPEED_SUPPORTED_COMPLEXES)) {
+                            service.setCharacteristic(this.api.hap.Characteristic.RotationSpeed, this.getRotationSpeedPercentage(ctx));
+                        }
                     });
                 }
             }
