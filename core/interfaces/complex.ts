@@ -9,6 +9,7 @@ export interface Region {
 
 export interface Complex {
     index: string
+    apartId: string
     region: string
     name: string
     status: string
