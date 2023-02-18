@@ -125,6 +125,7 @@ class ComplexFetcher extends FetcherBase {
             for(const complex of complexes) {
                 filtered.push({
                     index: complex['index'],
+                    apartId: complex['apartId'],
                     region: complex['danjiArea'],
                     name: complex['name'],
                     status: complex['status'],
