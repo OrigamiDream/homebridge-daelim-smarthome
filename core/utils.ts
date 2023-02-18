@@ -16,6 +16,8 @@ import {
 } from "./fields";
 import {Complex, ComplexInfo} from "./interfaces/complex";
 import * as fs from "fs";
+import {MenuItem} from "./interfaces/menu";
+import axios from "axios";
 
 export interface SemanticVersion {
     major: number,
@@ -63,6 +65,7 @@ export class Utils {
 
     public static COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/complexes.json";
     public static HOMEKIT_SECURE_VIDEO_IDLE_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/assets/hksv_camera_idle.png";
+    public static MENU_INFO_URL = "https://smarthome.daelimcorp.co.kr/json/getApartMenuInfo.do";
 
     static createSemanticVersion(major: number, minor: number, patch: number, beta: number = -1): SemanticVersion {
         return {
@@ -135,6 +138,31 @@ export class Utils {
                     complexes: []
                 }
             });
+    }
+
+    static async fetchSupportedMenus(complex: Complex): Promise<MenuItem[]> {
+        const params = {
+            apartId: complex.apartId,
+            searchMenuGubun: "mobile"
+        };
+        const queryString = new URLSearchParams(params).toString();
+        return await axios.post(`${this.MENU_INFO_URL}?${queryString}`, undefined, {
+            responseType: "json"
+        }).then((response) => {
+            return response.data;
+        }).then((data: any) => {
+            const items: MenuItem[] = [];
+            for(const item of data["item"]) {
+                if(item["menuGubun"] !== "mobile") {
+                    continue;
+                }
+                items.push({
+                    menuName: item["menuName"],
+                    supported: item["useYn"] == "Y"
+                });
+            }
+            return items;
+        });
     }
 
     static async findMatchedComplex(regionName: string, complexName: string): Promise<Complex> {
