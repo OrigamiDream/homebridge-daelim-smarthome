@@ -25,7 +25,7 @@ export class HeaterAccessories extends HeaterCoolerAccessories {
 
     getCurrentHeaterCoolerState(accessory: PlatformAccessory): CharacteristicValue {
         const context = accessory.context as HeaterCoolerAccessoryInterface;
-        if(context.active && context.desiredTemperature < context.currentTemperature) {
+        if(context.active && context.desiredTemperature > context.currentTemperature) {
             return this.api.hap.Characteristic.CurrentHeaterCoolerState.HEATING;
         }
         return this.api.hap.Characteristic.CurrentHeaterCoolerState.INACTIVE;
