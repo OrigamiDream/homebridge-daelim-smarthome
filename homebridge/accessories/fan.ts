@@ -188,10 +188,10 @@ export class FanAccessories extends Accessories<FanAccessoryInterface> {
             if(!this.client?.isDeviceSupported(FAN_MENU_NAME)) {
                 return;
             }
-            this.registerLazyAccessories(body, (deviceID, displayName) => {
+            this.registerLazyAccessories(body, (deviceID) => {
                 return {
                     deviceID: deviceID,
-                    displayName: displayName,
+                    displayName: '환기',
                     init: false,
                     active: false,
                     rotationSpeed: FanRotationSpeed.OFF
