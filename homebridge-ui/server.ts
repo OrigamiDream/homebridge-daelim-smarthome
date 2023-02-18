@@ -236,6 +236,7 @@ export class UiServer extends HomebridgePluginUiServer {
         const suffixMap: { [key: string]: string } = {
             'light': '전등',
             'heating': '난방',
+            'cooling': '에어컨',
             'wallsocket': '콘센트',
             'fan': '환풍기',
             'camera': '인터폰'
