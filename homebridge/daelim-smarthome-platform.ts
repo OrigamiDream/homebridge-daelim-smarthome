@@ -12,6 +12,7 @@ import {DoorAccessories} from "./accessories/door";
 import {VehicleAccessories} from "./accessories/vehicle";
 import {CameraAccessories} from "./accessories/camera";
 import fcm, {Credentials} from "push-receiver";
+import {CoolerAccessories} from "./accessories/cooler";
 
 export = (api: API) => {
     api.registerPlatform(Utils.PLATFORM_NAME, DaelimSmartHomePlatform);
@@ -35,6 +36,7 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
             this.accessories.push(new LightbulbAccessories(this.log, this.api, this.config));
             this.accessories.push(new OutletAccessories(this.log, this.api, this.config));
             this.accessories.push(new HeaterAccessories(this.log, this.api, this.config));
+            this.accessories.push(new CoolerAccessories(this.log, this.api, this.config));
             this.accessories.push(new GasAccessories(this.log, this.api, this.config));
             this.accessories.push(new ElevatorAccessories(this.log, this.api, this.config));
             this.accessories.push(new DoorAccessories(this.log, this.api, this.config));
