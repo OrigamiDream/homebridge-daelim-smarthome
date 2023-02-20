@@ -15,6 +15,7 @@ import {DaelimConfig} from "../../core/interfaces/daelim-config";
 interface LightbulbAccessoryInterface extends AccessoryInterface {
 
     brightness: number
+    supportsBrightnessAdjustmentWithoutState: boolean
     brightnessAdjustable: boolean
     on: boolean
     maxBrightness: number
@@ -76,6 +77,8 @@ const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
         }
     }
 ]
+
+export const MAX_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB = 6;
 
 export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
 
@@ -184,13 +187,20 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
     }
 
     createItemInterface(accessory: PlatformAccessory, isActive: boolean): any {
+        const context = accessory.context as LightbulbAccessoryInterface;
         let item: any = {
             device: "light",
-            uid: accessory.context.deviceID,
+            uid: context.deviceID,
             arg1: isActive ? "on" : "off"
         };
-        if(isActive) {
-            item["arg2"] = String(accessory.context.brightness)
+        const supportsOnly = context.supportsBrightnessAdjustmentWithoutState && !context.brightnessAdjustable;
+        if(isActive && (context.brightnessAdjustable || supportsOnly)) {
+            if(supportsOnly) {
+                item["arg2"] = isActive ? MAX_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB : 0;
+            } else {
+                item["arg2"] = String(context.brightness);
+            }
+            item["arg3"] = "y";
         }
         return item;
     }
@@ -245,21 +255,40 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                             });
                         }
                     }
+                } else if(accessory.context.supportsBrightnessAdjustmentWithoutState) {
+                    // 6 is the maximum brightness for 3-level lightbulb
+                    accessory.context.brightness = accessory.context.on ? MAX_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB : 0;
                 }
             }
         }
+    }
+
+    checkBrightnessAdjustable(items: any[], deviceIdQuery: string) {
+        for (const item of items) {
+            const deviceType = item['device'];
+            if(deviceType !== this.getDeviceType()) {
+                continue;
+            }
+            const deviceID = item['uid'];
+            if(deviceID !== deviceIdQuery) {
+                continue;
+            }
+            return 'arg2' in item;
+        }
+        return false;
     }
 
     registerListeners() {
         super.registerListeners();
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
             this.registerLazyAccessories(body, (deviceID, displayName, info) => {
-                const brightnessAdjustable = info["dimming"] === "y";
+                const brightnessAdjustable = info["dimming"] === "y" && this.checkBrightnessAdjustable(body['item'] || [], deviceID);
                 return {
                     deviceID: deviceID,
                     displayName: displayName,
                     init: false,
                     brightness: 0,
+                    supportsBrightnessAdjustmentWithoutState: info["dimming"] === "y",
                     brightnessAdjustable: brightnessAdjustable,
                     on: false,
                     maxBrightness: 100,
