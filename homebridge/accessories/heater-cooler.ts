@@ -60,7 +60,7 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
                     callback(new Error('TIMED OUT'));
                     return;
                 }
-                this.refreshHeaterState(response['item'] || []);
+                this.refreshHeaterCoolerState(response['item'] || []);
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
@@ -105,7 +105,8 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
                 minStep: 1
             })
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                if(accessory.context.desiredTemperature === value) {
+                if(accessory.context.desiredTemperature === value || !accessory.context.active) {
+                    // Temperature slider is disabled when the accessory is not active
                     callback(undefined);
                     return;
                 }
@@ -126,7 +127,7 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
                     callback(new Error('TIMED OUT'));
                     return;
                 }
-                this.refreshHeaterState(response['item'] || []);
+                this.refreshHeaterCoolerState(response['item'] || []);
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
@@ -138,11 +139,6 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
 
         service.getCharacteristic(this.api.hap.Characteristic.CurrentTemperature)
             .setValue(this.getCurrentTemperature(accessory))
-            .setProps({
-                minValue: this.minimumTemperature,
-                maxValue: this.maximumTemperature,
-                minStep: 1
-            })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 if(!this.checkAccessoryAvailability(accessory, callback)) {
                     return;
@@ -151,7 +147,7 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
             });
     }
 
-    refreshHeaterState(items: any[], force: boolean = false) {
+    refreshHeaterCoolerState(items: any[], force: boolean = false) {
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
             const deviceType = item['device'];
@@ -162,9 +158,8 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
                 const active = item['arg1'] === 'on';
-                const desiredTemperature = parseInt(item['arg2']);
-                const currentTemperature = parseInt(item['arg3']);
-
+                const desiredTemperature = parseInt(item['arg2']) || accessory.context.desiredTemperature;
+                const currentTemperature = parseInt(item['arg3']) || accessory.context.currentTemperature;
                 accessory.context.desiredTemperature = desiredTemperature;
                 accessory.context.currentTemperature = currentTemperature;
                 accessory.context.active = active && desiredTemperature >= this.minimumTemperature;
@@ -195,19 +190,19 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
                     currentTemperature: 0
                 }
             })
-            this.refreshHeaterState(body['item'] || [], true);
+            this.refreshHeaterCoolerState(body['item'] || [], false);
         });
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.INVOKE_RESPONSE, (body) => {
-            this.refreshHeaterState(body['item'] || [], true);
+            this.refreshHeaterCoolerState(body['item'] || [], false);
         });
     }
 
     getThresholdTemperature(accessory: PlatformAccessory): CharacteristicValue {
-        return Math.max(this.minimumTemperature, Math.min(this.maximumTemperature, parseFloat(accessory.context.desiredTemperature)))
+        return Math.max(this.minimumTemperature, Math.min(this.maximumTemperature, parseFloat(accessory.context.desiredTemperature)));
     }
 
     getCurrentTemperature(accessory: PlatformAccessory): CharacteristicValue {
-        return Math.max(this.minimumTemperature, Math.min(this.maximumTemperature, parseFloat(accessory.context.currentTemperature)));
+        return parseFloat(accessory.context.currentTemperature);
     }
 
     abstract getThresholdTemperatureCharacteristic(): WithUUID<{ new(): Characteristic }>;
