@@ -97,7 +97,20 @@ export class Client {
         return false;
     }
 
-    private async forceUpdatePushPreferences(name: string, state: string = "on") {
+    private checkPushPreferencesEnabled(response: any, name: string) {
+        const items = response['item'] || [];
+        for(const item of items) {
+            if(item["name"] === name) {
+                return item["arg1"] === "on";
+            }
+        }
+        return false;
+    }
+
+    private async forceUpdatePushPreferences(response: any, name: string, state: string = "on") {
+        if(this.checkPushPreferencesEnabled(response, name)) {
+            return;
+        }
         await this.sendDeferredRequest({
             type: "setting",
             item: [{
@@ -165,9 +178,15 @@ export class Client {
             this.sendUnreliableRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
         });
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (_) => {
-            await this.forceUpdatePushPreferences("door");
-            await this.forceUpdatePushPreferences("car");
-            await this.forceUpdatePushPreferences("visitor"); // for camera
+            const response = await this.sendDeferredRequest({
+                type: "query",
+                item: [{
+                    name: "all"
+                }]
+            }, Types.SETTING, SettingSubTypes.PUSH_QUERY_REQUEST, SettingSubTypes.PUSH_QUERY_RESPONSE, (_) => true);
+            await this.forceUpdatePushPreferences(response, "door");
+            await this.forceUpdatePushPreferences(response, "car");
+            await this.forceUpdatePushPreferences(response, "visitor"); // for camera
 
             // registering fcm push token
             this.sendUnreliableRequest({
