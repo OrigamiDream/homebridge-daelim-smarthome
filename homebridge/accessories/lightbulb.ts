@@ -15,7 +15,6 @@ import {DaelimConfig} from "../../core/interfaces/daelim-config";
 interface LightbulbAccessoryInterface extends AccessoryInterface {
 
     brightness: number
-    supportsBrightnessAdjustmentWithoutState: boolean
     brightnessAdjustable: boolean
     on: boolean
     maxBrightness: number
@@ -28,7 +27,7 @@ interface LightbulbAccessoryInterface extends AccessoryInterface {
 
 interface BrightnessAdjustableSettings {
 
-    condition: (brightness: string) => boolean
+    condition: (deviceID: string, brightness?: string) => boolean
     maxBrightness: number
     minBrightness: number
     minSteps: number
@@ -39,12 +38,23 @@ interface BrightnessAdjustableSettings {
 
 }
 
+export const REGEX_PATTERN_FOR_3_LEVEL_LIGHTBULB = /Lt([0-9]{0,2})-([0-9]{0,2})/i;
+export const MINIMUM_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB = 1;
+export const SECONDARY_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB = 3;
+export const MAX_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB = 6;
+
+function check3LevelBrightnessLightbulb(deviceID: string) {
+    return REGEX_PATTERN_FOR_3_LEVEL_LIGHTBULB.test(deviceID);
+}
+
 const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
     {
-        condition: brightness => brightness.length >= 2, // 00, 10, 20, ...
+        condition: (deviceID, brightness) => {
+            return brightness !== undefined && brightness.length >= 2; // 00, 10, 20, ...
+        },
         maxBrightness: 80,
         minBrightness: 10,
-        minSteps: 100 / 8, // 10,
+        minSteps: 100 / 8,
         brightnessExceedJumpTo: 100,
 
         getBrightness: (brightness, settings) => {
@@ -59,26 +69,39 @@ const BRIGHTNESS_ADJUSTABLE_SETTINGS: BrightnessAdjustableSettings[] = [
         }
     },
     {
-        condition: brightness => brightness.length == 1, // 0, 1, 2, ...
-        maxBrightness: 7,
+        condition: (deviceID, brightness) => {
+            return check3LevelBrightnessLightbulb(deviceID) && (brightness === undefined || brightness.length == 1); // 0, 1, 3, 6
+        },
+        maxBrightness: 6,
         minBrightness: 1,
-        minSteps: 100 / 7, // 1
-        brightnessExceedJumpTo: 7,
+        minSteps: 100 / 3, // 1, 3, 6
+        brightnessExceedJumpTo: 6,
 
         getBrightness: (brightness, settings) => {
-            return brightness * settings.minSteps;
+            if(brightness === 0) {
+                return 0;
+            } else if(brightness === MINIMUM_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB) {
+                return settings.minSteps;
+            } else if(brightness === SECONDARY_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB) {
+                return settings.minSteps * 2;
+            } else {
+                return settings.minSteps * 3;
+            }
         },
         fromBrightness: (brightness, settings) => {
-            const level = (brightness as number) / settings.minSteps;
-            if(level >= settings.maxBrightness) {
-                return settings.brightnessExceedJumpTo;
+            const level = parseInt(((brightness as number) / settings.minSteps).toFixed(0));
+            if(level === 0) {
+                return 0;
+            } else if(level === 1) {
+                return MINIMUM_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB;
+            } else if(level === 2) {
+                return SECONDARY_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB;
+            } else {
+                return MAX_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB;
             }
-            return level;
         }
     }
 ]
-
-export const MAX_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB = 6;
 
 export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
 
@@ -193,13 +216,8 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             uid: context.deviceID,
             arg1: isActive ? "on" : "off"
         };
-        const supportsOnly = context.supportsBrightnessAdjustmentWithoutState && !context.brightnessAdjustable;
-        if(isActive && (context.brightnessAdjustable || supportsOnly)) {
-            if(supportsOnly) {
-                item["arg2"] = isActive ? MAX_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB : 0;
-            } else {
-                item["arg2"] = String(context.brightness);
-            }
+        if(isActive && context.brightnessAdjustable) {
+            item["arg2"] = String(context.brightness);
             item["arg3"] = "y";
         }
         return item;
@@ -215,80 +233,65 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
             const deviceID = item['uid'];
             const accessory = this.findAccessoryWithDeviceID(deviceID);
             if(accessory) {
-                accessory.context.on = item['arg1'] === 'on';
-                accessory.context.init = true;
+                const ctx = accessory.context as LightbulbAccessoryInterface;
+                ctx.on = item['arg1'] === 'on';
+                ctx.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
+                        service.setCharacteristic(this.api.hap.Characteristic.On, ctx.on);
                     });
                 }
 
-                if(accessory.context.brightnessAdjustable) {
+                if(ctx.brightnessAdjustable) {
                     // Update new brightness rate when the accessory is on.
-                    const brightness = item['arg2'];
-                    const index = this.findAdjustableBrightnessSettingIndex(brightness);
+                    let brightness = item['arg2'];
+                    if(check3LevelBrightnessLightbulb(ctx.deviceID) && brightness === undefined) {
+                        brightness = ctx.on ? MAX_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB : 0;
+                    }
+                    const index = this.findAdjustableBrightnessSettingIndex(ctx.deviceID, brightness.toString());
                     const settings = BRIGHTNESS_ADJUSTABLE_SETTINGS[index];
 
                     if(force) {
-                        accessory.context.minBrightness = settings.minBrightness;
-                        accessory.context.maxBrightness = settings.maxBrightness;
-                        accessory.context.minSteps = settings.minSteps;
-                        accessory.context.brightnessExceedJumpTo = settings.brightnessExceedJumpTo;
-                        accessory.context.brightnessSettingIndex = index;
+                        ctx.minBrightness = settings.minBrightness;
+                        ctx.maxBrightness = settings.maxBrightness;
+                        ctx.minSteps = settings.minSteps;
+                        ctx.brightnessExceedJumpTo = settings.brightnessExceedJumpTo;
+                        ctx.brightnessSettingIndex = index;
                         this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
                             service.getCharacteristic(this.api.hap.Characteristic.Brightness)
                                 .setProps({
                                     minValue: 0,
                                     maxValue: 100,
-                                    minStep: accessory.context.minSteps,
+                                    minStep: ctx.minSteps,
                                 });
                         });
                     }
 
-                    if(accessory.context.on) {
-                        accessory.context.brightness = parseInt(brightness);
+                    if(ctx.on) {
+                        ctx.brightness = parseInt(brightness);
 
                         if(force) {
                             this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
-                                const brightness = settings.getBrightness(Math.min(accessory.context.maxBrightness, accessory.context.brightness), settings)
+                                const brightness = settings.getBrightness(Math.min(ctx.maxBrightness, ctx.brightness), settings)
                                 service.setCharacteristic(this.api.hap.Characteristic.Brightness, brightness);
                             });
                         }
                     }
-                } else if(accessory.context.supportsBrightnessAdjustmentWithoutState) {
-                    // 6 is the maximum brightness for 3-level lightbulb
-                    accessory.context.brightness = accessory.context.on ? MAX_BRIGHTNESS_FOR_3_LEVEL_LIGHTBULB : 0;
                 }
             }
         }
-    }
-
-    checkBrightnessAdjustable(items: any[], deviceIdQuery: string) {
-        for (const item of items) {
-            const deviceType = item['device'];
-            if(deviceType !== this.getDeviceType()) {
-                continue;
-            }
-            const deviceID = item['uid'];
-            if(deviceID !== deviceIdQuery) {
-                continue;
-            }
-            return 'arg2' in item;
-        }
-        return false;
     }
 
     registerListeners() {
         super.registerListeners();
         this.client?.registerResponseListener(Types.DEVICE, DeviceSubTypes.QUERY_RESPONSE, (body) => {
             this.registerLazyAccessories(body, (deviceID, displayName, info) => {
-                const brightnessAdjustable = info["dimming"] === "y" && this.checkBrightnessAdjustable(body['item'] || [], deviceID);
+                const brightnessAdjustable = info["dimming"] === "y";
                 return {
                     deviceID: deviceID,
                     displayName: displayName,
                     init: false,
                     brightness: 0,
-                    supportsBrightnessAdjustmentWithoutState: info["dimming"] === "y",
                     brightnessAdjustable: brightnessAdjustable,
                     on: false,
                     maxBrightness: 100,
@@ -306,10 +309,10 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         });
     }
 
-    findAdjustableBrightnessSettingIndex(brightness: string): number {
+    findAdjustableBrightnessSettingIndex(deviceID: string, brightness: string): number {
         for(let i = 0; i < BRIGHTNESS_ADJUSTABLE_SETTINGS.length; i++) {
             const settings = BRIGHTNESS_ADJUSTABLE_SETTINGS[i];
-            if(settings.condition(brightness)) {
+            if(settings.condition(deviceID, brightness)) {
                 return i;
             }
         }
