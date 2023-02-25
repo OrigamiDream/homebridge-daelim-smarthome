@@ -135,7 +135,7 @@ export class Accessories<T extends AccessoryInterface> {
 
     private verifyAndFlushEnqueuedAccessories(body: any): any[] {
         const items = body['item'] || [];
-        const filtered = [];
+        const filtered: any[] = [];
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
             const deviceType = item['device'];
