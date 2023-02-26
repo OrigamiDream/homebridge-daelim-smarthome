@@ -11,7 +11,7 @@
    1. homebridge-ui 관리 패널에 접속
    2. 우측 상단 `로그 보기` 버튼 클릭
    3. 우측 상단 `다운로드` 버튼 클릭 (사용자 환경에 따라 개인정보 등이 포함될 수 있습니다.)
-   4. 다운로드된 `homebridge.log.txt` 파일을 적절한 검열을 거쳐 [새 이슈 작성](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/new)을 해 주시거나 개발자의 [메일](mailto:feuds_ebb.0c@icloud.com)로 보내주세요.
+   4. 다운로드된 `homebridge.log.txt` 파일을 적절한 검열을 거쳐 [새 이슈 작성](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/new)을 해 주시거나 개발자의 [메일](mailto:hello@origamidream.me)로 보내주세요.
 
 <br>
 <br>
@@ -20,7 +20,7 @@
 1. 해당 문제가 발생했을 때, 어떠한 절차를 거쳐야 문제를 재현할 수 있는지 최대한 설명해주시면 큰 도움이 됩니다.
 2. 로그 다운로드
    1. Terminal 에서 `~/.homebridge` 혹은 사용자 설정된 Homebridge 디렉토리로 이동
-   2. `homebridge.log` 파일을 적절한 검열을 거쳐 [새 이슈 작성](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/new)을 해 주시거나 개발자의 [메일](mailto:feuds_ebb.0c@icloud.com)로 보내주세요.
+   2. `homebridge.log` 파일을 적절한 검열을 거쳐 [새 이슈 작성](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/new)을 해 주시거나 개발자의 [메일](mailto:hello@origamidream.me)로 보내주세요.
 
 <br>
 <br>
