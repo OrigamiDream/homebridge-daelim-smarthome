@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge DL E&C Smart Home",
   "name": "homebridge-daelim-smarthome",
-  "version": "1.4.1-beta.6",
+  "version": "1.4.1-beta.7",
   "description": "A third-party Homebridge platform plugin for DL E&C SmartHome",
   "main": "dist/homebridge/daelim-smarthome-platform.js",
   "keywords": [
