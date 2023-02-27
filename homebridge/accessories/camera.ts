@@ -92,7 +92,7 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
         super(log, api, config, ["camera"], [
             api.hap.Service.MotionSensor,
             api.hap.Service.CameraOperatingMode,
-            api.hap.Service.CameraEventRecordingManagement
+            api.hap.Service.CameraRecordingManagement
         ]);
         this.processor = ffmpegPath || "ffmpeg";
     }
@@ -113,8 +113,8 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
                 callback(undefined, this.getAccessoryInterface(accessory).motionOnCamera);
             });
 
-        // CameraEventRecordingManagement
-        const recordingService = this.ensureServiceAvailability(this.api.hap.Service.CameraEventRecordingManagement, services);
+        // CameraRecordingManagement
+        const recordingService = this.ensureServiceAvailability(this.api.hap.Service.CameraRecordingManagement, services);
         recordingService.getCharacteristic(this.api.hap.Characteristic.Active)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
