@@ -21,7 +21,8 @@ interface GasAccessoryInterface extends AccessoryInterface {
 export class GasAccessories extends Accessories<GasAccessoryInterface> {
 
     constructor(log: Logging, api: API, config: DaelimConfig) {
-        super(log, api, config, ["gas"], [api.hap.Service.Valve]);
+        super(log, api, config, ["gas"], [api.hap.Service.LockMechanism]);
+        this.removeLegacyService = true; // Magic flag for Valve → LockMechanism migration
     }
 
     async identify(accessory: PlatformAccessory): Promise<void> {
@@ -50,17 +51,31 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
         super.configureAccessory(accessory, services);
-        const service = this.ensureServiceAvailability(this.api.hap.Service.Valve, services);
-
-        service.getCharacteristic(this.api.hap.Characteristic.Active)
+        const service = this.ensureServiceAvailability(this.api.hap.Service.LockMechanism, services);
+        service.getCharacteristic(this.api.hap.Characteristic.Name)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
+                callback(undefined, accessory.context.displayName);
+            });
+        service.getCharacteristic(this.api.hap.Characteristic.LockCurrentState)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                if(!this.checkAccessoryAvailability(accessory, callback)) {
+                    return;
+                }
+                callback(undefined, accessory.context.on ? this.api.hap.Characteristic.LockCurrentState.UNSECURED : this.api.hap.Characteristic.LockCurrentState.SECURED);
+            });
+        service.getCharacteristic(this.api.hap.Characteristic.LockTargetState)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                const isActive = value === this.api.hap.Characteristic.Active.ACTIVE
-                // Old state is same with new state
-                if(accessory.context.on === isActive) {
+                const ctx = accessory.context as GasAccessoryInterface;
+                const isActive = value === this.api.hap.Characteristic.LockTargetState.UNSECURED;
+                // Previous state is same with new state
+                if(ctx.on === isActive) {
                     callback(undefined);
                     return;
                 }
-                if(!accessory.context.on) {
+                if(!ctx.on) {
                     if(isActive) {
                         this.client?.sendUnreliableRequest({
                             type: 'query',
@@ -77,15 +92,15 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
                     type: 'invoke',
                     item: [{
                         device: 'gas',
-                        uid: accessory.context.deviceID,
+                        uid: ctx.deviceID,
                         arg1: 'off'
                     }]
                 }, Types.DEVICE, DeviceSubTypes.INVOKE_REQUEST, DeviceSubTypes.INVOKE_RESPONSE, body => {
                     return this.matchesAccessoryDeviceID(accessory, body);
                 }).catch(_ => {
                     return undefined;
-                })
-                if(response == undefined) {
+                });
+                if(response === undefined) {
                     callback(new Error('TIMED OUT'));
                     return;
                 }
@@ -96,23 +111,7 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
                 if(!this.checkAccessoryAvailability(accessory, callback)) {
                     return;
                 }
-                callback(undefined, accessory.context.on ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
-            });
-
-        service.getCharacteristic(this.api.hap.Characteristic.InUse)
-            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                if(!this.checkAccessoryAvailability(accessory, callback)) {
-                    return;
-                }
-                callback(undefined, accessory.context.on ? this.api.hap.Characteristic.InUse.IN_USE : this.api.hap.Characteristic.InUse.NOT_IN_USE);
-            });
-
-        service.getCharacteristic(this.api.hap.Characteristic.ValveType)
-            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                if(!this.checkAccessoryAvailability(accessory, callback)) {
-                    return;
-                }
-                callback(undefined, this.api.hap.Characteristic.ValveType.GENERIC_VALVE);
+                callback(undefined, accessory.context.on ? this.api.hap.Characteristic.LockCurrentState.UNSECURED : this.api.hap.Characteristic.LockCurrentState.SECURED);
             });
     }
 
@@ -129,11 +128,10 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
                 accessory.context.on = item['arg1'] === 'on';
                 accessory.context.init = true;
                 if(force) {
-                    this.findService(accessory, this.api.hap.Service.Valve, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.on ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
-                        service.setCharacteristic(this.api.hap.Characteristic.InUse, accessory.context.on ? this.api.hap.Characteristic.InUse.IN_USE : this.api.hap.Characteristic.InUse.NOT_IN_USE);
-                        service.setCharacteristic(this.api.hap.Characteristic.ValveType, this.api.hap.Characteristic.ValveType.GENERIC_VALVE);
-                    });
+                    this.findService(accessory, this.api.hap.Service.LockMechanism, (service) => {
+                        service.setCharacteristic(this.api.hap.Characteristic.LockCurrentState, accessory.context.on ? this.api.hap.Characteristic.LockCurrentState.UNSECURED : this.api.hap.Characteristic.LockCurrentState.SECURED);
+                        service.setCharacteristic(this.api.hap.Characteristic.LockTargetState, accessory.context.on ? this.api.hap.Characteristic.LockCurrentState.UNSECURED : this.api.hap.Characteristic.LockCurrentState.SECURED);
+                    })
                 }
             }
         }
