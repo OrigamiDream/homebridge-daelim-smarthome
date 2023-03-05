@@ -6,6 +6,7 @@ import {Semaphore, Utils} from "../core/utils";
 import {Accessories, AccessoryInterface} from "./accessories/accessories";
 import {OutletAccessories} from "./accessories/outlet";
 import {HeaterAccessories} from "./accessories/heater";
+import {CoolerAccessories} from "./accessories/cooler";
 import {GasAccessories} from "./accessories/gas";
 import {FanAccessories} from "./accessories/fan";
 import {ElevatorAccessories} from "./accessories/elevator";
@@ -13,7 +14,6 @@ import {DoorAccessories} from "./accessories/door";
 import {VehicleAccessories} from "./accessories/vehicle";
 import {CameraAccessories} from "./accessories/camera";
 import fcm, {Credentials} from "push-receiver";
-import {CoolerAccessories} from "./accessories/cooler";
 
 export = (api: API) => {
     api.registerPlatform(Utils.PLATFORM_NAME, DaelimSmartHomePlatform);
