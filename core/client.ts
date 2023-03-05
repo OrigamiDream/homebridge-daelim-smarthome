@@ -8,6 +8,7 @@ import {Complex} from "./interfaces/complex";
 import {setInterval} from "timers";
 import Timeout = NodeJS.Timeout;
 import fcm, {Credentials} from "push-receiver";
+import {MenuItem} from "./interfaces/menu";
 
 export interface PushData {
     readonly from: string
@@ -43,6 +44,7 @@ export class Client {
     private readonly address: ClientAddress;
     private readonly semaphore = new Semaphore();
     private complex?: Complex;
+    private menuItems?: MenuItem[];
     private handler?: NetworkHandler;
     private isLoggedIn = false;
     private isRefreshing = false;
@@ -86,7 +88,29 @@ export class Client {
         return pin;
     }
 
-    private async forceUpdatePushPreferences(name: string, state: string = "on") {
+    doesComplexMatch(directoryNames: string[]): boolean {
+        for(const directoryName of directoryNames) {
+            if(this.complex?.directoryName === directoryName) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private checkPushPreferencesEnabled(response: any, name: string) {
+        const items = response['item'] || [];
+        for(const item of items) {
+            if(item["name"] === name) {
+                return item["arg1"] === "on";
+            }
+        }
+        return false;
+    }
+
+    private async forceUpdatePushPreferences(response: any, name: string, state: string = "on") {
+        if(this.checkPushPreferencesEnabled(response, name)) {
+            return;
+        }
         await this.sendDeferredRequest({
             type: "setting",
             item: [{
@@ -154,9 +178,15 @@ export class Client {
             this.sendUnreliableRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
         });
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (_) => {
-            await this.forceUpdatePushPreferences("door");
-            await this.forceUpdatePushPreferences("car");
-            await this.forceUpdatePushPreferences("visitor"); // for camera
+            const response = await this.sendDeferredRequest({
+                type: "query",
+                item: [{
+                    name: "all"
+                }]
+            }, Types.SETTING, SettingSubTypes.PUSH_QUERY_REQUEST, SettingSubTypes.PUSH_QUERY_RESPONSE, (_) => true);
+            await this.forceUpdatePushPreferences(response, "door");
+            await this.forceUpdatePushPreferences(response, "car");
+            await this.forceUpdatePushPreferences(response, "visitor"); // for camera
 
             // registering fcm push token
             this.sendUnreliableRequest({
@@ -258,6 +288,7 @@ export class Client {
 
         this.log('Looking for complex info...');
         this.complex = await Utils.findMatchedComplex(this.config.region, this.config.complex);
+        this.menuItems = await Utils.fetchSupportedMenus(this.complex);
         this.log(`Complex info about (${this.config.complex}) has found.`);
         this.handler = new NetworkHandler(this.log, this.complex);
         this.handler.onConnected = () => {
@@ -309,6 +340,19 @@ export class Client {
 
     isNetworkRefreshing() {
         return this.isRefreshing;
+    }
+
+    isDeviceSupported(deviceMenuName: string): boolean {
+        if(!this.menuItems) {
+            this.log.warn("Failed to get list of supported of menu items");
+            return false;
+        }
+        for(const item of this.menuItems) {
+            if(item.menuName === deviceMenuName && item.supported) {
+                return true;
+            }
+        }
+        return false;
     }
 
     startService() {

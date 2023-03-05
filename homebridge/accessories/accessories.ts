@@ -37,6 +37,7 @@ export class Accessories<T extends AccessoryInterface> {
     protected readonly enqueuedAccessoriesCache: EnqueuedAccessoryMap = {};
 
     private lastInitRequestTimestamp: number = -1;
+    protected removeLegacyService = false;
 
     /**
      * Accessories class
@@ -135,7 +136,7 @@ export class Accessories<T extends AccessoryInterface> {
 
     private verifyAndFlushEnqueuedAccessories(body: any): any[] {
         const items = body['item'] || [];
-        const filtered = [];
+        const filtered: any[] = [];
         for(let i = 0; i < items.length; i++) {
             const item = items[i];
             const deviceType = item['device'];
@@ -212,6 +213,20 @@ export class Accessories<T extends AccessoryInterface> {
                     this.log.info("Restoring cached legacy accessory: %s (%s, %s)", context.displayName, context.deviceID, this.getDeviceType());
                 } else {
                     this.log.info("Restoring cached accessory: %s (%s, %s)", context.displayName, context.deviceID, this.getDeviceType());
+                }
+                if(this.removeLegacyService) {
+                    const serviceTypes = this.serviceTypes.map((serviceType) => serviceType.UUID);
+                    const takedown = [];
+                    for(const service of cachedAccessory.services) {
+                        if(serviceTypes.includes(service.UUID)) {
+                            continue;
+                        }
+                        this.log.debug('Removing legacy service %s from accessory: %s (%s, %s)', service.constructor.name, context.displayName, context.deviceID, this.getDeviceType());
+                        takedown.push(service);
+                    }
+                    for(const service of takedown) {
+                        cachedAccessory.removeService(service);
+                    }
                 }
                 return cachedAccessory;
             }
