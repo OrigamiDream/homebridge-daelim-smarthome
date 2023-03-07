@@ -8,19 +8,19 @@
 [![Downloads](https://img.shields.io/npm/dt/homebridge-daelim-smarthome.svg?color=critical)](https://www.npmjs.com/package/homebridge-daelim-smarthome)
 [![Version](https://img.shields.io/npm/v/homebridge-daelim-smarthome)](https://www.npmjs.com/package/homebridge-daelim-smarthome)
 
-e편한세상 및 아크로 계열 아파트 단지를 위한 공식 [Homebridge](https://github.com/homebridge/homebridge) 플러그인
+e편한세상 및 아크로 계열 아파트 단지를 위한 [Homebridge](https://github.com/homebridge/homebridge) 인증된 플러그인
 
 다음의 기능들을 지원합니다.
-1. 전등
+1. 전등<sup>[1](#lightbulb)</sup>
 2. 난방
 3. 콘센트
-4. 환풍기
+4. 환풍기<sup>[2](#fans)</sup>
 5. 시스템 에어컨
 6. 가스 밸브 (단방향)
 7. 엘레베이터 호출 (도착알림 없음)
 8. 세대현관 및 공동현관 출입 모션 센서
 9. 입차 모션 센서
-10. HomeKit Secure Video를 통한 세대현관 및 공동현관 방문자 표시
+10. 세대현관 및 공동현관 방문자 이미지 표시<sup>[3](#hksv)</sup>
 11. 세대현관 및 공동현관 방문자 알림
 
 ###### DL건설에서 새로 출시한 [스마트 eLife](https://apps.apple.com/kr/app/%EC%8A%A4%EB%A7%88%ED%8A%B8-elife/id1551248421) 앱과 호환되지 않습니다.<br>해당 아파트 거주민 중 개발을 도와주실 의향이 있으시다면 [새 이슈 작성](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/new)을 해 주시기 바랍니다.
@@ -55,3 +55,7 @@ sudo npm install -g --unsafe-perm homebridge-daelim-smarthome
 4. `npm link`로 npm 패키지를 등록합니다.
 5. Homebridge-ui 웹사이트로 이동하면 플러그인 목록에서 `homebridge-daelim-smarthome`을 찾을 수 있습니다.
 6. 설정 버튼을 눌러 플러그인 구성 지침에 따르세요.
+
+<sub><b id="lightbulb">1</b> 세대에 따라 거실 전등 밝기를 3단계 혹은 8단계로 조절 가능합니다.</sub><br>
+<sub><b id="fans">2</b> 일부 세대의 경우 환풍기 풍량 조절이 가능합니다.</sub><br>
+<sub><b id="hksv">3</b> HomeKit Secure Video를 통해 표기되며, 홈킷 허브인 Apple TV 혹은 HomePod이 있어야 합니다.</sub>
