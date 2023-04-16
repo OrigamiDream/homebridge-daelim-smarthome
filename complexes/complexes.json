@@ -219,7 +219,7 @@
                     "region": "서울특별시",
                     "name": "e편한세상 신촌 4단지",
                     "status": "LIVE",
-                    "serverIp": "124.7.147.251",
+                    "serverIp": "125.7.147.251",
                     "directoryName": "sinchon",
                     "geolocation": {
                         "state": "서울특별시",
@@ -2483,7 +2483,7 @@
                     "region": "기타",
                     "name": "스마트홈 대림코퍼 시연용",
                     "status": "LIVE",
-                    "serverIp": "223.171.66.42",
+                    "serverIp": "223.171.132.6",
                     "directoryName": "daelimcorpmh",
                     "geolocation": {
                         "state": "서울특별시",
