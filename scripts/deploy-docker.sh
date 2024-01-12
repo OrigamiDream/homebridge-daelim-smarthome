@@ -37,7 +37,7 @@ docker run \
   -p 8581:8581/tcp \
   -v $root_dir:/homebridge \
   -d \
-  oznu/homebridge:ubuntu
+  homebridge/homebridge:latest
 
 echo "Waiting for the Docker container up..."
 until [ "`docker inspect -f {{.State.Running}} homebridge`" == "true" ]; do
