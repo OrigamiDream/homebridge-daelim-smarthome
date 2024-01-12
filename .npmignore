@@ -4,6 +4,7 @@ homebridge-ui/
 core/
 complexes/
 branding/
+!/dist/*
 
 # Ignore temporary volume
 .homebridge*
