@@ -78,7 +78,7 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
                 continue;
             }
             const services = accessories.getServiceTypes().map((serviceType) => {
-                return accessory.getService(serviceType) || accessory.addService(serviceType, accessory.displayName);
+                return accessory.getService(serviceType) || accessory.addService(serviceType, accessory.displayName, serviceType.UUID);
             });
             if(services.length > 0) {
                 accessories.configureAccessory(accessory, services);
