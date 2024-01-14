@@ -242,7 +242,7 @@ export class Accessories<T extends AccessoryInterface> {
         const accessory = new this.api.platformAccessory(context.displayName, uuid);
 
         let services = this.serviceTypes.map((serviceType) => {
-            return accessory.getService(serviceType) || accessory.addService(serviceType, context.displayName);
+            return accessory.getService(serviceType) || accessory.addService(serviceType, context.displayName, serviceType.UUID);
         })
         accessory.context = context;
         accessory.context.version = Utils.currentSemanticVersion().toString();
