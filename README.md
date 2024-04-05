@@ -60,7 +60,7 @@ sudo npm install -g --unsafe-perm homebridge-daelim-smarthome
 
 1. `git clone https://github.com/OrigamiDream/homebridge-daelim-smarthome.git`을 통해 레포지토리를 로컬에 설치합니다.
 2. `npm install ./homebridge-daelim-smarthome`으로 플러그인을 빌드 및 설치합니다.
-3. 문제가 생긴 경우, `npm install hap-nodejs` 실행 후 2번 명령어 다시 수행합니다.
+3. 문제가 생긴 경우, `npm install hap-nodejs` 실행 후 Step 2 를 다시 수행합니다.
 4. Homebridge-UI 웹사이트로 이동하면 플러그인 목록에서 `homebridge-daelim-smarthome`을 찾을 수 있습니다.
 5. 설정 버튼을 눌러 플러그인 구성 지침에 따르세요.
 
