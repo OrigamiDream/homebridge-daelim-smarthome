@@ -45,7 +45,7 @@ e편한세상 및 아크로 계열 아파트 단지를 위한 [Homebridge](https
 sudo npm install -g --unsafe-perm homebridge-daelim-smarthome
 ```
 
-### 직접 빌드하여 Terminal에서 설치
+### 직접 빌드하여 설치 (macOS, Linux 전용)
 
 <small>Node.js 환경을 필요로합니다.</small>
 
@@ -53,8 +53,16 @@ sudo npm install -g --unsafe-perm homebridge-daelim-smarthome
 2. `cd homebridge-daelim-smarthome`으로 로컬에 설치된 레포지토리로 이동합니다.
 3. `npm i && npm run build`로 플러그인을 빌드합니다.
 4. `npm link`로 npm 패키지를 등록합니다.
-5. Homebridge-ui 웹사이트로 이동하면 플러그인 목록에서 `homebridge-daelim-smarthome`을 찾을 수 있습니다.
+5. Homebridge-UI 웹사이트로 이동하면 플러그인 목록에서 `homebridge-daelim-smarthome`을 찾을 수 있습니다.
 6. 설정 버튼을 눌러 플러그인 구성 지침에 따르세요.
+
+### 직접 빌드하여 설치 (Homebridge Docker Terminal 내에서 작업)
+
+1. `git clone https://github.com/OrigamiDream/homebridge-daelim-smarthome.git`을 통해 레포지토리를 로컬에 설치합니다.
+2. `npm install ./homebridge-daelim-smarthome`으로 플러그인을 빌드 및 설치합니다.
+3. 문제가 생긴 경우, `npm install hap-nodejs` 실행 후 2번 명령어 다시 수행합니다.
+4. Homebridge-UI 웹사이트로 이동하면 플러그인 목록에서 `homebridge-daelim-smarthome`을 찾을 수 있습니다.
+5. 설정 버튼을 눌러 플러그인 구성 지침에 따르세요.
 
 <sub><b id="lightbulb">1</b> 세대에 따라 거실 전등 밝기를 3단계 혹은 8단계로 조절 가능합니다.</sub><br>
 <sub><b id="fans">2</b> 일부 세대의 경우 환풍기 풍량 조절이 가능합니다.</sub><br>
