@@ -5,7 +5,6 @@ import {
     CharacteristicGetCallback,
     CharacteristicSetCallback,
     CharacteristicValue,
-    Formats,
     Logging,
     PlatformAccessory,
     Service
@@ -84,7 +83,7 @@ export class FanAccessories extends Accessories<FanAccessoryInterface> {
         if(this.client?.doesComplexMatch(FAN_SPEED_SUPPORTED_COMPLEXES)) {
             service.getCharacteristic(this.api.hap.Characteristic.RotationSpeed)
                 .setProps({
-                    format: Formats.FLOAT,
+                    format: this.api.hap.Formats.FLOAT,
                     minValue: 0,
                     maxValue: 100, // Up to level 3
                     minStep: FAN_ROTATION_SPEED_UNIT
