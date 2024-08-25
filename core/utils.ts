@@ -62,6 +62,9 @@ export class Utils {
     public static PLATFORM_NAME = "DaelimSmartHomePlatform";
     public static MANUFACTURER_NAME = "DL E&C Co.,Ltd.";
     public static FCM_SENDER_ID = "251248256994";
+    public static FCM_PROJECT_ID = "daelim-smarthome";
+    public static FCM_APP_ID = "1:251248256994:android:4f4ccc5221a7b689";
+    public static FCM_API_KEY = "AIzaSyAm__JwMJS8utB54p36cDxl8lsKu2wHKNI";
 
     public static COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/complexes.json";
     public static HOMEKIT_SECURE_VIDEO_IDLE_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/assets/hksv_camera_idle.png";

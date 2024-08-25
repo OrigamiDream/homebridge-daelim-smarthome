@@ -13,7 +13,7 @@ import {ElevatorAccessories} from "./accessories/elevator";
 import {DoorAccessories} from "./accessories/door";
 import {VehicleAccessories} from "./accessories/vehicle";
 import {CameraAccessories} from "./accessories/camera";
-import fcm, {Credentials} from "push-receiver";
+import PushReceiver from "@eneris/push-receiver";
 
 export = (api: API) => {
     api.registerPlatform(Utils.PLATFORM_NAME, DaelimSmartHomePlatform);
@@ -93,8 +93,18 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
         }
 
         // firebase cloud messaging
-        const credentials = await fcm.register(Utils.FCM_SENDER_ID);
-        this.client = new Client(this.log, this.config, credentials as Credentials);
+        const push = new PushReceiver({
+            debug: false,
+            persistentIds: [],
+            firebase: {
+                apiKey: Utils.FCM_API_KEY,
+                appId: Utils.FCM_APP_ID,
+                projectId: Utils.FCM_PROJECT_ID,
+                messagingSenderId: Utils.FCM_SENDER_ID,
+            },
+            credentials: undefined,
+        })
+        this.client = new Client(this.log, this.config, push);
         await this.client.prepareService();
 
         this.client.registerListeners();

@@ -7,8 +7,8 @@ import {Errors, LoginSubTypes, PushSubTypes, PushTypes, SettingSubTypes, SubType
 import {Complex} from "./interfaces/complex";
 import {setInterval} from "timers";
 import Timeout = NodeJS.Timeout;
-import fcm, {Credentials} from "push-receiver";
 import {MenuItem} from "./interfaces/menu";
+import PushReceiver from "@eneris/push-receiver";
 
 export interface PushData {
     readonly from: string
@@ -54,7 +54,7 @@ export class Client {
 
     constructor(private readonly log: Logging,
                 private readonly config: DaelimConfig,
-                private readonly credentials: Credentials) {
+                private readonly push: PushReceiver) {
         this.config = config;
         this.authorization = {
             certification: '00000000',
@@ -192,7 +192,7 @@ export class Client {
             this.sendUnreliableRequest({
                 dong: this.address.complex,
                 ho: this.address.room,
-                pushID: this.credentials.fcm.token,
+                pushID: this.push.fcmToken,
                 phoneType: "android"
             }, Types.LOGIN, LoginSubTypes.PUSH_REQUEST);
 
@@ -269,22 +269,26 @@ export class Client {
     }
 
     async prepareService() {
-        fcm.listen({ ...this.credentials, persistentIds: [] }, (data: any) => {
-            const orig = data.notification;
+        this.push.onNotification((notification) => {
+            const orig = notification.message;
+            if(!orig || !orig.data) {
+                return;
+            }
             const pushData: PushData = {
-                from: orig.from,
-                priority: orig.priority,
-                title: orig.data.title,
-                message: orig.data.message,
-                reserved: orig.data.data3
+                from: orig.from!,
+                priority: orig.priority!,
+                title: orig.data['title'] as string,
+                message: orig.data['message'] as string,
+                reserved: orig.data['data3'] as string,
             };
             this.log.debug(`<=== PUSH(Type: ${orig.data.data1}, Sub Type: ${orig.data.data2}) :: ${JSON.stringify(pushData)}`);
             for(const eventListener of this.pushEventListeners) {
-                if(eventListener.type === parseInt(orig.data.data1) && eventListener.subType == parseInt(orig.data.data2)) {
+                if(eventListener.type === parseInt(orig.data['data1'] as string) && eventListener.subType == parseInt(orig.data['data2'] as string)) {
                     eventListener.callback(pushData);
                 }
             }
         });
+        await this.push.connect();
 
         this.log('Looking for complex info...');
         this.complex = await Utils.findMatchedComplex(this.config.region, this.config.complex);
