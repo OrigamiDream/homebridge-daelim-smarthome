@@ -5,7 +5,7 @@ import {
     CharacteristicEventTypes,
     CharacteristicGetCallback,
     CharacteristicSetCallback,
-    CharacteristicValue, Formats,
+    CharacteristicValue,
     Logging,
     PlatformAccessory,
     Service
@@ -166,7 +166,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
         if(accessory.context.brightnessAdjustable) {
             service.getCharacteristic(this.api.hap.Characteristic.Brightness)
                 .setProps({
-                    format: Formats.FLOAT,
+                    format: this.api.hap.Formats.FLOAT,
                     minValue: 0,
                     maxValue: 100,
                     minStep: accessory.context.minSteps
