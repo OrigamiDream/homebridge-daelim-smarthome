@@ -151,14 +151,14 @@ export class Utils {
         };
 
         // Avoid expired SSL certificate on the request.
-        const httpAgent = new https.Agent({
+        const httpsAgent = new https.Agent({
             rejectUnauthorized: false
         });
 
         const queryString = new URLSearchParams(params).toString();
         return await axios.post(`${this.MENU_INFO_URL}?${queryString}`, undefined, {
             responseType: "json",
-            httpAgent,
+            httpsAgent,
         }).then((response) => {
             return response.data;
         }).then((data: any) => {
