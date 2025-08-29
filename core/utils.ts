@@ -18,6 +18,7 @@ import {Complex, ComplexInfo} from "./interfaces/complex";
 import * as fs from "fs";
 import {MenuItem} from "./interfaces/menu";
 import axios from "axios";
+import * as https from "node:https";
 
 export interface SemanticVersion {
     major: number,
@@ -148,9 +149,16 @@ export class Utils {
             apartId: complex.apartId,
             searchMenuGubun: "mobile"
         };
+
+        // Avoid expired SSL certificate on the request.
+        const httpsAgent = new https.Agent({
+            rejectUnauthorized: false
+        });
+
         const queryString = new URLSearchParams(params).toString();
         return await axios.post(`${this.MENU_INFO_URL}?${queryString}`, undefined, {
-            responseType: "json"
+            responseType: "json",
+            httpsAgent,
         }).then((response) => {
             return response.data;
         }).then((data: any) => {
