@@ -1,5 +1,6 @@
 const axios = require('axios');
 const fs = require('fs');
+const {Agent} = require("node:https");
 
 class FetcherBase {
     constructor(filename, regex) {
@@ -8,11 +9,15 @@ class FetcherBase {
         this.baseURL = 'https://smarthome.daelimcorp.co.kr/main/choice_1.do'
         this.regex = regex
         this.pipes = [];
+        this.httpsAgent = new Agent({
+            rejectUnauthorized: false
+        });
 
         this.addPipe(async () => {
             const response = await axios({
                 url: this.baseURL,
-                method: 'get'
+                method: 'get',
+                httpsAgent: this.httpsAgent
             }).catch(reason => {
                 console.error(reason);
                 return undefined;
