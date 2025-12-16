@@ -1,0 +1,82 @@
+name: Publish
+on:
+  # Production release
+  push:
+    tags:
+      - 'v*'
+      - '!v**-beta.*'
+
+  # Beta release
+  workflow_dispatch:
+    inputs:
+      branch:
+        type: string
+        description: Branch name to publish beta from
+        required: true
+
+permissions:
+  contents: write  # create GitHub Release
+  id-token: write  # REQUIRED for npm trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (prod)
+        if: github.event_name == 'push'
+        uses: actions/checkout@v3
+
+      - name: Checkout (beta)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Setup git user
+        if: github.event_name == 'workflow_dispatch'
+        uses: fregante/setup-git-user@v1
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      # Beta release flow
+      - name: Bump beta version
+        if: github.event_name == 'workflow_dispatch'
+        run: npm version prerelease --preid=beta
+      - name: Push beta version commit
+        if: github.event_name == 'workflow_dispatch'
+        run: git push origin "${{ github.event.inputs.branch }}"
+      - name: Publish beta to npmjs
+        if: github.event_name == 'workflow_dispatch'
+        run: npm publish --tag beta
+
+      # Production release flow
+      - name: Parse release info
+        if: github.event_name == 'push'
+        env:
+          LOG_DIR: logs
+        run: |
+          filename="${{ env.LOG_DIR }}/${{ github.ref_name }}.md"
+          echo "RELEASE_NAME=$(head -n 1 $filename)" >> $GITHUB_ENV
+          echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
+          echo "$(tail -n +2 $filename)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ env.RELEASE_NAME }}
+          body: |
+            ${{ env.RELEASE_BODY }}
+          draft: false
+          prerelease: false
+      - name: Publish production to npmjs
+        if: github.event_name == 'push'
+        run: npm publish
