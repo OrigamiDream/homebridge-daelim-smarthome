@@ -4,7 +4,7 @@ import {Semaphore, Utils} from "./utils";
 import {Logging} from "homebridge";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
 import {Errors, LoginSubTypes, PushSubTypes, PushTypes, SettingSubTypes, SubTypes, Types} from "./fields";
-import {Complex} from "./interfaces/complex";
+import {DaelimComplex} from "./interfaces/daelim-complex";
 import {setInterval} from "timers";
 import Timeout = NodeJS.Timeout;
 import {MenuItem} from "./interfaces/menu";
@@ -43,7 +43,7 @@ export class Client {
     private readonly authorization: ClientAuthorization;
     private readonly address: ClientAddress;
     private readonly semaphore = new Semaphore();
-    private complex?: Complex;
+    private complex?: DaelimComplex;
     private menuItems?: MenuItem[];
     private handler?: NetworkHandler;
     private isLoggedIn = false;

@@ -3,7 +3,7 @@ import {Client} from "./client";
 import {Chunk} from "./chunk";
 import {Packet} from "./packet";
 import {Errors, SubTypes, Types} from "./fields";
-import {Complex} from "./interfaces/complex";
+import {DaelimComplex} from "./interfaces/daelim-complex";
 
 export type ResponseCallback = (body: any) => void;
 export type ErrorCallback = () => void;
@@ -58,7 +58,7 @@ export class NetworkHandler {
     private isConnected = false;
 
     private readonly log: LoggerBase;
-    private readonly complex: Complex;
+    private readonly complex: DaelimComplex;
 
     private readonly listeners: ResponseListener[] = [];
     private readonly errorListeners: ErrorListener[] = [];
@@ -69,7 +69,7 @@ export class NetworkHandler {
     public onConnected?: () => void;
     public onDisconnected?: () => void;
 
-    constructor(log: LoggerBase, complex: Complex) {
+    constructor(log: LoggerBase, complex: DaelimComplex) {
         this.log = log;
         this.complex = complex;
     }

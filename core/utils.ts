@@ -14,11 +14,12 @@ import {
     SystemSubTypes,
     Types
 } from "./fields";
-import {Complex, ComplexInfo} from "./interfaces/complex";
+import {DaelimComplex, DaelimComplexInfo} from "./interfaces/daelim-complex";
 import * as fs from "fs";
 import {MenuItem} from "./interfaces/menu";
 import axios from "axios";
 import * as https from "node:https";
+import {SmartELifeComplex} from "./interfaces/smart-elife-complex";
 
 export interface SemanticVersion {
     major: number,
@@ -67,7 +68,8 @@ export class Utils {
     public static FCM_APP_ID = "1:251248256994:android:4f4ccc5221a7b689";
     public static FCM_API_KEY = "AIzaSyAm__JwMJS8utB54p36cDxl8lsKu2wHKNI";
 
-    public static COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/daelim/complexes/complexes.json";
+    public static DAELIM_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/daelim/complexes/complexes.json";
+    public static SMART_ELIFE_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/smart-elife/complexes/complexes.json";
     public static HOMEKIT_SECURE_VIDEO_IDLE_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/assets/hksv_camera_idle.png";
     public static MENU_INFO_URL = "https://smarthome.daelimcorp.co.kr/json/getApartMenuInfo.do";
 
@@ -132,9 +134,9 @@ export class Utils {
         }
     }
 
-    static async fetchComplexInfo(): Promise<ComplexInfo> {
-        return await fetch(this.COMPLEX_URL)
-            .then(response => response.json() as ComplexInfo | any)
+    static async fetchDaelimComplexInfo(): Promise<DaelimComplexInfo> {
+        return await fetch(this.DAELIM_COMPLEX_URL)
+            .then(response => response.json() as DaelimComplexInfo | any)
             .catch(reason => {
                 console.error('Failed to parse complex info:');
                 console.error(reason);
@@ -144,7 +146,28 @@ export class Utils {
             });
     }
 
-    static async fetchSupportedMenus(complex: Complex): Promise<MenuItem[]> {
+    static async fetchSmartELifeComplexInfo(): Promise<SmartELifeComplex[]> {
+        return await fetch(this.SMART_ELIFE_COMPLEX_URL)
+            .then(response => response.json())
+            .then(response => (response as SmartELifeComplex[]).map((complex) => ({
+                complexKey: complex.complexKey,
+                complexName: complex.complexName,
+                complexAccessKey: complex.complexAccessKey,
+                complexCode: complex.complexCode,
+                complexDisplayName: complex.complexDisplayName,
+                dongs: complex.dongs?.map((dong) => ({
+                    dong: dong.dong,
+                    hos: dong.hos,
+                })) ?? [],
+            })))
+            .catch(reason => {
+                console.error('Failed to parse complex info:');
+                console.error(reason);
+                return [];
+            })
+    }
+
+    static async fetchSupportedMenus(complex: DaelimComplex): Promise<MenuItem[]> {
         const params = {
             apartId: complex.apartId,
             searchMenuGubun: "mobile"
@@ -176,8 +199,8 @@ export class Utils {
         });
     }
 
-    static async findMatchedComplex(regionName: string, complexName: string): Promise<Complex> {
-        const info = await Utils.fetchComplexInfo();
+    static async findMatchedComplex(regionName: string, complexName: string): Promise<DaelimComplex> {
+        const info = await Utils.fetchDaelimComplexInfo();
         const regions = info.complexes;
         if(regions.length == 0) {
             throw new Error('No regions are available');

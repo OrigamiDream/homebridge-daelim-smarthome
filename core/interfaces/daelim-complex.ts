@@ -1,13 +1,13 @@
-export interface ComplexInfo {
+export interface DaelimComplexInfo {
     complexes: Region[]
 }
 
 export interface Region {
     region: string
-    complexes: Complex[]
+    complexes: DaelimComplex[]
 }
 
-export interface Complex {
+export interface DaelimComplex {
     index: string
     apartId: string
     region: string
