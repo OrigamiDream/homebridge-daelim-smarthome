@@ -1,13 +1,13 @@
 import readlineSync from 'readline-sync';
-import {DaelimConfig} from "./interfaces/daelim-config";
-import {Semaphore, Utils} from "./utils";
+import {DaelimConfig} from "../interfaces/daelim-config";
+import {Semaphore, Utils} from "../utils";
 import {Logging} from "homebridge";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "./network";
 import {Errors, LoginSubTypes, PushSubTypes, PushTypes, SettingSubTypes, SubTypes, Types} from "./fields";
-import {DaelimComplex} from "./interfaces/daelim-complex";
+import {DaelimComplex} from "../interfaces/daelim-complex";
 import {setInterval} from "timers";
 import Timeout = NodeJS.Timeout;
-import {MenuItem} from "./interfaces/menu";
+import {MenuItem} from "../interfaces/menu";
 import PushReceiver from "@eneris/push-receiver";
 
 export interface PushData {

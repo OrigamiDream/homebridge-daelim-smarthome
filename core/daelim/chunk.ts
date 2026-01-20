@@ -1,5 +1,5 @@
 import { ByteBuffer } from "./byte-buffer";
-import { Utils } from "./utils";
+import { Utils } from "../utils";
 
 export class Chunk {
 

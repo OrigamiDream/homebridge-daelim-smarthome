@@ -3,7 +3,7 @@ import { PacketHeader } from "./packet-header";
 import { Chunk } from "./chunk";
 import { Errors, SubTypes, Types } from "./fields";
 import { ByteBuffer } from "./byte-buffer";
-import { Utils } from "./utils";
+import { Utils } from "../utils";
 
 interface PacketBody {
     raw: Uint8Array | undefined,

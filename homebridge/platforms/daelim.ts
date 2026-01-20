@@ -1,6 +1,6 @@
 import AbstractSmartHomePlatform from "./platform";
 import {API, Logging, PlatformAccessory, PlatformConfig} from "homebridge";
-import {Client} from "../../core/client";
+import {Client} from "../../core/daelim/client";
 import {Accessories, AccessoryInterface} from "../accessories/accessories";
 import {DaelimConfig} from "../../core/interfaces/daelim-config";
 import {Utils} from "../../core/utils";

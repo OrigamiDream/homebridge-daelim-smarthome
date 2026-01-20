@@ -1,7 +1,7 @@
 import {HomebridgePluginUiServer} from "@homebridge/plugin-ui-utils";
-import {ErrorCallback, LoggerBase, NetworkHandler, ResponseCallback} from "../core/network";
+import {ErrorCallback, LoggerBase, NetworkHandler, ResponseCallback} from "../core/daelim/network";
 import {Semaphore, Utils} from "../core/utils";
-import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "../core/fields";
+import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "../core/daelim/fields";
 import * as crypto from 'crypto';
 import {Device} from "../core/interfaces/daelim-config";
 import Timeout = NodeJS.Timeout;

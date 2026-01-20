@@ -3,7 +3,7 @@ import {Client} from "./client";
 import {Chunk} from "./chunk";
 import {Packet} from "./packet";
 import {Errors, SubTypes, Types} from "./fields";
-import {DaelimComplex} from "./interfaces/daelim-complex";
+import {DaelimComplex} from "../interfaces/daelim-complex";
 
 export type ResponseCallback = (body: any) => void;
 export type ErrorCallback = () => void;

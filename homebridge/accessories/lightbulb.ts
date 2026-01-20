@@ -1,5 +1,5 @@
 import {Accessories, AccessoryInterface} from "./accessories";
-import {DeviceSubTypes, Types} from "../../core/fields";
+import {DeviceSubTypes, Types} from "../../core/daelim/fields";
 import {
     API,
     CharacteristicEventTypes,

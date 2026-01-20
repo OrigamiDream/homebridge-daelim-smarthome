@@ -13,7 +13,7 @@ import {
     SettingSubTypes,
     SystemSubTypes,
     Types
-} from "./fields";
+} from "./daelim/fields";
 import {DaelimComplex, DaelimComplexInfo} from "./interfaces/daelim-complex";
 import * as fs from "fs";
 import {MenuItem} from "./interfaces/menu";

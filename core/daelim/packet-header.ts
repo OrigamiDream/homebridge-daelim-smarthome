@@ -1,7 +1,7 @@
 import { TextDecoder, TextEncoder } from "util";
 import { ByteBuffer } from "./byte-buffer";
 import {Errors, SubTypes, Types} from "./fields";
-import {Utils} from "./utils";
+import {Utils} from "../utils";
 
 export class PacketHeader {
 

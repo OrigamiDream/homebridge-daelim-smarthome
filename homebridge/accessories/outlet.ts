@@ -9,7 +9,7 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
-import {DeviceSubTypes, Types} from "../../core/fields";
+import {DeviceSubTypes, Types} from "../../core/daelim/fields";
 import {DaelimConfig} from "../../core/interfaces/daelim-config";
 
 interface OutletAccessoryInterface extends AccessoryInterface {
