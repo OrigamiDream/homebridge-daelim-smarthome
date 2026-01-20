@@ -1,4 +1,4 @@
-name: Fetch Complex Info
+name: Fetch Complex Info (Daelim)
 
 on:
   workflow_dispatch:
@@ -21,18 +21,18 @@ jobs:
         run: npm install
 
       - name: Run Cronjob
-        run: npm run refresh
+        run: npm run refresh-daelim
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v4
         with:
           add-paths: |
-            complexes/*.json
-          commit-message: '[Scheduled] Update complex info'
-          branch: fetch-complex-patch
-          title: '[Scheduled] Update complex info'
+            complexes/daelim/*.json
+          commit-message: '[Scheduled] Update Daelim complexes'
+          branch: fetch-complex-daelim-patch
+          title: '[Scheduled] Update Daelim complexes'
           body: |
-            Complex info have been changed
+            Complex info (Daelim) have been changed
             
             This is automatically generated Pull Request
           reviewers: OrigamiDream

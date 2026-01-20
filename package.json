@@ -18,7 +18,8 @@
     "build": "rimraf ./dist && tsc && cp -r ./homebridge-ui/public ./dist/homebridge-ui/public",
     "prepublishOnly": "npm run build",
     "postpublish": "npm run clean",
-    "refresh": "node complexes/index.js",
+    "refresh-daelim": "node complexes/daelim/index.js",
+    "refresh-smart-elife": "node complexes/smart-elife/index.js",
     "interface": "node homebridge-ui/server.js",
     "deployPi": "npm run build && python3 scripts/deploy.py"
   },

@@ -5,7 +5,7 @@ const {Agent} = require("node:https");
 class FetcherBase {
     constructor(filename, regex) {
         this.filename = filename;
-        this.targetDirectory = './complexes';
+        this.targetDirectory = './complexes/daelim';
         this.baseURL = 'https://smarthome.daelimcorp.co.kr/main/choice_1.do'
         this.regex = regex
         this.pipes = [];
