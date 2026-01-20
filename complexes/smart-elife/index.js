@@ -1,15 +1,27 @@
-import fs from "fs";
+const fs = require("fs");
 
 const BASE_URL = "https://node.apt.co.kr:7443";
 const UA = "Mozilla/5.0 DAELIM/ANDROID";
 
-async function fetchJson(url, options = {}) {
-    const res = await fetch(url, options);
-    if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
+async function fetchJson(url, options = {}, retries = 3) {
+    const timeoutMs = 20000;
+    for (let attempt = 1; attempt <= retries; attempt += 1) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const res = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(timer);
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
+            }
+            return await res.json();
+        } catch (err) {
+            clearTimeout(timer);
+            if (attempt >= retries) throw err;
+            await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+        }
     }
-    return res.json();
 }
 
 function mapComplex(raw) {
@@ -63,7 +75,55 @@ function mapComplex(raw) {
         updUid: raw["upd_uid"] ?? null,
         updIp: raw["upd_ip"] ?? null,
         tokenRegDate: raw["tk_reg_date"] ?? null,
+        dongs: [],
     };
+}
+
+function extractList(data, preferredKeys = []) {
+    if (!data || !Array.isArray(data.data)) return [];
+    const list = data.data;
+    if (list.length === 0) return [];
+    if (typeof list[0] === "object") {
+        const out = [];
+        for (const row of list) {
+            for (const key of preferredKeys) {
+                if (row && row[key]) {
+                    out.push(String(row[key]));
+                    break;
+                }
+            }
+        }
+        return out.filter(Boolean);
+    }
+    return list.map((v) => String(v));
+}
+
+async function fetchDongs(csrf, danjiKey) {
+    const resp = await fetchJson(`${BASE_URL}/login/selectDong.ajax`, {
+        method: "POST",
+        headers: {
+            "User-Agent": UA,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "_csrf": csrf,
+        },
+        body: JSON.stringify({ "dj_ck": danjiKey }),
+    });
+    return extractList(resp, ["dg_nm", "dong"]);
+}
+
+async function fetchHos(csrf, danjiKey, dong) {
+    const resp = await fetchJson(`${BASE_URL}/login/selectHo.ajax`, {
+        method: "POST",
+        headers: {
+            "User-Agent": UA,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "_csrf": csrf,
+        },
+        body: JSON.stringify({ "dj_ck": danjiKey, "select_dong": dong }),
+    });
+    return extractList(resp, ["ho_nm", "ho"]);
 }
 
 async function main() {
@@ -87,6 +147,30 @@ async function main() {
 
     const rawList = Array.isArray(danjiResp.data) ? danjiResp.data : [];
     const mapped = rawList.map(mapComplex);
+
+    const concurrency = 10;
+    let cursor = 0;
+
+    async function worker() {
+        while (cursor < mapped.length) {
+            const index = cursor++;
+            const complex = mapped[index];
+            const danjiKey = complex.complexKey || complex.complexCode || complex.apartmentCode;
+            if (!danjiKey) continue;
+
+            console.log(`Updating ${complex.complexDisplayName}...`);
+
+            const dongs = await fetchDongs(csrf, danjiKey);
+            const hoTasks = dongs.map(async (dong) => {
+                const hos = await fetchHos(csrf, danjiKey, dong);
+                return { dong, hos };
+            });
+            complex.dongs = await Promise.all(hoTasks);
+        }
+    }
+
+    const workers = Array.from({ length: concurrency }, () => worker());
+    await Promise.all(workers);
 
     fs.writeFileSync("./complexes/smart-elife/complexes.json", JSON.stringify(mapped, null, 2), "utf-8");
     console.log(`Wrote ${mapped.length} complexes to complexes.json`);
