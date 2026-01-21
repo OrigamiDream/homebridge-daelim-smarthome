@@ -1,8 +1,8 @@
 import {API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig,} from "homebridge";
 import {Utils} from "../core/utils";
-import AbstractSmartHomePlatform from "./platforms/platform";
-import DaelimPlatform from "./platforms/daelim";
-import SmartELifePlatform from "./platforms/smart-elife";
+import AbstractProvider from "./providers/provider";
+import DaelimProvider from "./providers/daelim";
+import SmartELifeProvider from "./providers/smart-elife";
 
 export = (api: API) => {
     api.registerPlatform(Utils.PLATFORM_NAME, DaelimSmartHomePlatform);
@@ -10,32 +10,32 @@ export = (api: API) => {
 
 class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
 
-    private readonly platform?: AbstractSmartHomePlatform;
+    private readonly provider?: AbstractProvider;
 
     constructor(log: Logging, config: PlatformConfig, api: API) {
-        const platform = config["platform"] || null;
-        if(!platform) {
-            log.warn("Platform is not defined. (daelim | smart-elife)");
+        const provider = config["provider"] || null;
+        if(!provider) {
+            log.warn("Provider is not defined. (daelim | smart-elife)");
             return;
         }
 
-        switch(platform) {
+        switch(provider) {
             case "daelim": {
-                this.platform = new DaelimPlatform(log, config, api);
+                this.provider = new DaelimProvider(log, config, api);
                 break;
             }
             case "smart-elife": {
-                this.platform = new SmartELifePlatform(log, config, api);
+                this.provider = new SmartELifeProvider(log, config, api);
                 break;
             }
             default:
-                log.warn(`Prohibited platform type: ${platform}`);
+                log.warn(`Prohibited provider type: ${provider}`);
                 return;
         }
-        this.platform.registerOnLaunching();
+        this.provider.registerOnLaunching();
     }
 
     configureAccessory(accessory: PlatformAccessory): void {
-        this.platform?.configureAccessory(accessory);
+        this.provider?.configureAccessory(accessory);
     }
 }

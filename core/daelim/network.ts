@@ -4,16 +4,10 @@ import {Chunk} from "./chunk";
 import {Packet} from "./packet";
 import {Errors, SubTypes, Types} from "./fields";
 import {DaelimComplex} from "../interfaces/daelim-complex";
+import {LoggerBase} from "../utils";
 
 export type ResponseCallback = (body: any) => void;
 export type ErrorCallback = () => void;
-
-export interface LoggerBase {
-    info(message: string, ...parameters: any[]): void;
-    warn(message: string, ...parameters: any[]): void;
-    error(message: string, ...parameters: any[]): void;
-    debug(message: string, ...parameters: any[]): void;
-}
 
 interface ResponseListener {
 

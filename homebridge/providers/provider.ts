@@ -1,7 +1,7 @@
 import {API, APIEvent, Logging, PlatformAccessory} from "homebridge";
 import {Semaphore} from "../../core/utils";
 
-export default class AbstractSmartHomePlatform {
+export default class AbstractProvider {
 
     constructor(
         protected readonly log: Logging,

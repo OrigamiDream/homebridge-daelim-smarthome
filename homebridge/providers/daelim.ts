@@ -1,4 +1,4 @@
-import AbstractSmartHomePlatform from "./platform";
+import AbstractProvider from "./provider";
 import {API, Logging, PlatformAccessory, PlatformConfig} from "homebridge";
 import {Client} from "../../core/daelim/client";
 import {Accessories, AccessoryInterface} from "../accessories/accessories";
@@ -16,7 +16,7 @@ import {DoorAccessories} from "../accessories/door";
 import {VehicleAccessories} from "../accessories/vehicle";
 import {CameraAccessories} from "../accessories/camera";
 
-export default class DaelimPlatform extends AbstractSmartHomePlatform {
+export default class DaelimProvider extends AbstractProvider {
 
     private client?: Client;
     private readonly config?: DaelimConfig;

@@ -21,6 +21,13 @@ import axios from "axios";
 import * as https from "node:https";
 import {SmartELifeComplex} from "./interfaces/smart-elife-complex";
 
+export interface LoggerBase {
+    info(message: string, ...parameters: any[]): void;
+    warn(message: string, ...parameters: any[]): void;
+    error(message: string, ...parameters: any[]): void;
+    debug(message: string, ...parameters: any[]): void;
+}
+
 export interface SemanticVersion {
     major: number,
     minor: number,

@@ -64,9 +64,9 @@ function startTimer(duration, onTick, onComplete) {
     stopTimer();
     remainingDuration = duration;
     onTick();
-    timerIntervalId = setInterval(() => {
+    timerIntervalId = setInterval(async () => {
         if(remainingDuration === 0) {
-            onComplete();
+            await onComplete();
             stopTimer();
             return;
         }

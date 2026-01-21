@@ -1,9 +1,9 @@
-import AbstractSmartHomePlatform from "./platform";
+import AbstractProvider from "./provider";
 import {API, Logging, PlatformAccessory, PlatformConfig} from "homebridge";
 import {SmartELifeConfig} from "../../core/interfaces/smart-elife-config";
 import {Utils} from "../../core/utils";
 
-export default class SmartELifePlatform extends AbstractSmartHomePlatform {
+export default class SmartELifeProvider extends AbstractProvider {
 
     private readonly config?: SmartELifeConfig;
 
