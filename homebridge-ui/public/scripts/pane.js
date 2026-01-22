@@ -14,7 +14,7 @@ function refreshTrademark(config) {
     }
 }
 
-export class PaneManager {
+class PaneManager {
     constructor() {
         this.element = document.getElementById("mainForm");
         this.platformConfig = {
@@ -30,36 +30,45 @@ export class PaneManager {
             this.platformConfig = pluginConfigBlocks[0];
         }
         this.currentPane = new ProviderPane(this.element, this.platformConfig);
+        while(this.currentPane.canPassthrough()) {
+            this.currentPane.unregister();
+            this.currentPane = this.currentPane.nextPane();
+        }
         this.currentPane.register();
+        doTransition(undefined, this.currentPane.selfPane());
 
         document.getElementById("back-button").addEventListener("click", async () => {
             document.getElementById("advancedForm").classList.add("hidden");
             document.getElementById("setupForm").classList.remove("hidden");
             document.getElementById("footer").classList.remove("hidden");
 
-            await window.homebridge.updatePluginConfig([this.platformConfig]);
+            this.currentPane.updatePluginConfig();
+            this.currentPane.savePluginConfig();
             window.homebridge.endForm();
         });
     }
 }
 
-export class Pane {
+class Pane {
     constructor(element, config) {
         this.element = element;
         this.config = config;
     }
 
-    getSelfPane() {
+    selfPane() {
     }
 
-    createNextPane() {
+    prevPane() {
+    }
+
+    nextPane() {
     }
 
     register() {
     }
 
     unregister() {
-        this.getSelfPane().remove();
+        this.selfPane().remove();
     }
 
     async updatePluginConfig() {
@@ -70,19 +79,26 @@ export class Pane {
         await window.homebridge.savePluginConfig();
     }
 
-    async advance(newConfigOptions, newPane) {
+    async advance(newConfigOptions, newPane, backward) {
+        backward = backward || false;
+
         for(const key in newConfigOptions) {
             this.config[key] = newConfigOptions[key];
         }
         await this.updatePluginConfig();
         refreshTrademark(this.config);
 
-        while(newPane.canPassthrough()) {
-            newPane.unregister(); // attempt to remove elements.
-            newPane = newPane.createNextPane();
+        console.log("newConfig:", this.config);
+        console.log("newPane:", newPane);
+
+        if(!backward) {
+            while(newPane.canPassthrough()) {
+                newPane.unregister(); // attempt to remove elements.
+                newPane = newPane.nextPane();
+            }
         }
         newPane.register();
-        doTransition(this.getSelfPane(), newPane.getSelfPane());
+        doTransition(this.selfPane(), newPane.selfPane());
         setTimeout(() => {
             this.unregister();
         }, 1000);
@@ -105,7 +121,7 @@ export class Pane {
         }
 
         return `
-            <div class="text-center">
+            <div class="text-center mt-3">
                 ${errors.join("")}
                 ${options.previous ? previous : ''}
                 ${options.next ? next : ''}
@@ -150,79 +166,90 @@ export class Pane {
     }
 }
 
-export class ProviderPane extends Pane {
+class ProviderPane extends Pane {
     constructor(element, config) {
         super(element, config);
 
-        this.element.append(`
-            <div id="setup-provider" class="hidden">
-                <div class="text-center">
-                    <h2>사용하실 플랫폼을 선택해주세요.</h2>
-                </div>
-                <div class="form-group">
-                    <div class="d-flex justify-content-center align-items-start">
-                        <label class="d-flex flex-column align-items-center mx-3">
-                            <img class="img-fluid mb-2 w-75" alt="DL E&C Smart Home" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/v1.5.0-beta/branding/daelim.png?raw=true">
-                            <input class="form-check-input" type="radio" name="provider" value="daelim" checked>
-                            <span>e편한세상 스마트홈 2.0</span>
-                        </label>
-                        <label class="d-flex flex-column align-items-center mx-3">
-                            <img class="img-fluid mb-2 w-75" alt="Smart eLife" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/v1.5.0-beta/branding/smart-elife.png?raw=true">
-                            <input class="form-check-input" type="radio" name="provider" value="smart-elife">
-                            <span>스마트 eLife</span>
-                        </label>
-                    </div>
-                </div>
-                ${this.createNavigation("provider", { previous: false })}
+        this.pane = document.createElement("div");
+        this.pane.classList.add("hidden");
+        this.pane.id = "setup-provider";
+        this.pane.innerHTML = `
+            <div class="text-center">
+                <h2>사용하실 플랫폼을 선택해주세요.</h2>
             </div>
-        `);
+            <div class="form-group">
+                <div class="d-flex justify-content-center align-items-start">
+                    <label class="d-flex flex-column align-items-center m-3">
+                        <img class="img-fluid mb-2 w-25" style="border-radius: 24%" alt="DL E&C Smart Home" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/feature/smart-elife/branding/daeilm.png?raw=true">
+                        <input class="form-check-input" type="radio" name="provider" value="daelim" checked>
+                        <span>e편한세상 스마트홈 2.0</span>
+                    </label>
+                    <label class="d-flex flex-column align-items-center m-3">
+                        <img class="img-fluid mb-2 w-25" style="border-radius: 24%" alt="Smart eLife" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/feature/smart-elife/branding/smart-elife.png?raw=true">
+                        <input class="form-check-input" type="radio" name="provider" value="smart-elife">
+                        <span>스마트 eLife</span>
+                    </label>
+                </div>
+            </div>
+            ${this.createNavigation("provider", { previous: false })}
+        `;
+        this.element.append(this.pane);
     }
 
     canPassthrough() {
         return !!this.config.provider;
     }
 
-    getSelfPane() {
-        return document.getElementById("setup-provider");
+    selfPane() {
+        return this.pane;
+    }
+
+    nextPane() {
+        const provider = this.getSelectedProvider();
+        console.log("Provider:", provider);
+        if(provider === "daelim") {
+            return new RegionPane(this.element, this.config);
+        } else if(provider === "smart-elife") {
+            return new ComplexPane(this.element, this.config, "smart-elife");
+        } else {
+            console.error(`Prohibited provider: ${provider}`);
+        }
+    }
+
+    getSelectedProvider() {
+        if(!!this.config.provider) {
+            return this.config.provider;
+        } else {
+            return document.querySelector('input[name="provider"]:checked')?.value;
+        }
     }
 
     register() {
         this.getRightNavigation("provider").disabled = false;
         this.registerNextNavigation("provider", async () => {
-            const provider = document.querySelector('input[name="provider"]:checked')?.value;
-            if(!provider) {
-                return;
-            }
-            let newPane;
-            if(provider === "daelim") {
-                newPane = new RegionPane(this.element, this.config);
-            } else if(provider === "smart-elife") {
-                newPane = new ComplexPane(this.element, this.config, "smart-elife");
-            } else {
-                console.error(`Prohibited provider: ${provider}`);
-                return;
-            }
-            await this.advance({ provider: provider }, newPane);
+            await this.advance({ provider: this.getSelectedProvider() }, this.nextPane());
         });
     }
 }
 
-export class RegionPane extends Pane {
+class RegionPane extends Pane {
     constructor(element, config) {
         super(element, config);
         this.url = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/regions.json";
 
-        this.element.append(`
-            <div id="setup-regions" class="hidden">
-                <div class="form-group">
-                    <label for="region">지역</label>
-                    <select class="form-control" id="region" name="region">
-                        <option selected disabled>로딩 중</option>
-                    </select>
-                </div>
-                ${this.createNavigation("region")}
+        this.pane = document.createElement("div");
+        this.pane.classList.add("hidden");
+        this.pane.id = "setup-regions";
+        this.pane.innerHTML = `
+            <div class="form-group">
+                <label for="region">지역</label>
+                <select class="form-control" id="region" name="region">
+                    <option selected disabled>로딩 중</option>
+                </select>
             </div>
-        `);
+            ${this.createNavigation("region")}
+        `;
+        this.element.append(this.pane);
         this.regionElement = document.getElementById("region");
         this.regionElement.value = config.region;
 
@@ -251,8 +278,16 @@ export class RegionPane extends Pane {
         return !!this.config.region;
     }
 
-    getSelfPane() {
-        return document.getElementById("setup-regions");
+    selfPane() {
+        return this.pane;
+    }
+
+    prevPane() {
+        return new ProviderPane(this.element, this.config);
+    }
+
+    nextPane() {
+        return new ComplexPane(this.element, this.config, "daelim");
     }
 
     register() {
@@ -265,7 +300,7 @@ export class RegionPane extends Pane {
             this.getRightNavigation("region").disabled = false;
         });
         this.registerPrevNavigation("region", async () => {
-            await this.advance({}, new ProviderPane(this.element, this.config));
+            await this.advance({ region: undefined }, this.prevPane(), true);
         });
         this.registerNextNavigation("region", async () => {
             let newConfigOptions;
@@ -279,32 +314,31 @@ export class RegionPane extends Pane {
                     complex: undefined,
                 }
             }
-            await this.advance(
-                newConfigOptions,
-                new ComplexPane(this.element, this.config, "daelim"),
-            );
+            await this.advance(newConfigOptions, this.nextPane());
         });
     }
 }
 
-export class ComplexPane extends Pane {
+class ComplexPane extends Pane {
 
     constructor(element, config, provider) {
         super(element, config);
         this.provider = provider;
-        this.url = `https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/v1.5.0-beta/${provider}/complexes/complexes.json`
+        this.url = `https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/feature/smart-elife/complexes/${provider}/complexes.json`
 
-        this.element.append(`
-            <div id="setup-complexes" class="hidden">
-                <div class="form-group">
-                    <label for="complex">단지</label>
-                    <select class="form-control" id="complex" name="complex">
-                        <option selected disabled>로딩 중</option>
-                    </select>
-                </div>
-                ${this.createNavigation("complex")}
+        this.pane = document.createElement("div");
+        this.pane.classList.add("hidden");
+        this.pane.id = "setup-complexes";
+        this.pane.innerHTML = `
+            <div class="form-group">
+                <label for="complex">단지</label>
+                <select class="form-control" id="complex" name="complex">
+                    <option selected disabled>로딩 중</option>
+                </select>
             </div>
-        `);
+            ${this.createNavigation("complex")}
+        `;
+        this.element.append(this.pane);
 
         this.complexElement = document.getElementById("complex");
         this.complexElement.value = config.complex;
@@ -319,7 +353,7 @@ export class ComplexPane extends Pane {
                 }
                 const complexes = complexesJson[0]["complexes"];
                 if(!!complexes) {
-                    this.complexElement.innerHTML = '';
+                    this.complexElement.innerHTML = "";
                 }
                 for(const complex of complexes) {
                     this.complexElement.append(createElement("option", {
@@ -337,6 +371,7 @@ export class ComplexPane extends Pane {
                     this.complexElement.innerHTML = '<option selected disabled>적합한 단지 정보가 없습니다.</option>';
                     return;
                 }
+                this.complexElement.innerHTML = "";
                 for(const complex of response) {
                     this.complexElement.append(createElement("option", {
                         innerText: complex["complexDisplayName"],
@@ -356,8 +391,22 @@ export class ComplexPane extends Pane {
         return !!this.config.complex;
     }
 
-    getSelfPane() {
-        return document.getElementById("setup-complexes");
+    selfPane() {
+        return this.pane;
+    }
+
+    prevPane() {
+        if(this.provider === "daelim") {
+            return new RegionPane(this.element, this.config);
+        } else if(this.provider === "smart-elife") {
+            return new ProviderPane(this.element, this.config);
+        } else {
+            console.error(`Prohibited provider: ${this.provider}`);
+        }
+    }
+
+    nextPane() {
+        return new AuthorizationPane(this.element, this.config, this.provider);
     }
 
     register() {
@@ -371,26 +420,15 @@ export class ComplexPane extends Pane {
             this.getRightNavigation("complex").disabled = false;
         });
         this.registerPrevNavigation("complex", async () => {
-            if(this.provider === "daelim") {
-                await this.advance({}, new RegionPane(this.element, this.config));
-            } else if(this.provider === "smart-elife") {
-                await this.advance({}, new ProviderPane(this.element, this.config));
-            } else {
-                console.error(`Prohibited provider: ${this.provider}`);
-            }
+            await this.advance({ complex: undefined }, this.prevPane(), true);
         });
         this.registerNextNavigation("complex", async () => {
-            await this.advance(
-                {
-                    complex: this.complexElement.value,
-                },
-                new AuthorizationPane(this.element, this.config, this.provider),
-            );
+            await this.advance({ complex: this.complexElement.value }, this.nextPane());
         });
     }
 }
 
-export class AuthorizationPane extends Pane {
+class AuthorizationPane extends Pane {
     constructor(element, config, provider) {
         super(element, config);
         this.provider = provider;
@@ -398,31 +436,33 @@ export class AuthorizationPane extends Pane {
         const errors = [
             { "id": "invalid-authorization", "text": "아이디 혹은 비밀번호가 유효하지 않습니다." },
         ];
-        this.element.append(`
-            <div id="setup-authorization" class="hidden">
-                <div class="form-group">
-                    <label for="username">아이디</label>
-                    <input class="form-control" type="text" id="username" name="username" autocomplete="username">
-                    <br>
-                    <label for="password">비밀번호</label>
-                    <input class="form-control" type="password" id="password" name="password" autocomplete="password">
-                </div>
-                ${this.createNavigation("authorization", { errors })}
+        this.pane = document.createElement("div");
+        this.pane.classList.add("hidden");
+        this.pane.id = "setup-authorization";
+        this.pane.innerHTML = `
+            <div class="form-group">
+                <label for="username">아이디</label>
+                <input class="form-control" type="text" id="username" name="username" autocomplete="username">
+                <br>
+                <label for="password">비밀번호</label>
+                <input class="form-control" type="password" id="password" name="password" autocomplete="password">
             </div>
-        `);
+            ${this.createNavigation("authorization", { errors })}
+        `;
+        this.element.append(this.pane);
 
         this.usernameElement = document.getElementById("username");
-        this.usernameElement.value = config.username;
+        this.usernameElement.value = config.username || "";
         this.passwordElement = document.getElementById("password");
-        this.passwordElement.value = config.password;
+        this.passwordElement.value = config.password || "";
     }
 
     canPassthrough() {
         return !!this.config.username && !!this.config.password;
     }
 
-    getSelfPane() {
-        return document.getElementById("setup-authorization");
+    selfPane() {
+        return this.pane;
     }
 
     _refreshNavigation() {
@@ -432,11 +472,19 @@ export class AuthorizationPane extends Pane {
         );
     }
 
+    prevPane() {
+        return new ComplexPane(this.element, this.config, this.provider);
+    }
+
+    nextPane() {
+        return new WallpadPasscodePane(this.element, this.config, this.provider);
+    }
+
     register() {
         this.usernameElement.addEventListener("keyup", this._refreshNavigation.bind(this));
         this.passwordElement.addEventListener("keyup", this._refreshNavigation.bind(this));
         this.registerPrevNavigation("authorization", async () => {
-            await this.advance({}, new ComplexPane(this.element, this.config, this.provider));
+            await this.advance({ username: undefined, password: undefined }, this.prevPane(), true);
         });
         this.registerNextNavigation("authorization", async () => {
             window.homebridge.showSpinner();
@@ -447,8 +495,8 @@ export class AuthorizationPane extends Pane {
             await window.homebridge.request(`/${this.provider}/sign-in`, {
                 region: this.config.region,
                 complex: this.config.complex,
-                username: this.config.username,
-                password: this.config.password,
+                username: this.usernameElement.value,
+                password: this.passwordElement.value,
             });
         });
         window.homebridge.addEventListener("invalid-authorization", () => {
@@ -465,39 +513,41 @@ export class AuthorizationPane extends Pane {
                     username: this.usernameElement.value,
                     password: this.passwordElement.value,
                 },
-                new WallpadPasscodePane(this.element, this.config, this.provider),
+                this.nextPane(),
             );
         });
     }
 }
 
-export class WallpadPasscodePane extends Pane {
+class WallpadPasscodePane extends Pane {
     constructor(element, config, provider) {
         super(element, config);
         this.provider = provider;
 
-        this.element.append(`
-            <div id="verify-wallpad" class="hidden">
-                <div class="form-group">
-                    <label for="passcode">월패드 인증번호</label>
-                    <input class="form-control" type="text" id="passcode" name="passcode">
-                    <br>
-                    
-                    <div class="text-center">
-                        <p>월패드에 나타난 인증번호를 <span id="remaining-time">—</span>초 내에 입력하세요.</p>
-                        <button type="button" id="verify-button" class="btn btn-primary" disabled=>인증</button>
-                    </div>
+        this.pane = document.createElement("div");
+        this.pane.classList.add("hidden");
+        this.pane.id = "verify-wallpad";
+        this.pane.innerHTML = `
+            <div class="form-group">
+                <label for="passcode">월패드 인증번호</label>
+                <input class="form-control" type="text" id="passcode" name="passcode">
+                <br>
+                
+                <div class="text-center mt-3">
+                    <p>월패드에 나타난 인증번호를 <span id="remaining-time">—</span>초 내에 입력하세요.</p>
+                    <button type="button" id="verify-button" class="btn btn-primary" disabled=>인증</button>
                 </div>
             </div>
-        `);
+        `;
+        this.element.append(this.pane);
 
         this.passcodeElement = document.getElementById("passcode");
         this.passcodeElement.value = "";
         this.verifyButton = document.getElementById("verify-button");
     }
 
-    getSelfPane() {
-        return document.getElementById("verify-button");
+    selfPane() {
+        return this.pane;
     }
 
     canPassthrough() {
@@ -514,13 +564,21 @@ export class WallpadPasscodePane extends Pane {
         }
     }
 
+    prevPane() {
+        return new AuthorizationPane(this.element, this.config, this.provider);
+    }
+
+    nextPane() {
+        return new CompletePane(this.element, this.config);
+    }
+
     register() {
         this.passcodeElement.addEventListener("keyup", this._refreshNavigation.bind(this));
         startTimer(180, () => {
             const element = document.getElementById("remaining-time");
             element.innerText = remainingDuration;
         }, async () => {
-            await this.advance({}, new AuthorizationPane(this.element, this.config, this.provider));
+            await this.advance({ uuid: undefined }, this.prevPane(), true);
         });
         this.verifyButton.addEventListener("click", async () => {
             if(this.verifyButton.disabled) {
@@ -537,7 +595,7 @@ export class WallpadPasscodePane extends Pane {
             window.homebridge.hideSpinner();
             this.verifyButton.disabled = true;
             window.homebridge.toast.error("월패드 인증번호가 다릅니다.");
-            await this.advance({}, new AuthorizationPane(this.element, this.config, this.provider));
+            await this.advance({ uuid: undefined }, this.prevPane(), true);
         });
         window.homebridge.addEventListener("complete", async (event) => {
             window.homebridge.hideSpinner();
@@ -546,34 +604,36 @@ export class WallpadPasscodePane extends Pane {
             console.log("Sign-in successful.");
             await this.advance({
                 uuid: event["data"].uuid,
-            }, new CompletePane(this.element, this.config));
+            }, this.nextPane());
         });
     }
 }
 
-export class CompletePane extends Pane {
+class CompletePane extends Pane {
     constructor(element, config) {
         super(element, config);
 
-        this.element.append(`
-            <div id="done" class="hidden">
-                <div class="text-center">
-                    <h2>설정이 완료되었습니다.</h2>
-                    <p>이제 <span class="brand-name">DL E&C</span> 아파트의 가구를 애플 기기에서 제어할 수 있습니다.</p>
-                    <button type="button" id="advanced-button" class="btn btn-secondary" disabled>고급</button>
-                    <button type="button" id="reset-button" class="btn btn-primary">재설정</button>
-                    <button type="button" id="done-button" class="btn btn-primary">닫기</button>
-                </div>
+        this.pane = document.createElement("div");
+        this.pane.classList.add("hidden");
+        this.pane.id = "done";
+        this.pane.innerHTML = `
+            <div class="text-center">
+                <h2>설정이 완료되었습니다.</h2>
+                <p>이제 <span class="brand-name">DL E&C</span> 아파트의 가구를 애플 기기에서 제어할 수 있습니다.</p>
+                <button type="button" id="advanced-button" class="btn btn-secondary" disabled>고급</button>
+                <button type="button" id="reset-button" class="btn btn-primary">재설정</button>
+                <button type="button" id="done-button" class="btn btn-primary">닫기</button>
             </div>
-        `);
+        `;
+        this.element.append(this.pane);
 
         this.advancedButton = document.getElementById("advanced-button");
         this.resetButton = document.getElementById("reset-button");
         this.doneButton = document.getElementById("done-button");
     }
 
-    getSelfPane() {
-        return document.getElementById("done");
+    selfPane() {
+        return this.pane;
     }
 
     canPassthrough() {
@@ -581,8 +641,21 @@ export class CompletePane extends Pane {
         return false;
     }
 
+    nextPane() {
+        return new ResetConfirmablePane(this.element, this.config);
+    }
+
     register() {
-        window.homebridge.addEventListener("devices-fetched", (event) => {
+        refreshTrademark(this.config);
+        setTimeout(async () => {
+            await window.homebridge.request(`/${this.config.provider}/fetch-devices`, {
+                region: this.config.region,
+                complex: this.config.complex,
+                username: this.config.username,
+                password: this.config.password,
+            });
+        }, 0);
+        window.homebridge.addEventListener("devices-fetched", async (event) => {
             const devices = event["data"].devices;
             console.log(`Num of devices: ${devices.length}`);
 
@@ -600,11 +673,12 @@ export class CompletePane extends Pane {
                 }
             }
             this.config.devices = availableDevices;
+            await this.updatePluginConfig();
 
             this.advancedButton.removeAttribute("disabled");
         });
         this.resetButton.addEventListener("click", async () => {
-            await this.advance({}, new ResetConfirmablePane(this.element, this.config));
+            await this.advance({}, this.nextPane());
         });
         this.doneButton.addEventListener("click", async () => {
             await this.updatePluginConfig();
@@ -629,20 +703,22 @@ export class CompletePane extends Pane {
     }
 }
 
-export class ResetConfirmablePane extends Pane {
+class ResetConfirmablePane extends Pane {
     constructor(element, config) {
         super(element, config);
 
-        this.element.append(`
-            <div id="confirmable" class="hidden">
-                <div class="text-center">
-                    <h2>정말 재설정하시겠습니까?</h2>
-                    <p>확인 시 모든 저장된 설정이 초기화됩니다.</p>
-                    <button type="button" id="reset-confirmed-button" class="btn btn-primary">확인</button>
-                    <button type="button" id="reset-cancel-button" class="btn btn-primary">취소</button>
-                </div>
+        this.pane = document.createElement("div");
+        this.pane.classList.add("hidden");
+        this.pane.id = "confirmable";
+        this.pane.innerHTML = `
+            <div class="text-center">
+                <h2>정말 재설정하시겠습니까?</h2>
+                <p>확인 시 모든 저장된 설정이 초기화됩니다.</p>
+                <button type="button" id="reset-confirmed-button" class="btn btn-primary">확인</button>
+                <button type="button" id="reset-cancel-button" class="btn btn-primary">취소</button>
             </div>
-        `);
+        `;
+        this.element.append(this.pane);
 
         this.confirmButton = document.getElementById("reset-confirmed-button");
         this.cancelButton = document.getElementById("reset-cancel-button");
@@ -652,8 +728,8 @@ export class ResetConfirmablePane extends Pane {
         return false;
     }
 
-    getSelfPane() {
-        return document.getElementById("confirmable");
+    selfPane() {
+        return this.pane;
     }
 
     register() {

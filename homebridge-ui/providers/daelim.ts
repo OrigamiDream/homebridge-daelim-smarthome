@@ -64,6 +64,17 @@ export default class DaelimUiServer extends AbstractUiProvider {
         this.server.onRequest('/daelim/sign-in', this.signIn.bind(this));
         this.server.onRequest('/daelim/passcode', this.authorizePasscode.bind(this));
         this.server.onRequest('/daelim/invalidate', this.invalidate.bind(this));
+        this.server.onRequest('/daelim/fetch-devices', this.onRequestDevices.bind(this));
+    }
+
+    async onRequestDevices(p: any) {
+        if(this.isLoggedIn && this.devices) {
+            this.server.pushEvent("devices-fetched", {
+                devices: this.devices,
+            });
+        } else {
+            await this.signIn(p);
+        }
     }
 
     isDeviceSupportedIn(menuItems: MenuItem[], deviceMenuName: string): boolean {
@@ -343,7 +354,7 @@ export default class DaelimUiServer extends AbstractUiProvider {
                 this.semaphoreTimeout = undefined;
 
                 this.server.pushEvent('devices-fetched', {
-                    devices: this.devices
+                    devices: this.devices,
                 });
             }
         });
