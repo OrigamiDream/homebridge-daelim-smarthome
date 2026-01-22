@@ -83,10 +83,10 @@ export default class DaelimProvider extends AbstractProvider {
             debug: false,
             persistentIds: [],
             firebase: {
-                apiKey: Utils.FCM_API_KEY,
-                appId: Utils.FCM_APP_ID,
-                projectId: Utils.FCM_PROJECT_ID,
-                messagingSenderId: Utils.FCM_SENDER_ID,
+                apiKey: Utils.DAELIM_FCM_API_KEY,
+                appId: Utils.DAELIM_FCM_APP_ID,
+                projectId: Utils.DAELIM_FCM_PROJECT_ID,
+                messagingSenderId: Utils.DAELIM_FCM_SENDER_ID,
             },
             credentials: undefined,
         })

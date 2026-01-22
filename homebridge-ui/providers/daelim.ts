@@ -2,7 +2,7 @@ import AbstractUiProvider from "./ui-provider";
 import {HomebridgePluginUiServer} from "@homebridge/plugin-ui-utils";
 import {Device} from "../../core/interfaces/daelim-config";
 import {ErrorCallback, NetworkHandler, ResponseCallback} from "../../core/daelim/network";
-import {Semaphore, Utils} from "../../core/utils";
+import {LoggerBase, Semaphore, Utils} from "../../core/utils";
 import Timeout = NodeJS.Timeout;
 import {MenuItem} from "../../core/interfaces/menu";
 import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME, ELEVATOR_MENU_NAME} from "../../homebridge/accessories/elevator";
@@ -10,7 +10,6 @@ import {DOOR_DEVICES} from "../../homebridge/accessories/door";
 import {VEHICLE_DEVICE_ID, VEHICLE_DISPLAY_NAME} from "../../homebridge/accessories/vehicle";
 import {CAMERA_DEVICES} from "../../homebridge/accessories/camera";
 import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "../../core/daelim/fields";
-import ServerLogger from "../logger";
 
 interface ClientAuthorization {
     certification: string,
@@ -46,7 +45,7 @@ export default class DaelimUiServer extends AbstractUiProvider {
     private readonly semaphore = new Semaphore();
     private semaphoreTimeout?: Timeout;
 
-    constructor(server: HomebridgePluginUiServer, log: ServerLogger) {
+    constructor(server: HomebridgePluginUiServer, log: LoggerBase) {
         super(server, log);
 
         this.authorization = {

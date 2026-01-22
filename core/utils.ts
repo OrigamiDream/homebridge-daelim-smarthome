@@ -23,6 +23,7 @@ import {SmartELifeComplex} from "./interfaces/smart-elife-complex";
 import crypto from "crypto";
 
 export interface LoggerBase {
+    (message: string, ...parameters: any[]): void;
     info(message: string, ...parameters: any[]): void;
     warn(message: string, ...parameters: any[]): void;
     error(message: string, ...parameters: any[]): void;
@@ -71,10 +72,17 @@ export class Utils {
     public static PLUGIN_NAME = "homebridge-daelim-smarthome";
     public static PLATFORM_NAME = "DaelimSmartHomePlatform";
     public static MANUFACTURER_NAME = "DL E&C Co.,Ltd.";
-    public static FCM_SENDER_ID = "251248256994";
-    public static FCM_PROJECT_ID = "daelim-smarthome";
-    public static FCM_APP_ID = "1:251248256994:android:4f4ccc5221a7b689";
-    public static FCM_API_KEY = "AIzaSyAm__JwMJS8utB54p36cDxl8lsKu2wHKNI";
+
+    public static DAELIM_FCM_SENDER_ID = "251248256994";
+    public static DAELIM_FCM_PROJECT_ID = "daelim-smarthome";
+    public static DAELIM_FCM_APP_ID = "1:251248256994:android:4f4ccc5221a7b689";
+    public static DAELIM_FCM_API_KEY = "AIzaSyAm__JwMJS8utB54p36cDxl8lsKu2wHKNI";
+
+    public static SMART_ELIFE_FCM_SENDER_ID = "277598878115";
+    public static SMART_ELIFE_FCM_PROJECT_ID = "elife-smarthome-fcm";
+    public static SMART_ELIFE_FCM_APP_ID = "1:277598878115:android:0cf9968e683237d23e4216";
+    public static SMART_ELIFE_FCM_API_KEY = "AIzaSyC_XtNnRG3Xk2hCV9EM8b_B1nb_bxIcYYs";
+
     public static SMART_ELIFE_AES_KEY = "12345678901234567890123456789012";
     public static SMART_ELIFE_AES_IV = "HrPtH4kvhKjVsPU=";
     public static SMART_ELIFE_USER_AGENT = "Mozilla/5.0 DAELIM/ANDROID";
@@ -161,27 +169,6 @@ export class Utils {
                     complexes: []
                 }
             });
-    }
-
-    static async fetchSmartELifeComplexInfo(): Promise<SmartELifeComplex[]> {
-        return await fetch(this.SMART_ELIFE_COMPLEX_URL)
-            .then(response => response.json())
-            .then(response => (response as SmartELifeComplex[]).map((complex) => ({
-                complexKey: complex.complexKey,
-                complexName: complex.complexName,
-                complexAccessKey: complex.complexAccessKey,
-                complexCode: complex.complexCode,
-                complexDisplayName: complex.complexDisplayName,
-                dongs: complex.dongs?.map((dong) => ({
-                    dong: dong.dong,
-                    hos: dong.hos,
-                })) ?? [],
-            })))
-            .catch(reason => {
-                console.error('Failed to parse complex info:');
-                console.error(reason);
-                return [];
-            })
     }
 
     static async fetchSupportedMenus(complex: DaelimComplex): Promise<MenuItem[]> {

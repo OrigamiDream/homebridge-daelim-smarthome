@@ -3,6 +3,9 @@ import {LoggerBase, Utils} from "../utils";
 import {SmartELifeConfig} from "../interfaces/smart-elife-config";
 import crypto from "crypto";
 import {ClientResponseCode} from "./responses";
+import PushReceiver from "@eneris/push-receiver";
+import {Logging} from "homebridge";
+import {SmartELifeComplex} from "../interfaces/smart-elife-complex";
 
 export default class SmartELifeClient {
 
@@ -15,6 +18,8 @@ export default class SmartELifeClient {
     private csrfToken?: string;
     private attemptsCsrfIssuing: number = 0;
 
+    private complex?: SmartELifeComplex;
+
     // WallPad authorization temporary keys
     private userKey?: string;
     private roomKey?: string;
@@ -23,8 +28,9 @@ export default class SmartELifeClient {
     private readonly key = Utils.SMART_ELIFE_AES_KEY;
     private readonly iv = Utils.SMART_ELIFE_AES_IV;
 
-    constructor(private readonly log: LoggerBase,
-                private readonly config: SmartELifeConfig) {
+    constructor(private readonly log: Logging | LoggerBase,
+                private readonly config: SmartELifeConfig,
+                private readonly push?: PushReceiver) {
         this.httpBody = {
             "input_dv_make_info": "oznu",
             "input_dv_model_info": "homebridge",
@@ -115,7 +121,9 @@ export default class SmartELifeClient {
             }),
         });
         this.log.info(JSON.stringify(response, null, 2));
-
+        if(response["result"]) {
+            return ClientResponseCode.SUCCESS;
+        }
         const code = ClientResponseCode[response["errCode"] as keyof typeof ClientResponseCode];
         if(code === ClientResponseCode.UNCERTIFIED_WALLPAD) {
             this.userKey = response["userkey"];
@@ -142,6 +150,39 @@ export default class SmartELifeClient {
             }),
         });
         this.log.info(JSON.stringify(response, null, 2));
+        if(response["result"]) {
+            return ClientResponseCode.SUCCESS;
+        }
         return ClientResponseCode[response["errCode"] as keyof typeof ClientResponseCode];
+    }
+
+    async serve() {
+        if(this.push) {
+            this.log("Setting up Push notification receiver...");
+            this.push.onNotification((notification) => {
+                const orig = notification.message;
+                if(!orig || !orig.data) {
+                    return;
+                }
+                this.log.info(`[Push] onNotify: ${orig}`);
+            });
+            await this.push.connect();
+        }
+        this.complex = await this.fetchComplex();
+        if(this.complex) {
+            this.log(`Complex: ${this.complex.complexDisplayName}`);
+        }
+    }
+
+    private async fetchComplex() {
+        const complexes = await fetch(Utils.SMART_ELIFE_COMPLEX_URL)
+            .then((response) => response.json())
+            .then((json) => json as SmartELifeComplex[]);
+        const complexOne = complexes
+            .filter((complex) => complex.complexKey === this.config.complex);
+        if(!complexOne) {
+            return undefined;
+        }
+        return complexOne[0];
     }
 }

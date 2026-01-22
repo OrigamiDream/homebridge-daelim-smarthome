@@ -6,4 +6,9 @@ export interface SmartELifeConfig {
     password: string
     uuid: string
     version: SemanticVersion
+    devices: Device[]
+}
+
+export interface Device {
+    disabled: boolean
 }
