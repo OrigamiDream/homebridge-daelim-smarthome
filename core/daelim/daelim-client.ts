@@ -36,7 +36,7 @@ interface PushEventListener {
     callback: PushEventCallback
 }
 
-export class Client {
+export class DaelimClient {
 
     public static MMF_SERVER_PORT = 25301;
 

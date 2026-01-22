@@ -1,14 +1,18 @@
 import AbstractUiProvider from "./ui-provider";
 import {HomebridgePluginUiServer} from "@homebridge/plugin-ui-utils";
-import {Semaphore} from "../../core/utils";
-import Timeout = NodeJS.Timeout;
+import {Semaphore, Utils} from "../../core/utils";
 import ServerLogger from "../logger";
+import SmartELifeClient from "../../core/smart-elife/smart-elife-client";
+import {SmartELifeConfig} from "../../core/interfaces/smart-elife-config";
+import {ClientResponseCode} from "../../core/smart-elife/responses";
+import Timeout = NodeJS.Timeout;
 
 export default class SmartELifeUiServer extends AbstractUiProvider {
 
     // Semaphore for Wall-pad code timers
     private readonly semaphore = new Semaphore();
     private semaphoreTimeout?: Timeout;
+    private client?: SmartELifeClient;
 
     constructor(server: HomebridgePluginUiServer, log: ServerLogger) {
         super(server, log);
@@ -21,17 +25,63 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
     }
 
     async invalidate(_: any) {
-        // TODO: Implement
+        this.client = undefined;
     }
 
     async signIn(p: any) {
         const { complex, username, password } = p;
-        // TODO: Implement
+
+        this.log.info(`complex = ${complex}, username: ${username}`);
+
+        const uuid = Utils.generateUUID(username);
+
+        this.semaphore.createSemaphore();
+        this.semaphoreTimeout = setTimeout(() => {
+            if(!this.semaphoreTimeout) {
+                return;
+            }
+            this.semaphore.removeSemaphore();
+            clearTimeout(this.semaphoreTimeout);
+            this.semaphoreTimeout = undefined;
+        }, 10 * 1000);
+
+        this.log.info("Starting up Smart eLife...");
+
+        const config: SmartELifeConfig = {
+            complex, username, password, uuid,
+            version: Utils.currentSemanticVersion(),
+        };
+        this.client = new SmartELifeClient(this.log, config);
+
+        const response = await this.client.signIn();
+        switch(response) {
+            case ClientResponseCode.WRONG_RESULT_PASSWORD: {
+                this.server.pushEvent("invalid-authorization", {
+                    "reason": "invalid_username_and_password",
+                });
+                break;
+            }
+            case ClientResponseCode.UNCERTIFIED_WALLPAD: {
+                this.server.pushEvent("require-wallpad-passcode", {});
+                break;
+            }
+            case ClientResponseCode.SUCCESS: {
+                break;
+            }
+        }
     }
 
     async authorizePasscode(p: any) {
         const { passcode } = p;
-        // TODO: Implement
+        if(!this.client) {
+            this.log.error("Unexpected access to wallpad authorization.");
+            return;
+        }
+        const response = await this.client.authorizeWallpadPasscode(passcode);
+        switch(response) {
+            case ClientResponseCode.SUCCESS: {
+                break;
+            }
+        }
     }
-
 }

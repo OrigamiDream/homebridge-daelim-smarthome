@@ -1,6 +1,6 @@
 import AbstractProvider from "./provider";
 import {API, Logging, PlatformAccessory, PlatformConfig} from "homebridge";
-import {Client} from "../../core/daelim/client";
+import {DaelimClient} from "../../core/daelim/daelim-client";
 import {Accessories, AccessoryInterface} from "../accessories/accessories";
 import {DaelimConfig} from "../../core/interfaces/daelim-config";
 import {Utils} from "../../core/utils";
@@ -18,7 +18,7 @@ import {CameraAccessories} from "../accessories/camera";
 
 export default class DaelimProvider extends AbstractProvider {
 
-    private client?: Client;
+    private client?: DaelimClient;
     private readonly config?: DaelimConfig;
     private readonly accessories: Accessories<AccessoryInterface>[] = [];
 
@@ -90,7 +90,7 @@ export default class DaelimProvider extends AbstractProvider {
             },
             credentials: undefined,
         })
-        this.client = new Client(this.log, this.config, push);
+        this.client = new DaelimClient(this.log, this.config, push);
         await this.client.prepareService();
 
         this.client.registerListeners();

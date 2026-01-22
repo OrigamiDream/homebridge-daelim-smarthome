@@ -20,6 +20,7 @@ import {MenuItem} from "./interfaces/menu";
 import axios from "axios";
 import * as https from "node:https";
 import {SmartELifeComplex} from "./interfaces/smart-elife-complex";
+import crypto from "crypto";
 
 export interface LoggerBase {
     info(message: string, ...parameters: any[]): void;
@@ -74,6 +75,11 @@ export class Utils {
     public static FCM_PROJECT_ID = "daelim-smarthome";
     public static FCM_APP_ID = "1:251248256994:android:4f4ccc5221a7b689";
     public static FCM_API_KEY = "AIzaSyAm__JwMJS8utB54p36cDxl8lsKu2wHKNI";
+    public static SMART_ELIFE_AES_KEY = "12345678901234567890123456789012";
+    public static SMART_ELIFE_AES_IV = "HrPtH4kvhKjVsPU=";
+    public static SMART_ELIFE_USER_AGENT = "Mozilla/5.0 DAELIM/ANDROID";
+    public static SMART_ELIFE_BASE_URL = "https://node.apt.co.kr:7443";
+    public static SMART_ELIFE_APP_VERSION = "1.2.11";
 
     public static DAELIM_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/feature/smart-elife/complexes/daelim/complexes.json";
     public static SMART_ELIFE_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/feature/smart-elife/complexes/smart-elife/complexes.json";
@@ -129,6 +135,10 @@ export class Utils {
             parseInt(splits[2]),
             beta
         );
+    }
+
+    static sleep(ms: number) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     static currentSemanticVersion(): SemanticVersion {
@@ -257,4 +267,11 @@ export class Utils {
         }
     }
 
+    static generateUUID(key: string): string {
+        return crypto
+            .createHash('md5')
+            .update(key)
+            .digest('hex')
+            .toUpperCase();
+    }
 }

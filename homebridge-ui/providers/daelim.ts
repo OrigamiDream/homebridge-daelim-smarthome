@@ -10,7 +10,6 @@ import {DOOR_DEVICES} from "../../homebridge/accessories/door";
 import {VEHICLE_DEVICE_ID, VEHICLE_DISPLAY_NAME} from "../../homebridge/accessories/vehicle";
 import {CAMERA_DEVICES} from "../../homebridge/accessories/camera";
 import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "../../core/daelim/fields";
-import crypto from "crypto";
 import ServerLogger from "../logger";
 
 interface ClientAuthorization {
@@ -147,7 +146,7 @@ export default class DaelimUiServer extends AbstractUiProvider {
         this.complex = complex;
         this.username = username;
         this.password = password;
-        this.uuid = DaelimUiServer.generateUUID(username);
+        this.uuid = Utils.generateUUID(username);
         if(region && complex) {
             // create semaphores and its expirations
             this.semaphore.createSemaphore();
@@ -175,14 +174,6 @@ export default class DaelimUiServer extends AbstractUiProvider {
             id: this.username,
             num: String(passcode),
         }, Types.LOGIN, LoginSubTypes.WALL_PAD_REQUEST);
-    }
-
-    private static generateUUID(key: string): string {
-        return crypto
-            .createHash('md5')
-            .update(key)
-            .digest('hex')
-            .toUpperCase();
     }
 
     private static getFriendlyName(displayName: string, deviceType: string): string {

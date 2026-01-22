@@ -1,4 +1,4 @@
-import {Client} from "../../core/daelim/client";
+import {DaelimClient} from "../../core/daelim/daelim-client";
 import {API, CharacteristicGetCallback, Logging, PlatformAccessory, Service} from "homebridge";
 import {Utils} from "../../core/utils";
 import {WithUUID} from "hap-nodejs";
@@ -31,7 +31,7 @@ const NEW_UUID_COMBINATION: UUIDCombinationGenerator = (context) => `${context.d
 
 export class Accessories<T extends AccessoryInterface> {
 
-    protected client?: Client;
+    protected client?: DaelimClient;
 
     protected readonly accessories: PlatformAccessory[] = [];
     protected readonly enqueuedAccessoriesCache: EnqueuedAccessoryMap = {};
@@ -60,7 +60,7 @@ export class Accessories<T extends AccessoryInterface> {
         this.serviceTypes.push(api.hap.Service.AccessoryInformation);
     }
 
-    setClient(client: Client) {
+    setClient(client: DaelimClient) {
         this.client = client;
     }
 

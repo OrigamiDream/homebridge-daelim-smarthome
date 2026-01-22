@@ -1,5 +1,5 @@
 import net from "net";
-import {Client} from "./client";
+import {DaelimClient} from "./daelim-client";
 import {Chunk} from "./chunk";
 import {Packet} from "./packet";
 import {Errors, SubTypes, Types} from "./fields";
@@ -142,7 +142,7 @@ export class NetworkHandler {
         this.disconnect();
         this.socket = net.connect({
             host: this.complex.serverIp,
-            port: Client.MMF_SERVER_PORT
+            port: DaelimClient.MMF_SERVER_PORT
         });
         this.socket.on('connect', () => {
             this.isConnected = true;
