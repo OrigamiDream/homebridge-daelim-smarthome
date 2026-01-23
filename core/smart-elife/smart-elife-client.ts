@@ -5,7 +5,7 @@ import crypto from "crypto";
 import {ClientResponseCode} from "./responses";
 import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
-import {SmartELifeComplex} from "../interfaces/smart-elife-complex";
+import {SmartELifeComplex, SmartELifeUserInfo} from "../interfaces/smart-elife-complex";
 
 export default class SmartELifeClient {
 
@@ -19,6 +19,8 @@ export default class SmartELifeClient {
     private attemptsCsrfIssuing: number = 0;
 
     private complex?: SmartELifeComplex;
+    private userInfo?: SmartELifeUserInfo;
+    private accessToken?: string;
 
     // WallPad authorization temporary keys
     private userKey?: string;
@@ -45,7 +47,7 @@ export default class SmartELifeClient {
         let response = await fetch(url, options);
         if(!response.ok && response.status === 401) {
             const headers = options["headers"] || {};
-            headers["_csrf"] = this.getCsrfToken(true);
+            headers["_csrf"] = await this.getCsrfToken(true);
             options["headers"] = headers;
             response = await fetch(url, options);
         }
@@ -121,9 +123,35 @@ export default class SmartELifeClient {
             }),
         });
         this.log.info(JSON.stringify(response, null, 2));
-        if(response["result"]) {
+
+        const res = String(response["result"] || "false").toLowerCase();
+        if(res === "true") {
+            const homeList = response["homeList"];
+            if(!!homeList) {
+                this.log.warn(`You may registered multiple homes. Requires to choose a home: ${JSON.stringify(homeList, null, 2)}`);
+                return ClientResponseCode.INCOMPLETE_USER_INFO;
+            }
+            const token = response["daelim_elife"];
+            if(!response["userInfo"]) {
+                this.log.error(`No \`userInfo\` found from the response: ${JSON.stringify(response, null, 2)}`);
+                return ClientResponseCode.INCOMPLETE_USER_INFO;
+            }
+
+            const info = response["userInfo"];
+            this.userInfo = {
+                apartment: {
+                    building: info["dong"],
+                    unit: info["ho"],
+                },
+                complexCode: info["djCd"], // danji-code
+                guid: info["guid"],
+                username: info["alias"],
+            };
+            this.accessToken = token;
             return ClientResponseCode.SUCCESS;
         }
+
+        this.log.warn("The error message returned: %s", response["errMsg"] || "");
         const code = ClientResponseCode[response["errCode"] as keyof typeof ClientResponseCode];
         if(code === ClientResponseCode.UNCERTIFIED_WALLPAD) {
             this.userKey = response["userkey"];
@@ -153,7 +181,18 @@ export default class SmartELifeClient {
         if(response["result"]) {
             return ClientResponseCode.SUCCESS;
         }
+
+        this.log.warn("The error message returned: %s", response["errMsg"] || "");
         return ClientResponseCode[response["errCode"] as keyof typeof ClientResponseCode];
+    }
+
+    createSaltedAccessToken() {
+        if(!this.accessToken) {
+            this.log.error("The access token is not yet issued. Do sign-in first.");
+            return undefined;
+        }
+        const payload = `daelim_elife::${Date.now()}`;
+        return this.aesEncryptBase64(payload, this.accessToken, this.iv);
     }
 
     async serve() {
@@ -171,6 +210,15 @@ export default class SmartELifeClient {
         this.complex = await this.fetchComplex();
         if(this.complex) {
             this.log(`Complex: ${this.complex.complexDisplayName}`);
+            this.log.debug("JSON: %s", JSON.stringify(this.complex, null, 2));
+        }
+
+        if(this.userInfo) {
+            this.log(`User info: %s (%s-%s)`,
+                this.userInfo.username,
+                this.userInfo.apartment.building,
+                this.userInfo.apartment.unit);
+            this.log.debug("JSON: %s", JSON.stringify(this.userInfo, null, 2));
         }
     }
 
