@@ -86,7 +86,7 @@ export class Utils {
     public static SMART_ELIFE_AES_KEY = "12345678901234567890123456789012";
     public static SMART_ELIFE_AES_IV = "HrPtH4kvhKjVsPU=";
     public static SMART_ELIFE_USER_AGENT = "Mozilla/5.0 DAELIM/ANDROID";
-    public static SMART_ELIFE_BASE_URL = "https://node.apt.co.kr:7443";
+    public static SMART_ELIFE_BASE_URL = "https://smartelife.apt.co.kr";
     public static SMART_ELIFE_APP_VERSION = "1.2.11";
 
     public static DAELIM_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/feature/smart-elife/complexes/daelim/complexes.json";

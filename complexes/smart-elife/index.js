@@ -1,6 +1,6 @@
 const fs = require("fs");
 
-const BASE_URL = "https://node.apt.co.kr:7443";
+const BASE_URL = "https://smartelife.apt.co.kr";
 const UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Build/TQ3A.230805.001) " +
     "AppleWebKit/537.36 (KHTML, like Gecko) " +
     "Chrome/120.0.0.0 " +
