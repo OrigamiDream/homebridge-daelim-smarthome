@@ -1,7 +1,11 @@
 const fs = require("fs");
 
 const BASE_URL = "https://node.apt.co.kr:7443";
-const UA = "Mozilla/5.0 DAELIM/ANDROID";
+const UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Build/TQ3A.230805.001) " +
+    "AppleWebKit/537.36 (KHTML, like Gecko) " +
+    "Chrome/120.0.0.0 " +
+    "Mobile Safari/537.36 " +
+    "DAELIM/ANDROID";
 
 async function fetchJson(url, options = {}, retries = 3) {
     const timeoutMs = 20000;
