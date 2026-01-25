@@ -2,7 +2,7 @@ import AbstractUiProvider from "./ui-provider";
 import {HomebridgePluginUiServer} from "@homebridge/plugin-ui-utils";
 import {LoggerBase, Semaphore, Utils} from "../../core/utils";
 import SmartELifeClient from "../../core/smart-elife/smart-elife-client";
-import {SmartELifeConfig} from "../../core/interfaces/smart-elife-config";
+import {Device, SmartELifeConfig} from "../../core/interfaces/smart-elife-config";
 import {ClientResponseCode} from "../../core/smart-elife/responses";
 import Timeout = NodeJS.Timeout;
 import {Logging} from "homebridge";
@@ -14,8 +14,17 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
     private semaphoreTimeout?: Timeout;
     private client?: SmartELifeClient;
 
+    private readonly devices: Device[];
+
     constructor(server: HomebridgePluginUiServer, log: LoggerBase | Logging) {
         super(server, log);
+
+        this.devices = this.configureInitialDevices();
+    }
+
+    configureInitialDevices() {
+        // TODO: Add initial devices (elevator, motion sensors, etc.)
+        return [];
     }
 
     configure() {
@@ -50,6 +59,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         const config: SmartELifeConfig = {
             complex, username, password, uuid,
             version: Utils.currentSemanticVersion(),
+            devices: this.devices,
         };
         this.client = new SmartELifeClient(this.log, config);
 
