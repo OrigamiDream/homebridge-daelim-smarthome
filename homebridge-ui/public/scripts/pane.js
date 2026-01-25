@@ -30,9 +30,11 @@ class PaneManager {
             this.platformConfig = pluginConfigBlocks[0];
         }
         this.currentPane = new ProviderPane(this.element, this.platformConfig);
+        this.currentPane.manager = this;
         while(this.currentPane.canPassthrough()) {
             this.currentPane.unregister();
             this.currentPane = this.currentPane.nextPane();
+            this.currentPane.manager = this;
         }
         this.currentPane.register();
         doTransition(undefined, this.currentPane.selfPane());
@@ -53,6 +55,9 @@ class Pane {
     constructor(element, config) {
         this.element = element;
         this.config = config;
+        this._listeners = [];
+        this._homebridgeListeners = [];
+        this._disposed = false;
     }
 
     selfPane() {
@@ -68,7 +73,44 @@ class Pane {
     }
 
     unregister() {
+        this.dispose();
         this.selfPane().remove();
+    }
+
+    dispose() {
+        if(this._disposed) {
+            return;
+        }
+        this._disposed = true;
+        for(const entry of this._listeners) {
+            entry.target.removeEventListener(entry.event, entry.handler, entry.options);
+        }
+        this._listeners = [];
+        if(window.homebridge && window.homebridge.removeEventListener) {
+            for(const entry of this._homebridgeListeners) {
+                window.homebridge.removeEventListener(entry.event, entry.handler);
+            }
+        }
+        this._homebridgeListeners = [];
+    }
+
+    addListener(target, event, handler, options) {
+        target.addEventListener(event, handler, options);
+        this._listeners.push({ target, event, handler, options });
+    }
+
+    addHomebridgeListener(event, handler) {
+        if(window.homebridge && window.homebridge.addEventListener) {
+            window.homebridge.addEventListener(event, handler);
+            this._homebridgeListeners.push({ event, handler });
+        }
+    }
+
+    ensureAttached() {
+        const pane = this.selfPane();
+        if(pane && !pane.isConnected) {
+            this.element.append(pane);
+        }
     }
 
     async updatePluginConfig() {
@@ -98,6 +140,11 @@ class Pane {
             }
         }
         newPane.register();
+        if(this.manager) {
+            newPane.manager = this.manager;
+            this.manager.currentPane = newPane;
+        }
+        this.dispose();
         doTransition(this.selfPane(), newPane.selfPane());
         setTimeout(() => {
             this.unregister();
@@ -134,35 +181,37 @@ class Pane {
     }
 
     getLeftNavigation(key) {
-        return document.getElementById(`${key}-prev-btn`);
+        return this.selfPane().querySelector(`#${key}-prev-btn`);
     }
 
     getRightNavigation(key) {
-        return document.getElementById(`${key}-next-btn`);
+        return this.selfPane().querySelector(`#${key}-next-btn`);
     }
 
     registerPrevNavigation(key, fn) {
         const nav = this.getLeftNavigation(key);
-        nav.addEventListener("click", async () => {
+        const handler = async () => {
             if(nav.disabled) {
                 return;
             }
             nav.disabled = true;
             await fn();
             nav.disabled = false;
-        });
+        };
+        this.addListener(nav, "click", handler);
     }
 
     registerNextNavigation(key, fn) {
         const nav = this.getRightNavigation(key);
-        nav.addEventListener("click", async () => {
+        const handler = async () => {
             if(nav.disabled) {
                 return;
             }
             nav.disabled = true;
             await fn();
             nav.disabled = false;
-        });
+        };
+        this.addListener(nav, "click", handler);
     }
 }
 
@@ -193,7 +242,6 @@ class ProviderPane extends Pane {
             </div>
             ${this.createNavigation("provider", { previous: false })}
         `;
-        this.element.append(this.pane);
     }
 
     canPassthrough() {
@@ -220,11 +268,12 @@ class ProviderPane extends Pane {
         if(!!this.config.provider) {
             return this.config.provider;
         } else {
-            return document.querySelector('input[name="provider"]:checked')?.value;
+            return this.pane.querySelector('input[name="provider"]:checked')?.value;
         }
     }
 
     register() {
+        this.ensureAttached();
         this.getRightNavigation("provider").disabled = false;
         this.registerNextNavigation("provider", async () => {
             await this.advance({ provider: this.getSelectedProvider() }, this.nextPane());
@@ -249,29 +298,9 @@ class RegionPane extends Pane {
             </div>
             ${this.createNavigation("region")}
         `;
-        this.element.append(this.pane);
-        this.regionElement = document.getElementById("region");
+        this.regionElement = this.pane.querySelector("#region");
         this.regionElement.value = config.region;
-
-        setTimeout(async () => {
-            const regionsJson = await fetch(this.url)
-                .then((response) => response.json())
-                .then((json) => json["regions"]);
-            if(!!regionsJson) {
-                this.regionElement.innerHTML = "";
-            }
-            for(const region of regionsJson) {
-                this.regionElement.append(createElement("option", {
-                    innerText: region,
-                    value: region,
-                }));
-            }
-            this.regionElement.append(createElement("option", {
-                innerText: "지역을 선택하세요.",
-                disabled: true,
-                selected: true,
-            }));
-        }, 0);
+        this._regionsLoaded = false;
     }
 
     canPassthrough() {
@@ -291,7 +320,33 @@ class RegionPane extends Pane {
     }
 
     register() {
-        this.regionElement.addEventListener("change", () => {
+        this.ensureAttached();
+        if(!this._regionsLoaded) {
+            this._regionsLoaded = true;
+            setTimeout(async () => {
+                const regionsJson = await fetch(this.url)
+                    .then((response) => response.json())
+                    .then((json) => json["regions"]);
+                if(this._disposed) {
+                    return;
+                }
+                if(!!regionsJson) {
+                    this.regionElement.innerHTML = "";
+                }
+                for(const region of regionsJson) {
+                    this.regionElement.append(createElement("option", {
+                        innerText: region,
+                        value: region,
+                    }));
+                }
+                this.regionElement.append(createElement("option", {
+                    innerText: "지역을 선택하세요.",
+                    disabled: true,
+                    selected: true,
+                }));
+            }, 0);
+        }
+        this.addListener(this.regionElement, "change", () => {
             const newValue = this.regionElement.value;
             if(newValue === "로딩 중" || newValue === "지역을 선택하세요.") {
                 this.getRightNavigation("region").disabled = true;
@@ -338,53 +393,9 @@ class ComplexPane extends Pane {
             </div>
             ${this.createNavigation("complex")}
         `;
-        this.element.append(this.pane);
-
-        this.complexElement = document.getElementById("complex");
+        this.complexElement = this.pane.querySelector("#complex");
         this.complexElement.value = config.complex;
-
-        setTimeout(async () => {
-            const response = await fetch(this.url).then((response) => response.json());
-            if(this.provider === "daelim") {
-                const complexesJson = response["complexes"].filter(o => o["region"] === config.region);
-                if(!complexesJson || !complexesJson[0]) {
-                    this.complexElement.innerHTML = '<option selected disabled>적합한 단지 정보가 없습니다.</option>';
-                    return;
-                }
-                const complexes = complexesJson[0]["complexes"];
-                if(!!complexes) {
-                    this.complexElement.innerHTML = "";
-                }
-                for(const complex of complexes) {
-                    this.complexElement.append(createElement("option", {
-                        innerText: complex["name"],
-                        value: complex["name"],
-                    }));
-                }
-                this.complexElement.prepend(createElement("option", {
-                    innerText: "단지를 선택하세요.",
-                    disabled: true,
-                    selected: true,
-                }));
-            } else if(this.provider === "smart-elife") {
-                if(!response) {
-                    this.complexElement.innerHTML = '<option selected disabled>적합한 단지 정보가 없습니다.</option>';
-                    return;
-                }
-                this.complexElement.innerHTML = "";
-                for(const complex of response) {
-                    this.complexElement.append(createElement("option", {
-                        innerText: complex["complexDisplayName"],
-                        value: complex["complexKey"],
-                    }));
-                }
-                this.complexElement.prepend(createElement("option", {
-                    innerText: "단지를 선택하세요.",
-                    disabled: true,
-                    selected: true,
-                }));
-            }
-        }, 0);
+        this._complexesLoaded = false;
     }
 
     canPassthrough() {
@@ -410,8 +421,57 @@ class ComplexPane extends Pane {
     }
 
     register() {
+        this.ensureAttached();
+        if(!this._complexesLoaded) {
+            this._complexesLoaded = true;
+            setTimeout(async () => {
+                const response = await fetch(this.url).then((response) => response.json());
+                if(this._disposed) {
+                    return;
+                }
+                if(this.provider === "daelim") {
+                    const complexesJson = response["complexes"].filter(o => o["region"] === this.config.region);
+                    if(!complexesJson || !complexesJson[0]) {
+                        this.complexElement.innerHTML = '<option selected disabled>적합한 단지 정보가 없습니다.</option>';
+                        return;
+                    }
+                    const complexes = complexesJson[0]["complexes"];
+                    if(!!complexes) {
+                        this.complexElement.innerHTML = "";
+                    }
+                    for(const complex of complexes) {
+                        this.complexElement.append(createElement("option", {
+                            innerText: complex["name"],
+                            value: complex["name"],
+                        }));
+                    }
+                    this.complexElement.prepend(createElement("option", {
+                        innerText: "단지를 선택하세요.",
+                        disabled: true,
+                        selected: true,
+                    }));
+                } else if(this.provider === "smart-elife") {
+                    if(!response) {
+                        this.complexElement.innerHTML = '<option selected disabled>적합한 단지 정보가 없습니다.</option>';
+                        return;
+                    }
+                    this.complexElement.innerHTML = "";
+                    for(const complex of response) {
+                        this.complexElement.append(createElement("option", {
+                            innerText: complex["complexDisplayName"],
+                            value: complex["complexKey"],
+                        }));
+                    }
+                    this.complexElement.prepend(createElement("option", {
+                        innerText: "단지를 선택하세요.",
+                        disabled: true,
+                        selected: true,
+                    }));
+                }
+            }, 0);
+        }
         // register events
-        this.complexElement.addEventListener("change", () => {
+        this.addListener(this.complexElement, "change", () => {
             const newValue = this.complexElement.value;
             if(newValue === "단지를 선택하세요." || newValue === "적합한 단지 정보가 없습니다.") {
                 this.getRightNavigation("complex").disabled = true;
@@ -432,6 +492,7 @@ class AuthorizationPane extends Pane {
     constructor(element, config, provider) {
         super(element, config);
         this.provider = provider;
+        this.isCompleted = false;
 
         const errors = [
             { "id": "invalid-authorization", "text": "아이디 혹은 비밀번호가 유효하지 않습니다." },
@@ -449,11 +510,9 @@ class AuthorizationPane extends Pane {
             </div>
             ${this.createNavigation("authorization", { errors })}
         `;
-        this.element.append(this.pane);
-
-        this.usernameElement = document.getElementById("username");
+        this.usernameElement = this.pane.querySelector("#username");
         this.usernameElement.value = config.username || "";
-        this.passwordElement = document.getElementById("password");
+        this.passwordElement = this.pane.querySelector("#password");
         this.passwordElement.value = config.password || "";
     }
 
@@ -477,18 +536,28 @@ class AuthorizationPane extends Pane {
     }
 
     nextPane() {
-        return new WallpadPasscodePane(this.element, this.config, this.provider);
+        if(this.isCompleted) {
+            return new CompletePane(this.element, this.config);
+        } else {
+            return new WallpadPasscodePane(this.element, this.config, this.provider);
+        }
+    }
+
+    dispose() {
+        this.isCompleted = false;
+        return super.dispose();
     }
 
     register() {
-        this.usernameElement.addEventListener("keyup", this._refreshNavigation.bind(this));
-        this.passwordElement.addEventListener("keyup", this._refreshNavigation.bind(this));
+        this.ensureAttached();
+        this.addListener(this.usernameElement, "keyup", this._refreshNavigation.bind(this));
+        this.addListener(this.passwordElement, "keyup", this._refreshNavigation.bind(this));
         this.registerPrevNavigation("authorization", async () => {
             await this.advance({ username: undefined, password: undefined }, this.prevPane(), true);
         });
         this.registerNextNavigation("authorization", async () => {
             window.homebridge.showSpinner();
-            const element = document.getElementById("invalid-authorization");
+            const element = this.pane.querySelector("#invalid-authorization");
             if(!!element && !element.classList.contains("hidden")) {
                 element.classList.add("hidden");
             }
@@ -499,15 +568,17 @@ class AuthorizationPane extends Pane {
                 password: this.passwordElement.value,
             });
         });
-        window.homebridge.addEventListener("invalid-authorization", () => {
+        this.addHomebridgeListener("invalid-authorization", () => {
             window.homebridge.hideSpinner();
-            const element = document.getElementById("invalid-authorization");
+            const element = this.pane.querySelector("#invalid-authorization");
             if(!!element) {
                 element.classList.remove("hidden");
             }
         });
-        window.homebridge.addEventListener("require-wallpad-passcode", async () => {
+        this.addHomebridgeListener("require-wallpad-passcode", async () => {
             window.homebridge.hideSpinner();
+            this.isCompleted = false;
+
             await this.advance(
                 {
                     username: this.usernameElement.value,
@@ -515,6 +586,17 @@ class AuthorizationPane extends Pane {
                 },
                 this.nextPane(),
             );
+        });
+        this.addHomebridgeListener("complete", async (event) => {
+            window.homebridge.hideSpinner();
+            this.isCompleted = true;
+
+            console.log("Sign-in successful.");
+            await this.advance({
+                username: this.usernameElement.value,
+                password: this.passwordElement.value,
+                uuid: event["data"].uuid,
+            }, this.nextPane());
         });
     }
 }
@@ -539,11 +621,9 @@ class WallpadPasscodePane extends Pane {
                 </div>
             </div>
         `;
-        this.element.append(this.pane);
-
-        this.passcodeElement = document.getElementById("passcode");
+        this.passcodeElement = this.pane.querySelector("#passcode");
         this.passcodeElement.value = "";
-        this.verifyButton = document.getElementById("verify-button");
+        this.verifyButton = this.pane.querySelector("#verify-button");
     }
 
     selfPane() {
@@ -555,12 +635,11 @@ class WallpadPasscodePane extends Pane {
     }
 
     _refreshNavigation() {
-        const element = document.getElementById("verify-button");
         if(this.provider === "daelim") {
-            element.disabled = this.passcodeElement.value.length < 12;
+            this.verifyButton.disabled = this.passcodeElement.value.length < 12;
         } else {
             // TODO: Find the specific values the length of the passcode on Smart eLife.
-            element.disabled = this.passcodeElement.value.length < 4;
+            this.verifyButton.disabled = this.passcodeElement.value.length < 4;
         }
     }
 
@@ -573,31 +652,32 @@ class WallpadPasscodePane extends Pane {
     }
 
     register() {
-        this.passcodeElement.addEventListener("keyup", this._refreshNavigation.bind(this));
+        this.ensureAttached();
+        this.addListener(this.passcodeElement, "keyup", this._refreshNavigation.bind(this));
         startTimer(180, () => {
-            const element = document.getElementById("remaining-time");
+            const element = this.pane.querySelector("#remaining-time");
             element.innerText = remainingDuration;
         }, async () => {
             await this.advance({ uuid: undefined }, this.prevPane(), true);
         });
-        this.verifyButton.addEventListener("click", async () => {
+        this.addListener(this.verifyButton, "click", async () => {
             if(this.verifyButton.disabled) {
                 return;
             }
-            this.verifyButton.disabled = false;
+            this.verifyButton.disabled = true;
             stopTimer();
             window.homebridge.showSpinner();
             await window.homebridge.request(`/${this.config.provider}/passcode`, {
                 passcode: this.passcodeElement.value,
             });
         });
-        window.homebridge.addEventListener("invalid-wallpad-passcode", async () => {
+        this.addHomebridgeListener("invalid-wallpad-passcode", async () => {
             window.homebridge.hideSpinner();
             this.verifyButton.disabled = true;
             window.homebridge.toast.error("월패드 인증번호가 다릅니다.");
             await this.advance({ uuid: undefined }, this.prevPane(), true);
         });
-        window.homebridge.addEventListener("complete", async (event) => {
+        this.addHomebridgeListener("complete", async (event) => {
             window.homebridge.hideSpinner();
             this.verifyButton.disabled = true;
 
@@ -606,6 +686,11 @@ class WallpadPasscodePane extends Pane {
                 uuid: event["data"].uuid,
             }, this.nextPane());
         });
+    }
+
+    dispose() {
+        stopTimer();
+        super.dispose();
     }
 }
 
@@ -625,11 +710,9 @@ class CompletePane extends Pane {
                 <button type="button" id="done-button" class="btn btn-primary">닫기</button>
             </div>
         `;
-        this.element.append(this.pane);
-
-        this.advancedButton = document.getElementById("advanced-button");
-        this.resetButton = document.getElementById("reset-button");
-        this.doneButton = document.getElementById("done-button");
+        this.advancedButton = this.pane.querySelector("#advanced-button");
+        this.resetButton = this.pane.querySelector("#reset-button");
+        this.doneButton = this.pane.querySelector("#done-button");
     }
 
     selfPane() {
@@ -646,6 +729,7 @@ class CompletePane extends Pane {
     }
 
     register() {
+        this.ensureAttached();
         refreshTrademark(this.config);
         setTimeout(async () => {
             await window.homebridge.request(`/${this.config.provider}/fetch-devices`, {
@@ -655,7 +739,7 @@ class CompletePane extends Pane {
                 password: this.config.password,
             });
         }, 0);
-        window.homebridge.addEventListener("devices-fetched", async (event) => {
+        this.addHomebridgeListener("devices-fetched", async (event) => {
             const devices = event["data"].devices;
             console.log(`Num of devices: ${devices.length}`);
 
@@ -677,16 +761,16 @@ class CompletePane extends Pane {
 
             this.advancedButton.removeAttribute("disabled");
         });
-        this.resetButton.addEventListener("click", async () => {
+        this.addListener(this.resetButton, "click", async () => {
             await this.advance({}, this.nextPane());
         });
-        this.doneButton.addEventListener("click", async () => {
+        this.addListener(this.doneButton, "click", async () => {
             await this.updatePluginConfig();
             await this.savePluginConfig();
             window.homebridge.closeSettings();
         });
 
-        this.advancedButton.addEventListener("click", async () => {
+        this.addListener(this.advancedButton, "click", async () => {
             document.getElementById("setupForm").classList.add("hidden");
             document.getElementById("footer").classList.add("hidden");
             document.getElementById("advancedForm").classList.remove("hidden");
@@ -718,10 +802,8 @@ class ResetConfirmablePane extends Pane {
                 <button type="button" id="reset-cancel-button" class="btn btn-primary">취소</button>
             </div>
         `;
-        this.element.append(this.pane);
-
-        this.confirmButton = document.getElementById("reset-confirmed-button");
-        this.cancelButton = document.getElementById("reset-cancel-button");
+        this.confirmButton = this.pane.querySelector("#reset-confirmed-button");
+        this.cancelButton = this.pane.querySelector("#reset-cancel-button");
     }
 
     canPassthrough() {
@@ -733,7 +815,8 @@ class ResetConfirmablePane extends Pane {
     }
 
     register() {
-        this.confirmButton.addEventListener("click", async () => {
+        this.ensureAttached();
+        this.addListener(this.confirmButton, "click", async () => {
             window.homebridge.showSpinner();
 
             const provider = this.config.provider;
@@ -756,7 +839,7 @@ class ResetConfirmablePane extends Pane {
 
             await this.advance({}, new ProviderPane(this.element, this.config));
         });
-        this.cancelButton.addEventListener("click", async () => {
+        this.addListener(this.cancelButton, "click", async () => {
             await this.advance({}, new CompletePane(this.element, this.config));
         });
     }

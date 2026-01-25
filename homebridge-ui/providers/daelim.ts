@@ -40,6 +40,7 @@ export default class DaelimUiServer extends AbstractUiProvider {
 
     private handler?: NetworkHandler = undefined;
     private isLoggedIn: boolean = false;
+    private devicesFetched: boolean = false;
     private readonly authorization: ClientAuthorization;
     private readonly address: ClientAddress;
     private readonly semaphore = new Semaphore();
@@ -66,7 +67,7 @@ export default class DaelimUiServer extends AbstractUiProvider {
     }
 
     async onRequestDevices(p: any) {
-        if(this.isLoggedIn && this.devices) {
+        if(this.devicesFetched && this.devices) {
             this.server.pushEvent("devices-fetched", {
                 devices: this.devices,
             });
@@ -134,6 +135,9 @@ export default class DaelimUiServer extends AbstractUiProvider {
         this.username = undefined;
         this.password = undefined;
         this.uuid = undefined;
+        this.isLoggedIn = false;
+        this.devicesFetched = false;
+        this.devices = [];
     }
 
     async signIn(p: any) {
@@ -261,14 +265,13 @@ export default class DaelimUiServer extends AbstractUiProvider {
             this.authorization.login = body['loginpin'];
             this.sendUnreliableRequest({}, Types.LOGIN, LoginSubTypes.MENU_REQUEST);
         })
-        this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, (_) => {
-            this.isLoggedIn = true;
-            this.server.pushEvent('complete', { uuid: this.uuid });
-        })
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.WALL_PAD_RESPONSE, async (_) => {
             this.sendCertificationRequest();
         });
         this.registerResponseListener(Types.LOGIN, LoginSubTypes.MENU_RESPONSE, async (body) => {
+            this.isLoggedIn = true;
+            this.server.pushEvent('complete', { uuid: this.uuid });
+
             const controlInfo = body['controlinfo'];
             const keys = Object.keys(controlInfo);
             for(const key of keys) {
@@ -346,6 +349,7 @@ export default class DaelimUiServer extends AbstractUiProvider {
                 this.server.pushEvent('devices-fetched', {
                     devices: this.devices,
                 });
+                this.devicesFetched = true;
             }
         });
         // Error Listeners
