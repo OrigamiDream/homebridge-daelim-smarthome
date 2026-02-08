@@ -177,7 +177,12 @@ export default class SmartELifeClient {
             numAttempts += 1;
         } while(needsRetry);
 
-        return Utils.parseJsonSafe(text);
+        const json = Utils.parseJsonSafe(text);
+
+        // Debug purpose.
+        this.log.debug(`[Response from ${options.method} ${url}]\n${JSON.stringify(json, null, 2)}`);
+
+        return json;
     }
 
     private async fetchCSRFInplace() {
@@ -345,6 +350,15 @@ export default class SmartELifeClient {
         if(this.push) {
             this.log("Setting up Push notification receiver...");
 
+            this.push.onNotification((notification) => {
+                const orig = notification.message;
+                if(!orig || !orig.data) {
+                    return;
+                }
+                this.log.info(`[Push] onNotify (JSON): ${JSON.stringify(orig.data, null, 2)}`);
+            });
+            await this.push.connect();
+
             // Update Push tokens
             const accessToken = this.getAccessToken();
             if(!!accessToken) {
@@ -362,15 +376,6 @@ export default class SmartELifeClient {
             } else {
                 this.log.error("Could not update Push token.");
             }
-
-            this.push.onNotification((notification) => {
-                const orig = notification.message;
-                if(!orig || !orig.data) {
-                    return;
-                }
-                this.log.info(`[Push] onNotify (JSON): ${JSON.stringify(orig.data, null, 2)}`);
-            });
-            await this.push.connect();
         }
         this.complex = await this.fetchComplex();
         if(this.complex) {
