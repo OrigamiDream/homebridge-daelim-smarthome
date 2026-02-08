@@ -732,6 +732,19 @@ class CompletePane extends Pane {
         return new ResetConfirmablePane(this.element, this.config);
     }
 
+    devicesEquals(oldDevice, newDevice) {
+        if(this.config.provider === "daelim") {
+            return oldDevice.name === newDevice.name
+                && oldDevice.deviceId === newDevice.deviceId
+                && oldDevice.deviceType === newDevice.deviceType;
+        } else {
+            return oldDevice.deviceType === newDevice.deviceType
+                && oldDevice.deviceItemType === newDevice.deviceItemType
+                && oldDevice.alias === newDevice.alias
+                && oldDevice.uid === newDevice.uid;
+        }
+    }
+
     register() {
         this.ensureAttached();
         refreshTrademark(this.config);
@@ -749,11 +762,8 @@ class CompletePane extends Pane {
 
             const availableDevices = [];
             for(const device of devices) {
-                const equiv = (this.config.devices || []).filter(oldDevice => {
-                    return oldDevice.name === device.name
-                        && oldDevice.deviceId === device.deviceId
-                        && oldDevice.deviceType === device.deviceType;
-                });
+                const equiv = (this.config.devices || [])
+                    .filter(oldDevice => this.devicesEquals(oldDevice, device));
                 if(!equiv || !equiv.length) {
                     availableDevices.push(device);
                 } else {

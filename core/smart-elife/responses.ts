@@ -4,6 +4,9 @@ export enum ClientResponseCode {
     UNCERTIFIED_WALLPAD,
     INCOMPLETE_USER_INFO,
     EMPTY_PARAMETER,
+    NO_AUTH, // device controls => needs new sign-in
+    NO_LOGIN, // device controls => needs new sign-in
+    NOT_FOUND_PARAMETER, // device controls
     NO_EXIST_USER,
     FAIL_ADD_HOME,
     FAIL_UPDATE_HOME,

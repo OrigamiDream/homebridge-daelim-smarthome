@@ -14,15 +14,14 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
     private semaphoreTimeout?: Timeout;
     private client?: SmartELifeClient;
 
-    private readonly devices: Device[];
+    private devices: Device[] = [];
+    private devicesFetched: boolean = false;
 
     constructor(server: HomebridgePluginUiServer, log: LoggerBase | Logging) {
         super(server, log);
-
-        this.devices = this.configureInitialDevices();
     }
 
-    configureInitialDevices() {
+    configureInitialDevices(): Device[] {
         // TODO: Add initial devices (elevator, motion sensors, etc.)
         return [];
     }
@@ -31,6 +30,17 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         this.server.onRequest("/smart-elife/sign-in", this.signIn.bind(this));
         this.server.onRequest("/smart-elife/passcode", this.authorizePasscode.bind(this));
         this.server.onRequest("/smart-elife/invalidate", this.invalidate.bind(this));
+        this.server.onRequest("/smart-elife/fetch-devices", this.onRequestDevices.bind(this));
+    }
+
+    async onRequestDevices(p: any) {
+        if(this.devicesFetched && this.devices) {
+            this.server.pushEvent("devices-fetched", {
+                devices: this.devices,
+            });
+        } else {
+            await this.signIn(p);
+        }
     }
 
     async invalidate(_: any) {
@@ -69,28 +79,48 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
                 this.server.pushEvent("authorization-failed", {
                     "reason": "invalid-authorization",
                 });
-                break;
+                return;
             }
             case ClientResponseCode.WALLPAD_AUTHORIZATION_PREPARATION_FAILED: {
                 this.server.pushEvent("authorization-failed", {
                     "reason": "wallpad-preparation-fail",
                 });
-                break;
+                return;
             }
             case ClientResponseCode.INCOMPLETE_USER_INFO: {
                 this.server.pushEvent("authorization-failed", {
                     "reason": "incomplete-user-info",
                 });
-                break;
+                return;
             }
             case ClientResponseCode.UNCERTIFIED_WALLPAD: {
                 this.server.pushEvent("require-wallpad-passcode", {});
-                break;
+                return;
             }
             case ClientResponseCode.SUCCESS: {
+                // fallthrough
                 break;
             }
+            default: {
+                this.log.error(`Unexpected error: ${response}`);
+                return;
+            }
         }
+
+        // On success
+        this.server.pushEvent("complete", { uuid: uuid });
+
+        // Set up devices
+        const devices = this.configureInitialDevices();
+        const fetchedDevices = await this.client.fetchDevices();
+        for(const device of fetchedDevices) {
+            devices.push(device);
+        }
+        this.devices = devices;
+        this.server.pushEvent("devices-fetched", {
+            devices: this.devices,
+        });
+        this.devicesFetched = true;
     }
 
     async authorizePasscode(p: any) {

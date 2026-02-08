@@ -1,6 +1,6 @@
 import fetch, {Response} from "node-fetch";
 import {LoggerBase, Utils} from "../utils";
-import {SmartELifeConfig} from "../interfaces/smart-elife-config";
+import {Device, DeviceItemType, DeviceType, SmartELifeConfig} from "../interfaces/smart-elife-config";
 import {ClientResponseCode} from "./responses";
 import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
@@ -42,7 +42,7 @@ export default class SmartELifeClient {
                 private readonly config: SmartELifeConfig,
                 private readonly push?: PushReceiver) {
         this.httpBody = {
-            "input_dv_make_info": "apple",
+            "input_dv_make_info": "Apple",
             "input_dv_model_info": "iPhone18,4",
             "input_dv_osver_info": "26.2.1",
             "input_acc_os_info": "ios",
@@ -67,12 +67,44 @@ export default class SmartELifeClient {
     }
 
     private updateSessionCookieFromResponse(response: Response) {
-        // node-fetch v2 exposes Set-Cookie via headers.raw().
-        const raw = (response.headers as any)?.raw?.();
-        const setCookies: string[] = raw?.["set-cookie"] ?? raw?.()["set-cookie"] ?? [];
+        // Cookie header access differs by fetch implementation.
+        // - node-fetch v2: response.headers.raw()['set-cookie']
+        // - undici / Node 18+ fetch: response.headers.getSetCookie()
+        // - fallback: response.headers.get('set-cookie')
+
+        const headers: any = response.headers as any;
+
+        let setCookies: string[] = [];
+
+        try {
+            if(typeof headers?.raw === "function") {
+                const raw = headers.raw();
+                const v = raw?.["set-cookie"];
+                if(Array.isArray(v)) {
+                    setCookies = v;
+                }
+            } else if(typeof headers?.getSetCookie === "function") {
+                const v = headers.getSetCookie();
+                if(Array.isArray(v)) {
+                    setCookies = v;
+                }
+            } else if(typeof headers?.get === "function") {
+                const v = headers.get("set-cookie");
+                if(typeof v === "string" && v.length > 0) {
+                    // Some implementations merge cookies into a single header value.
+                    // Split on comma only when it looks like cookie delimiters.
+                    setCookies = v.split(/,(?=\s*[^=;\s]+=[^;]+)/g).map((s: string) => s.trim());
+                }
+            }
+        } catch {
+            // Ignore header parsing errors.
+            return;
+        }
+
         if(!Array.isArray(setCookies) || setCookies.length === 0) {
             return;
         }
+
         for(const cookie of setCookies) {
             const match = /^JSESSIONID=([^;]+)/.exec(cookie);
             if(match && match[1]) {
@@ -203,7 +235,7 @@ export default class SmartELifeClient {
         switch(code) {
             case ClientResponseCode.SUCCESS: {
                 const homeList = response["homeList"] || [];
-                if(!!homeList) {
+                if(homeList.length > 0) {
                     this.log.warn(`You may registered multiple homes. Requires to choose a home: ${JSON.stringify(homeList, null, 2)}`);
                     return ClientResponseCode.INCOMPLETE_USER_INFO;
                 }
@@ -343,7 +375,8 @@ export default class SmartELifeClient {
         this.complex = await this.fetchComplex();
         if(this.complex) {
             this.log(`Complex: ${this.complex.complexDisplayName}`);
-            this.log.debug("JSON: %s", JSON.stringify(this.complex, null, 2));
+            const { dongs, ...redacted } = this.complex;
+            this.log.debug("JSON: %s", JSON.stringify(redacted, null, 2));
         }
 
         if(this.userInfo) {
@@ -353,8 +386,31 @@ export default class SmartELifeClient {
                 this.userInfo.apartment.unit);
             this.log.debug("JSON: %s", JSON.stringify(this.userInfo, null, 2));
         }
+    }
 
-        // TODO: RegEx on `home.do` and parse the in-placed values.
+    async fetchDevices(): Promise<Device[]> {
+        const response = await this.fetchJson(`${this.baseUrl}/api/widget`, {
+            method: "POST",
+            headers: {
+                ...this.httpHeaders,
+                "Authorization": `Bearer ${this.getAccessToken()}`,
+            },
+            body: JSON.stringify({
+                "method": "devices",
+            }),
+        });
+        const data = response["data"] as any[];
+        return data
+            .map((e: any) => {
+                return {
+                    displayName: e["alias"],
+                    deviceType: DeviceType.parse(e["type"]),
+                    deviceItemType: DeviceItemType.parse(e["item"]),
+                    uid: e["uid"],
+                    disabled: false,
+                }
+            })
+            .filter((dev) => dev.deviceType === DeviceType.DEVICE);
     }
 
     private async fetchComplex() {
