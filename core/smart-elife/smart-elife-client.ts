@@ -1,7 +1,6 @@
-import fetch from "node-fetch";
+import fetch, {Response} from "node-fetch";
 import {LoggerBase, Utils} from "../utils";
 import {SmartELifeConfig} from "../interfaces/smart-elife-config";
-import crypto from "crypto";
 import {ClientResponseCode} from "./responses";
 import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
@@ -10,13 +9,22 @@ import {SmartELifeComplex, SmartELifeUserInfo} from "../interfaces/smart-elife-c
 export default class SmartELifeClient {
 
     private readonly httpBody: {[key: string]: string};
-    private readonly httpHeaders = {
+    private readonly httpHeaders: Record<string, string> = {
         "User-Agent": Utils.SMART_ELIFE_USER_AGENT,
-        "Accept": "application/json",
-        "Content-Type": "application/json",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Sec-Fetch-Site": "same-origin",
+        "Accept-Language": "ko-KR,ko;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Sec-Fetch-Mode": "cors",
+        "Content-Type": "application/json;charset=UTF-8",
+        "Origin": "https://smartelife.apt.co.kr",
+        "Connection": "keep-alive",
+        "Sec-Fetch-Dest": "empty",
     }
     private csrfToken?: string;
     private attemptsCsrfIssuing: number = 0;
+    private jsessionId?: string;
 
     private complex?: SmartELifeComplex;
     private userInfo?: SmartELifeUserInfo;
@@ -34,24 +42,110 @@ export default class SmartELifeClient {
                 private readonly config: SmartELifeConfig,
                 private readonly push?: PushReceiver) {
         this.httpBody = {
-            "input_dv_make_info": "oznu",
-            "input_dv_model_info": "homebridge",
-            "input_dv_osver_info": this.config.version.toString(),
-            "input_acc_os_info": "android",
-            "input_push_token": "",
-            "input_dv_uuid": this.config.uuid,
+            "input_dv_make_info": "apple",
+            "input_dv_model_info": "iPhone18,4",
+            "input_dv_osver_info": "26.2.1",
+            "input_acc_os_info": "ios",
+            "input_push_token": this.push?.fcmToken ?? "",
+            "input_dv_uuid": Utils.generateUUID(this.config.username),
         };
     }
 
-    private async fetchJson(url: string, options: any = {}) {
-        let response = await fetch(url, options);
-        if(!response.ok && response.status === 401) {
-            const headers = options["headers"] || {};
-            headers["_csrf"] = await this.getCsrfToken(true);
-            options["headers"] = headers;
-            response = await fetch(url, options);
+    private applySessionCookie(options: any) {
+        if(!this.jsessionId) {
+            return;
         }
-        return response.json();
+        const headers = options["headers"] || {};
+        const cookie = headers["Cookie"] || headers["cookie"];
+        const jsess = `JSESSIONID=${this.jsessionId}`;
+        if(!cookie) {
+            headers["Cookie"] = jsess;
+        } else if(typeof cookie === "string" && !cookie.includes("JSESSIONID=")) {
+            headers["Cookie"] = `${cookie}; ${jsess}`;
+        }
+        options["headers"] = headers;
+    }
+
+    private updateSessionCookieFromResponse(response: Response) {
+        // node-fetch v2 exposes Set-Cookie via headers.raw().
+        const raw = (response.headers as any)?.raw?.();
+        const setCookies: string[] = raw?.["set-cookie"] ?? raw?.()["set-cookie"] ?? [];
+        if(!Array.isArray(setCookies) || setCookies.length === 0) {
+            return;
+        }
+        for(const cookie of setCookies) {
+            const match = /^JSESSIONID=([^;]+)/.exec(cookie);
+            if(match && match[1]) {
+                this.jsessionId = match[1];
+                return;
+            }
+        }
+    }
+
+    private async fetchWithJSessionId(url: string, options: any = {}): Promise<Response> {
+        this.applySessionCookie(options);
+        let response = await fetch(url, options);
+        this.updateSessionCookieFromResponse(response);
+
+        // Debugging purpose.
+        let buf = `${options.method} ${url}\n`;
+        for(const headerKey in options.headers) {
+            const headerValue = options.headers[headerKey];
+            buf += `${headerKey}: ${headerValue}\n`;
+        }
+        if(!!options.body) {
+            buf += "\n";
+            const body = JSON.parse(options.body);
+            buf += JSON.stringify(body, null, 2);
+        }
+        this.log.debug(buf);
+        return response;
+    }
+
+    private async fetchJson(url: string, options: any = {}) {
+        // Do not mutate the caller's options object across retries.
+        const baseOptions: any = { ...options };
+        const baseHeaders: Record<string, string> = { ...(baseOptions.headers || {}) };
+        baseOptions.headers = baseHeaders;
+
+        // If the server indicates auth is required (or HTTP error), refresh token/csrf once and retry.
+        let needsRetry = false;
+        let numAttempts = 0;
+        let text;
+        do {
+            const opts: any = { ...baseOptions, headers: { ...baseHeaders } };
+            if(needsRetry) {
+                if(numAttempts === 1) {
+                    this.log.debug("Could not perform the request (seams token expiration). Retrying immediately.");
+                } else if(numAttempts <= 5) {
+                    this.log.debug(`Could not perform the request over ${numAttempts} attempts. Retrying within 5 seconds.`);
+                    await Utils.sleep(5000);
+                } else {
+                    throw new Error(`Could not perform the request over ${numAttempts} attempts. Request dropped.`);
+                }
+
+                if("_csrf" in opts.headers) {
+                    opts.headers["_csrf"] = await this.getCsrfToken(true);
+                }
+                if("Authorization" in opts.headers) {
+                    const response = await this.signIn();
+                    if(response !== ClientResponseCode.SUCCESS) {
+                        throw new Error(`Could not re-establish authentication.`);
+                    }
+                    const token = this.getAccessToken();
+                    if(token) {
+                        opts.headers["Authorization"] = `Bearer ${token}`;
+                    }
+                }
+            }
+            const response = await this.fetchWithJSessionId(url, opts);
+            text = await response.text();
+
+            needsRetry = !response.ok || response.status !== 200 || text === "requireLoginForAjax";
+            numAttempts += 1;
+        } while(needsRetry);
+
+        return Utils.parseJsonSafe(text);
     }
 
     private async fetchCSRFInplace() {
@@ -87,25 +181,8 @@ export default class SmartELifeClient {
         return this.csrfToken;
     }
 
-    private aesEncryptBase64(plaintext: string, key: string, iv: string, algorithm: string = "aes-256-cbc") {
-        const cipher = crypto.createCipheriv(
-            algorithm,
-            Buffer.from(key, "utf8"),
-            Buffer.from(iv, "utf8"),
-        );
-        const out = Buffer.concat([
-            cipher.update(plaintext, "utf8"),
-            cipher.final(),
-        ]);
-        return out.toString("base64");
-    }
-
     async signIn(): Promise<ClientResponseCode> {
-        const username = this.aesEncryptBase64(this.config.username, this.key, this.iv);
-        const password = this.aesEncryptBase64(this.config.password, this.key, this.iv);
-
-        const url = `${this.baseUrl}/login.ajax`
-        const response = await this.fetchJson(url, {
+        const response = await this.fetchJson(`${this.baseUrl}/login.ajax`, {
             method: "POST",
             headers: {
                 ...this.httpHeaders,
@@ -117,51 +194,39 @@ export default class SmartELifeClient {
                 "input_hm_cd": "",
                 "input_memb_uid": "",
                 "input_version": Utils.SMART_ELIFE_APP_VERSION,
-                "input_username": username,
-                "input_password": password,
+                "input_username": Utils.aes256Base64(this.config.username, this.key, this.iv),
+                "input_password": Utils.aes256Base64(this.config.password, this.key, this.iv),
                 "input_auto_login": "on",
             }),
         });
-        this.log.info(JSON.stringify(response, null, 2));
-
-        const res = String(response["result"] || "false").toLowerCase();
-        if(res === "true") {
-            const homeList = response["homeList"];
-            if(!!homeList) {
-                this.log.warn(`You may registered multiple homes. Requires to choose a home: ${JSON.stringify(homeList, null, 2)}`);
-                return ClientResponseCode.INCOMPLETE_USER_INFO;
+        const code = ClientResponseCode.parseResponseCode(response["errCode"]);
+        switch(code) {
+            case ClientResponseCode.SUCCESS: {
+                const homeList = response["homeList"] || [];
+                if(!!homeList) {
+                    this.log.warn(`You may registered multiple homes. Requires to choose a home: ${JSON.stringify(homeList, null, 2)}`);
+                    return ClientResponseCode.INCOMPLETE_USER_INFO;
+                }
+                return this.updateAuthorizationAndUserInfo(response);
             }
-            const token = response["daelim_elife"];
-            if(!response["userInfo"]) {
-                this.log.error(`No \`userInfo\` found from the response: ${JSON.stringify(response, null, 2)}`);
-                return ClientResponseCode.INCOMPLETE_USER_INFO;
+            case ClientResponseCode.UNCERTIFIED_WALLPAD: {
+                this.userKey = response["userkey"];
+                this.roomKey = response["roomkey"];
+                this.log.info(`Received user-key = ${this.userKey}, room-key = ${this.roomKey} prior to wallpad authorization.`);
+
+                // Ask for preparing the Wallpad authorization.
+                const success = await this.requestWallpadAuthorization();
+                if(!success) {
+                    return ClientResponseCode.WALLPAD_AUTHORIZATION_PREPARATION_FAILED;
+                }
+                return ClientResponseCode.SUCCESS;
             }
-
-            const info = response["userInfo"];
-            this.userInfo = {
-                apartment: {
-                    building: info["dong"],
-                    unit: info["ho"],
-                },
-                complexCode: info["djCd"], // danji-code
-                guid: info["guid"],
-                username: info["alias"],
-            };
-            this.accessToken = token;
-            return ClientResponseCode.SUCCESS;
         }
-
-        this.log.warn("The error message returned: %s", response["errMsg"] || "");
-        const code = ClientResponseCode[response["errCode"] as keyof typeof ClientResponseCode];
-        if(code === ClientResponseCode.UNCERTIFIED_WALLPAD) {
-            this.userKey = response["userkey"];
-            this.roomKey = response["roomkey"];
-            this.log.info(`Received user-key = ${this.userKey}, room-key = ${this.roomKey} prior to wallpad authorization.`);
-        }
+        this.log.warn("Unexpected client response code had been returned: %s", code);
         return code;
     }
 
-    async authorizeWallpadPasscode(passcode: string): Promise<ClientResponseCode> {
+    private async requestWallpadAuthorization() {
         const response = await this.fetchJson(`${this.baseUrl}/login/callWallpadAuth.ajax`, {
             method: "POST",
             headers: {
@@ -173,37 +238,105 @@ export default class SmartELifeClient {
                 "flag": "login",
                 "input_userkey": this.userKey,
                 "input_roomkey": this.roomKey,
-                "input_errtype": "",
+                "input_errtype": "DEFAULT",
+                "input_wallpad_key": "", // This field must be empty when I ask for preparing the wallpad authorization.
+            }),
+        });
+        return response["result"];
+    }
+
+    async authorizeWallpadPasscode(passcode: string): Promise<ClientResponseCode> {
+        const response = await this.fetchJson(`${this.baseUrl}/login/checkWallpadAuth.ajax`, {
+            method: "POST",
+            headers: {
+                ...this.httpHeaders,
+                "_csrf": await this.getCsrfToken(),
+            },
+            body: JSON.stringify({
+                ...this.httpBody,
+                "flag": "login",
+                "input_userkey": this.userKey,
+                "input_roomkey": this.roomKey,
+                "input_errtype": "DEFAULT",
                 "input_wallpad_key": passcode,
             }),
         });
-        this.log.info(JSON.stringify(response, null, 2));
-        if(response["result"]) {
-            return ClientResponseCode.SUCCESS;
+        if(!response["result"]) {
+            this.log.warn("The error message returned: %s", response["errMsg"] || "");
+            return ClientResponseCode.parseResponseCode(response["errCode"]);
         }
-
-        this.log.warn("The error message returned: %s", response["errMsg"] || "");
-        return ClientResponseCode[response["errCode"] as keyof typeof ClientResponseCode];
+        this.updateAuthorizationAndUserInfo(response);
+        return ClientResponseCode.SUCCESS;
     }
 
-    createSaltedAccessToken() {
+    private updateAuthorizationAndUserInfo(response: any): ClientResponseCode {
+        const token = response["daelim_elife"];
+        if(!response["userInfo"]) {
+            return ClientResponseCode.INCOMPLETE_USER_INFO;
+        }
+
+        const info = response["userInfo"];
+        this.userInfo = {
+            apartment: {
+                building: info["dong"],
+                unit: info["ho"],
+            },
+            complexCode: info["djCd"], // danji-code
+            guid: info["guid"],
+            username: info["alias"],
+        };
+        this.accessToken = token;
+        return ClientResponseCode.SUCCESS;
+    }
+
+    private getTimestamp() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const date = String(now.getDate()).padStart(2, "0");
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        const seconds = String(now.getSeconds()).padStart(2, "0");
+        return `${year}${month}${date}${hours}${minutes}${seconds}`;
+    }
+
+    private getAccessToken() {
         if(!this.accessToken) {
             this.log.error("The access token is not yet issued. Do sign-in first.");
             return undefined;
         }
-        const payload = `daelim_elife::${Date.now()}`;
-        return this.aesEncryptBase64(payload, this.accessToken, this.iv);
+        const payload = `${this.accessToken}::${this.getTimestamp()}`;
+        return Utils.aes256Base64(payload, this.key, this.iv);
     }
 
     async serve() {
         if(this.push) {
             this.log("Setting up Push notification receiver...");
+
+            // Update Push tokens
+            const accessToken = this.getAccessToken();
+            if(!!accessToken) {
+                await this.fetchJson(`${this.baseUrl}/common/updatePushToken.ajax`, {
+                    method: "POST",
+                    headers: {
+                        ...this.httpHeaders,
+                        "_csrf": await this.getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                        "Authorization": `Bearer ${this.getAccessToken()}`,
+                        "push_token": this.push.fcmToken,
+                    }),
+                });
+            } else {
+                this.log.error("Could not update Push token.");
+            }
+
             this.push.onNotification((notification) => {
                 const orig = notification.message;
                 if(!orig || !orig.data) {
                     return;
                 }
-                this.log.info(`[Push] onNotify: ${orig}`);
+                this.log.info(`[Push] onNotify (JSON): ${JSON.stringify(orig.data, null, 2)}`);
             });
             await this.push.connect();
         }
@@ -220,6 +353,8 @@ export default class SmartELifeClient {
                 this.userInfo.apartment.unit);
             this.log.debug("JSON: %s", JSON.stringify(this.userInfo, null, 2));
         }
+
+        // TODO: RegEx on `home.do` and parse the in-placed values.
     }
 
     private async fetchComplex() {

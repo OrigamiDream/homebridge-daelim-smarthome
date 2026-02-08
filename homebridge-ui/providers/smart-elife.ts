@@ -4,8 +4,8 @@ import {LoggerBase, Semaphore, Utils} from "../../core/utils";
 import SmartELifeClient from "../../core/smart-elife/smart-elife-client";
 import {Device, SmartELifeConfig} from "../../core/interfaces/smart-elife-config";
 import {ClientResponseCode} from "../../core/smart-elife/responses";
-import Timeout = NodeJS.Timeout;
 import {Logging} from "homebridge";
+import Timeout = NodeJS.Timeout;
 
 export default class SmartELifeUiServer extends AbstractUiProvider {
 
@@ -42,7 +42,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
 
         this.log.info(`complex = ${complex}, username: ${username}`);
 
-        const uuid = Utils.generateUUID(username);
+        const uuid = Utils.sha256(Utils.generateUUID(username), "daelim");
 
         this.semaphore.createSemaphore();
         this.semaphoreTimeout = setTimeout(() => {
@@ -66,8 +66,20 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         const response = await this.client.signIn();
         switch(response) {
             case ClientResponseCode.WRONG_RESULT_PASSWORD: {
-                this.server.pushEvent("invalid-authorization", {
-                    "reason": "invalid_username_and_password",
+                this.server.pushEvent("authorization-failed", {
+                    "reason": "invalid-authorization",
+                });
+                break;
+            }
+            case ClientResponseCode.WALLPAD_AUTHORIZATION_PREPARATION_FAILED: {
+                this.server.pushEvent("authorization-failed", {
+                    "reason": "wallpad-preparation-fail",
+                });
+                break;
+            }
+            case ClientResponseCode.INCOMPLETE_USER_INFO: {
+                this.server.pushEvent("authorization-failed", {
+                    "reason": "incomplete-user-info",
                 });
                 break;
             }

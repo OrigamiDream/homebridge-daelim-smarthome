@@ -19,8 +19,8 @@ import * as fs from "fs";
 import {MenuItem} from "./interfaces/menu";
 import axios from "axios";
 import * as https from "node:https";
-import {SmartELifeComplex} from "./interfaces/smart-elife-complex";
 import crypto from "crypto";
+import {createHash} from "node:crypto";
 
 export interface LoggerBase {
     (message: string, ...parameters: any[]): void;
@@ -85,7 +85,7 @@ export class Utils {
 
     public static SMART_ELIFE_AES_KEY = "12345678901234567890123456789012";
     public static SMART_ELIFE_AES_IV = "HrPtH4kvhKjVsPU=";
-    public static SMART_ELIFE_USER_AGENT = "Mozilla/5.0 DAELIM/ANDROID";
+    public static SMART_ELIFE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 9_2 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Mobile/13C75 DAELIM/IOS";
     public static SMART_ELIFE_BASE_URL = "https://smartelife.apt.co.kr";
     public static SMART_ELIFE_APP_VERSION = "1.2.11";
 
@@ -254,11 +254,40 @@ export class Utils {
         }
     }
 
+    static parseJsonSafe(text: string): any {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            throw new Error(`Failed to parse JSON response: ${text}`);
+        }
+    }
+
     static generateUUID(key: string): string {
         return crypto
             .createHash('md5')
             .update(key)
             .digest('hex')
             .toUpperCase();
+    }
+
+    static aes256Base64(plaintext: string, key: string, iv: string, algorithm: string = "aes-256-cbc") {
+        const cipher = crypto.createCipheriv(
+            algorithm,
+            Buffer.from(key, "utf8"),
+            Buffer.from(iv, "utf8"),
+        );
+        const out = Buffer.concat([
+            cipher.update(plaintext, "utf8"),
+            cipher.final(),
+        ]);
+        return out.toString("base64");
+    }
+
+    static sha256(a: string, b: string, enc: BufferEncoding = "utf8"): string {
+        const data = Buffer.concat([
+            Buffer.from(a, enc),
+            Buffer.from(b, enc),
+        ]);
+        return createHash("sha256").update(data).digest("hex");
     }
 }

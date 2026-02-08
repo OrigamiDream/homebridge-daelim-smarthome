@@ -374,8 +374,8 @@ export default class DaelimUiServer extends AbstractUiProvider {
             this.server.pushEvent('invalid-wallpad-passcode', {});
         });
         this.registerErrorListener(Errors.INVALID_USERNAME_AND_PASSWORD, () => {
-            this.server.pushEvent('invalid-authorization', {
-                reason: 'invalid_username_and_password'
+            this.server.pushEvent('authorization-failed', {
+                reason: 'invalid-authorization'
             });
         });
         this.registerErrorListener(Errors.REGISTRATION_NOT_COMPLETED, () => {

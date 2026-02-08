@@ -494,8 +494,10 @@ class AuthorizationPane extends Pane {
         this.provider = provider;
         this.isCompleted = false;
 
-        const errors = [
+        this.errors = [
             { "id": "invalid-authorization", "text": "아이디 혹은 비밀번호가 유효하지 않습니다." },
+            { "id": "wallpad-preparation-fail", "text": "월패드 연결에 실패했습니다. 나중에 다시 시도해주세요." },
+            { "id": "incomplete-user-info", "text": "사용자 정보가 완전하지 않습니다. 앱으로 로그인하여 다시 설정해주세요." },
         ];
         this.pane = document.createElement("div");
         this.pane.classList.add("hidden");
@@ -508,7 +510,7 @@ class AuthorizationPane extends Pane {
                 <label for="password">비밀번호</label>
                 <input class="form-control" type="password" id="password" name="password" autocomplete="password">
             </div>
-            ${this.createNavigation("authorization", { errors })}
+            ${this.createNavigation("authorization", { errors: this.errors })}
         `;
         this.usernameElement = this.pane.querySelector("#username");
         this.usernameElement.value = config.username || "";
@@ -557,9 +559,11 @@ class AuthorizationPane extends Pane {
         });
         this.registerNextNavigation("authorization", async () => {
             window.homebridge.showSpinner();
-            const element = this.pane.querySelector("#invalid-authorization");
-            if(!!element && !element.classList.contains("hidden")) {
-                element.classList.add("hidden");
+            for(const id in this.errors) {
+                const element = document.getElementById(id);
+                if(!!element && !element.classList.contains("hidden")) {
+                    element.classList.add("hidden");
+                }
             }
             await window.homebridge.request(`/${this.provider}/sign-in`, {
                 region: this.config.region,
@@ -568,9 +572,10 @@ class AuthorizationPane extends Pane {
                 password: this.passwordElement.value,
             });
         });
-        this.addHomebridgeListener("invalid-authorization", () => {
+        this.addHomebridgeListener("authorization-failed", (event) => {
+            const reasonId = event["data"].reason;
             window.homebridge.hideSpinner();
-            const element = this.pane.querySelector("#invalid-authorization");
+            const element = document.getElementById(reasonId);
             if(!!element) {
                 element.classList.remove("hidden");
             }
@@ -638,8 +643,7 @@ class WallpadPasscodePane extends Pane {
         if(this.provider === "daelim") {
             this.verifyButton.disabled = this.passcodeElement.value.length < 12;
         } else {
-            // TODO: Find the specific values the length of the passcode on Smart eLife.
-            this.verifyButton.disabled = this.passcodeElement.value.length < 4;
+            this.verifyButton.disabled = this.passcodeElement.value.length < 8;
         }
     }
 
