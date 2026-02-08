@@ -6,7 +6,7 @@ import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
 import {SmartELifeComplex, SmartELifeUserInfo} from "../interfaces/smart-elife-complex";
 import {parseDeviceList, parseRoomAndUserKey, WsKeys} from "./parsers";
-import WebSocketScheduler from "./ws-scheduler";
+import WebSocketScheduler, {Listener as WebSocketListener} from "./ws-scheduler";
 
 export default class SmartELifeClient {
 
@@ -497,7 +497,7 @@ export default class SmartELifeClient {
         const html = await this.fetchServerSideRenderedHTML();
         const deviceList = parseDeviceList(html);
 
-        await this.ws?.wsSendJson({
+        await this.sendWebSocketJson({
             "roomKey": this.roomKey,
             "userKey": this.userKey,
             "accessToken": Utils.SMART_ELIFE_WEB_SOCKET_TOKEN,
@@ -540,5 +540,13 @@ export default class SmartELifeClient {
             return undefined;
         }
         return complexOne[0];
+    }
+
+    async sendWebSocketJson(payload: any) {
+        await this.ws?.wsSendJson(payload);
+    }
+
+    addWebSocketListener(category: string, type: string, listener: WebSocketListener) {
+        this.ws?.addListener(category, type, listener);
     }
 }

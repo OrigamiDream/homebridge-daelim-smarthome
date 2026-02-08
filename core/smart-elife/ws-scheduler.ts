@@ -10,6 +10,14 @@ export interface WebSocketInjector {
     onResilient(client: SmartELifeClient): Promise<ClientResponseCode>;
 }
 
+export type Listener = (data: any) => void;
+
+interface ListenerInfo {
+    category: string
+    type: string
+    listener: Listener
+}
+
 export default class WebSocketScheduler {
 
     private ws?: WebSocket;
@@ -19,6 +27,8 @@ export default class WebSocketScheduler {
     private wsClosedByUser: boolean = false;
     private wsLastAuthRefreshAtMs: number = 0;
     private wsConnectPromise?: Promise<void>;
+
+    private readonly listeners: ListenerInfo[] = [];
 
     constructor(
         private readonly client: SmartELifeClient,
@@ -112,6 +122,10 @@ export default class WebSocketScheduler {
             ws.on("error", onError);
             ws.on("close", onClose);
         });
+    }
+
+    public addListener(category: string, type: string, listener: Listener) {
+        this.listeners.push({ category, type, listener });
     }
 
     public async wsSendJson(payload: any): Promise<void> {
@@ -218,10 +232,13 @@ export default class WebSocketScheduler {
                     }
 
                     const json = Utils.parseJsonSafe(text);
-                    if(json) {
-                        this.log.debug(`[WebSocket] message (JSON): ${JSON.stringify(json)}`);
-                    } else {
-                        this.log.debug(`[WebSocket] message: ${text}`);
+                    this.log.debug(`[WebSocket] message (JSON): ${JSON.stringify(json)}`);
+
+                    const header = json["header"];
+                    for(const info of this.listeners) {
+                        if(info.category === header["category"] && info.type === header["type"]) {
+                            info.listener(json["data"]);
+                        }
                     }
                 });
 
