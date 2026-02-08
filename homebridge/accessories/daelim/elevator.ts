@@ -9,8 +9,8 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
-import {DaelimConfig} from "../../core/interfaces/daelim-config";
-import {ElevatorCallSubTypes, Types} from "../../core/daelim/fields";
+import {DaelimConfig} from "../../../core/interfaces/daelim-config";
+import {ElevatorCallSubTypes, Types} from "../../../core/daelim/fields";
 
 interface ElevatorAccessoryInterface extends AccessoryInterface {
 

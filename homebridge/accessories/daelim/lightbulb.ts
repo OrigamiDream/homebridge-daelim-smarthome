@@ -1,5 +1,5 @@
 import {Accessories, AccessoryInterface} from "./accessories";
-import {DeviceSubTypes, Types} from "../../core/daelim/fields";
+import {DeviceSubTypes, Types} from "../../../core/daelim/fields";
 import {
     API,
     CharacteristicEventTypes,
@@ -10,7 +10,7 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
-import {DaelimConfig} from "../../core/interfaces/daelim-config";
+import {DaelimConfig} from "../../../core/interfaces/daelim-config";
 
 interface LightbulbAccessoryInterface extends AccessoryInterface {
 

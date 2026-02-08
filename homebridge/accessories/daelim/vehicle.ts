@@ -7,8 +7,8 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
-import {DaelimConfig} from "../../core/interfaces/daelim-config";
-import {EventPushTypes, PushTypes} from "../../core/daelim/fields";
+import {DaelimConfig} from "../../../core/interfaces/daelim-config";
+import {EventPushTypes, PushTypes} from "../../../core/daelim/fields";
 
 interface VehicleAccessoryInterface extends AccessoryInterface {
     motionTimer: number

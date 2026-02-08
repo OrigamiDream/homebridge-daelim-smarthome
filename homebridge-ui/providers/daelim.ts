@@ -5,10 +5,10 @@ import {ErrorCallback, NetworkHandler, ResponseCallback} from "../../core/daelim
 import {LoggerBase, Semaphore, Utils} from "../../core/utils";
 import Timeout = NodeJS.Timeout;
 import {MenuItem} from "../../core/interfaces/menu";
-import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME, ELEVATOR_MENU_NAME} from "../../homebridge/accessories/elevator";
-import {DOOR_DEVICES} from "../../homebridge/accessories/door";
-import {VEHICLE_DEVICE_ID, VEHICLE_DISPLAY_NAME} from "../../homebridge/accessories/vehicle";
-import {CAMERA_DEVICES} from "../../homebridge/accessories/camera";
+import {ELEVATOR_DEVICE_ID, ELEVATOR_DISPLAY_NAME, ELEVATOR_MENU_NAME} from "../../homebridge/accessories/daelim/elevator";
+import {DOOR_DEVICES} from "../../homebridge/accessories/daelim/door";
+import {VEHICLE_DEVICE_ID, VEHICLE_DISPLAY_NAME} from "../../homebridge/accessories/daelim/vehicle";
+import {CAMERA_DEVICES} from "../../homebridge/accessories/daelim/camera";
 import {DeviceSubTypes, Errors, LoginSubTypes, SubTypes, Types} from "../../core/daelim/fields";
 
 interface ClientAuthorization {

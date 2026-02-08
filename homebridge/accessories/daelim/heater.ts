@@ -1,6 +1,6 @@
 import {HeaterCoolerAccessories, HeaterCoolerAccessoryInterface} from "./heater-cooler";
 import {API, Characteristic, CharacteristicValue, Logging, PlatformAccessory} from "homebridge";
-import {DaelimConfig} from "../../core/interfaces/daelim-config";
+import {DaelimConfig} from "../../../core/interfaces/daelim-config";
 import {WithUUID} from "hap-nodejs";
 
 export class HeaterAccessories extends HeaterCoolerAccessories {

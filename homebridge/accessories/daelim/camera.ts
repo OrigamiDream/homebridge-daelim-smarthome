@@ -27,13 +27,13 @@ import {
     StreamRequestTypes,
     VideoInfo
 } from "homebridge";
-import {CameraConfig, DaelimConfig, defaultCameraConfig} from "../../core/interfaces/daelim-config";
-import {EventPushTypes, InfoSubTypes, PushTypes, Types} from "../../core/daelim/fields";
+import {CameraConfig, DaelimConfig, defaultCameraConfig} from "../../../core/interfaces/daelim-config";
+import {EventPushTypes, InfoSubTypes, PushTypes, Types} from "../../../core/daelim/fields";
 import ffmpegPath from "ffmpeg-for-homebridge";
 import pickPort, {pickPortOptions} from "pick-port";
 import {ChildProcessWithoutNullStreams, spawn} from "child_process";
 import axios from "axios";
-import {Utils} from "../../core/utils";
+import {Utils} from "../../../core/utils";
 import {Writable} from "stream";
 import readline from "readline";
 import {createSocket, Socket} from "dgram";

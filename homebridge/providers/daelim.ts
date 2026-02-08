@@ -1,20 +1,20 @@
 import AbstractProvider from "./provider";
 import {API, Logging, PlatformAccessory, PlatformConfig} from "homebridge";
 import {DaelimClient} from "../../core/daelim/daelim-client";
-import {Accessories, AccessoryInterface} from "../accessories/accessories";
+import {Accessories, AccessoryInterface} from "../accessories/daelim/accessories";
 import {DaelimConfig} from "../../core/interfaces/daelim-config";
 import {Utils} from "../../core/utils";
 import PushReceiver from "@eneris/push-receiver";
-import {LightbulbAccessories} from "../accessories/lightbulb";
-import {OutletAccessories} from "../accessories/outlet";
-import {HeaterAccessories} from "../accessories/heater";
-import {CoolerAccessories} from "../accessories/cooler";
-import {GasAccessories} from "../accessories/gas";
-import {FanAccessories} from "../accessories/fan";
-import {ElevatorAccessories} from "../accessories/elevator";
-import {DoorAccessories} from "../accessories/door";
-import {VehicleAccessories} from "../accessories/vehicle";
-import {CameraAccessories} from "../accessories/camera";
+import {LightbulbAccessories} from "../accessories/daelim/lightbulb";
+import {OutletAccessories} from "../accessories/daelim/outlet";
+import {HeaterAccessories} from "../accessories/daelim/heater";
+import {CoolerAccessories} from "../accessories/daelim/cooler";
+import {GasAccessories} from "../accessories/daelim/gas";
+import {FanAccessories} from "../accessories/daelim/fan";
+import {ElevatorAccessories} from "../accessories/daelim/elevator";
+import {DoorAccessories} from "../accessories/daelim/door";
+import {VehicleAccessories} from "../accessories/daelim/vehicle";
+import {CameraAccessories} from "../accessories/daelim/camera";
 
 export default class DaelimProvider extends AbstractProvider {
 

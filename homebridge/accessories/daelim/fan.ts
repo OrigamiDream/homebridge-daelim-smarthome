@@ -9,8 +9,8 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
-import {DaelimConfig} from "../../core/interfaces/daelim-config";
-import {DeviceSubTypes, Types} from "../../core/daelim/fields";
+import {DaelimConfig} from "../../../core/interfaces/daelim-config";
+import {DeviceSubTypes, Types} from "../../../core/daelim/fields";
 
 export const FAN_MENU_NAME = "환기";
 export const FAN_ROTATION_SPEED_UNIT = 100 / 3.0;
