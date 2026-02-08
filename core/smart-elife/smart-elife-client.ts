@@ -5,6 +5,8 @@ import {ClientResponseCode} from "./responses";
 import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
 import {SmartELifeComplex, SmartELifeUserInfo} from "../interfaces/smart-elife-complex";
+import {parseDeviceList, parseRoomAndUserKey, WsKeys} from "./parsers";
+import WebSocketScheduler from "./ws-scheduler";
 
 export default class SmartELifeClient {
 
@@ -33,6 +35,9 @@ export default class SmartELifeClient {
     // WallPad authorization temporary keys
     private userKey?: string;
     private roomKey?: string;
+    private serverSideRenderedHTML?: string;
+
+    private readonly ws?: WebSocketScheduler;
 
     private readonly baseUrl = Utils.SMART_ELIFE_BASE_URL;
     private readonly key = Utils.SMART_ELIFE_AES_KEY;
@@ -40,7 +45,8 @@ export default class SmartELifeClient {
 
     constructor(private readonly log: Logging | LoggerBase,
                 private readonly config: SmartELifeConfig,
-                private readonly push?: PushReceiver) {
+                private readonly push?: PushReceiver,
+                useWebSocket: boolean = true) {
         this.httpBody = {
             "input_dv_make_info": "Apple",
             "input_dv_model_info": "iPhone18,4",
@@ -49,6 +55,34 @@ export default class SmartELifeClient {
             "input_push_token": this.push?.fcmToken ?? "",
             "input_dv_uuid": Utils.generateUUID(this.config.username),
         };
+        if(useWebSocket) {
+            this.ws = this.createWebSocketScheduler();
+        }
+    }
+
+    private createWebSocketScheduler() {
+        return new WebSocketScheduler(this, this.baseUrl, this.log, {
+            getJSessionId(client: SmartELifeClient): string | undefined {
+                return client.jsessionId;
+            },
+            async onRefresh(client: SmartELifeClient): Promise<ClientResponseCode> {
+                return await client.signIn();
+            },
+            async onResilient(client: SmartELifeClient): Promise<ClientResponseCode> {
+                if(!client.accessToken) {
+                    return await client.signIn();
+                }
+                return ClientResponseCode.SUCCESS;
+            }
+        });
+    }
+
+    public static createForUI(log: Logging | LoggerBase, config: SmartELifeConfig) {
+        return new SmartELifeClient(log, config, undefined, false);
+    }
+
+    public static create(log: Logging | LoggerBase, config: SmartELifeConfig, push: PushReceiver) {
+        return new SmartELifeClient(log, config, push, true);
     }
 
     private applySessionCookie(options: any) {
@@ -187,7 +221,7 @@ export default class SmartELifeClient {
 
     private async fetchCSRFInplace() {
         const url = `${this.baseUrl}/common/nativeToken.ajax`;
-        const response = await fetch(url, {
+        const response = await this.fetchWithJSessionId(url, {
             method: "POST",
             headers: this.httpHeaders,
         });
@@ -223,7 +257,7 @@ export default class SmartELifeClient {
             method: "POST",
             headers: {
                 ...this.httpHeaders,
-                "_csrf": await this.getCsrfToken(),
+                "_csrf": await this.getCsrfToken(true),
             },
             body: JSON.stringify({
                 ...this.httpBody,
@@ -244,7 +278,9 @@ export default class SmartELifeClient {
                     this.log.warn(`You may registered multiple homes. Requires to choose a home: ${JSON.stringify(homeList, null, 2)}`);
                     return ClientResponseCode.INCOMPLETE_USER_INFO;
                 }
-                return this.updateAuthorizationAndUserInfo(response);
+                const responseCode = this.updateAuthorizationAndUserInfo(response);
+                await this.attemptsParsingRoomAndUserKeys();
+                return responseCode;
             }
             case ClientResponseCode.UNCERTIFIED_WALLPAD: {
                 this.userKey = response["userkey"];
@@ -261,6 +297,30 @@ export default class SmartELifeClient {
         }
         this.log.warn("Unexpected client response code had been returned: %s", code);
         return code;
+    }
+
+    private async attemptsParsingRoomAndUserKeys() {
+        if(this.config.userKey && this.config.roomKey) {
+            this.userKey = this.config.userKey;
+            this.roomKey = this.config.roomKey;
+            return;
+        }
+        const html = await this.fetchServerSideRenderedHTML();
+        const { userKey, roomKey } = parseRoomAndUserKey(html);
+
+        // Inject.
+        this.userKey = userKey;
+        this.roomKey = roomKey;
+    }
+
+    public getRoomAndUserKeys(): WsKeys {
+        // This variables will be initialized after `sign-in` succeeded.
+        if(!this.userKey) throw new Error("`userKey` not parsed yet.");
+        if(!this.roomKey) throw new Error("`roomKey` not parsed yet.");
+        return {
+            userKey: this.userKey,
+            roomKey: this.roomKey,
+        }
     }
 
     private async requestWallpadAuthorization() {
@@ -327,13 +387,16 @@ export default class SmartELifeClient {
     }
 
     private getTimestamp() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const date = String(now.getDate()).padStart(2, "0");
-        const hours = String(now.getHours()).padStart(2, "0");
-        const minutes = String(now.getMinutes()).padStart(2, "0");
-        const seconds = String(now.getSeconds()).padStart(2, "0");
+        // Smart eLife tokens embed a yyyyMMddHHmmss timestamp.
+        // Use Asia/Seoul time (KST, UTC+9) regardless of the host machine timezone.
+        const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+
+        const year = now.getUTCFullYear();
+        const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+        const date = String(now.getUTCDate()).padStart(2, "0");
+        const hours = String(now.getUTCHours()).padStart(2, "0");
+        const minutes = String(now.getUTCMinutes()).padStart(2, "0");
+        const seconds = String(now.getUTCSeconds()).padStart(2, "0");
         return `${year}${month}${date}${hours}${minutes}${seconds}`;
     }
 
@@ -344,6 +407,10 @@ export default class SmartELifeClient {
         }
         const payload = `${this.accessToken}::${this.getTimestamp()}`;
         return Utils.aes256Base64(payload, this.key, this.iv);
+    }
+
+    private getDevicePrimaryKey(): string {
+        return Utils.aes256Base64(this.config.uuid, this.key, this.iv);
     }
 
     async serve() {
@@ -391,6 +458,51 @@ export default class SmartELifeClient {
                 this.userInfo.apartment.unit);
             this.log.debug("JSON: %s", JSON.stringify(this.userInfo, null, 2));
         }
+
+        if(this.ws) {
+            await this.ws.serve();
+            await this.refreshDeviceStatus();
+        }
+    }
+
+    private async fetchServerSideRenderedHTML() {
+        if(this.serverSideRenderedHTML) {
+            return this.serverSideRenderedHTML;
+        }
+        const html = await this.fetchWithJSessionId(`${this.baseUrl}/main/home.do`, {
+            method: "GET",
+            headers: {
+                "User-Agent": Utils.SMART_ELIFE_USER_AGENT,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Sec-Fetch-Site": "none",
+                "Accept-Language": "ko-KR,ko;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Sec-Fetch-Mode": "navigate",
+                "Host": "smartelife.apt.co.kr",
+                "Connection": "keep-alive",
+                "Sec-Fetch-Dest": "document",
+                "_csrf": await this.getCsrfToken(),
+                "Authorization": `Bearer ${this.getAccessToken()}`,
+                "dpk": this.getDevicePrimaryKey(),
+            }
+        }).then((response) => response.text());
+        this.serverSideRenderedHTML = html;
+        return html;
+    }
+
+    private async refreshDeviceStatus() {
+        if(!this.ws) {
+            return;
+        }
+        const html = await this.fetchServerSideRenderedHTML();
+        const deviceList = parseDeviceList(html);
+
+        await this.ws?.wsSendJson({
+            "roomKey": this.roomKey,
+            "userKey": this.userKey,
+            "accessToken": Utils.SMART_ELIFE_WEB_SOCKET_TOKEN,
+            "data": deviceList,
+        });
     }
 
     async fetchDevices(): Promise<Device[]> {

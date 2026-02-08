@@ -88,6 +88,7 @@ export class Utils {
     public static SMART_ELIFE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 9_2 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Mobile/13C75 DAELIM/IOS";
     public static SMART_ELIFE_BASE_URL = "https://smartelife.apt.co.kr";
     public static SMART_ELIFE_APP_VERSION = "1.2.11";
+    public static SMART_ELIFE_WEB_SOCKET_TOKEN = "ITJVlrLjVwhdRrevNsFC81pMJEqdyDkkDtlGyf3ikn";
 
     public static DAELIM_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/feature/smart-elife/complexes/daelim/complexes.json";
     public static SMART_ELIFE_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/feature/smart-elife/complexes/smart-elife/complexes.json";

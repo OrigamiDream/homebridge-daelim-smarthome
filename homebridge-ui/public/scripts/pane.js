@@ -597,11 +597,16 @@ class AuthorizationPane extends Pane {
             this.isCompleted = true;
 
             console.log("Sign-in successful.");
-            await this.advance({
+            const newOptions = {
                 username: this.usernameElement.value,
                 password: this.passwordElement.value,
                 uuid: event["data"].uuid,
-            }, this.nextPane());
+            }
+            if(this.provider === "smart-elife") {
+                newOptions["roomKey"] = event["data"].roomKey;
+                newOptions["userKey"] = event["data"].userKey;
+            }
+            await this.advance(newOptions, this.nextPane());
         });
     }
 }
@@ -672,6 +677,9 @@ class WallpadPasscodePane extends Pane {
             stopTimer();
             window.homebridge.showSpinner();
             await window.homebridge.request(`/${this.config.provider}/passcode`, {
+                complex: this.config.complex,
+                username: this.config.username,
+                password: this.config.password,
                 passcode: this.passcodeElement.value,
             });
         });
@@ -686,9 +694,14 @@ class WallpadPasscodePane extends Pane {
             this.verifyButton.disabled = true;
 
             console.log("Sign-in successful.");
-            await this.advance({
+            const newOptions = {
                 uuid: event["data"].uuid,
-            }, this.nextPane());
+            }
+            if(this.provider === "smart-elife") {
+                newOptions["roomKey"] = event["data"].roomKey;
+                newOptions["userKey"] = event["data"].userKey;
+            }
+            await this.advance(newOptions, this.nextPane());
         });
     }
 

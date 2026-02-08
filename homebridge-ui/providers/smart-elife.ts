@@ -71,7 +71,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
             version: Utils.currentSemanticVersion(),
             devices: this.devices,
         };
-        this.client = new SmartELifeClient(this.log, config);
+        this.client = SmartELifeClient.createForUI(this.log, config);
 
         const response = await this.client.signIn();
         switch(response) {
@@ -107,8 +107,10 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
             }
         }
 
+        const { roomKey, userKey } = this.client.getRoomAndUserKeys();
+
         // On success
-        this.server.pushEvent("complete", { uuid: uuid });
+        this.server.pushEvent("complete", { uuid, roomKey, userKey });
 
         // Set up devices
         const devices = this.configureInitialDevices();
@@ -124,7 +126,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
     }
 
     async authorizePasscode(p: any) {
-        const { passcode } = p;
+        const { passcode, ...rests } = p;
         if(!this.client) {
             this.log.error("Unexpected access to wallpad authorization.");
             return;
@@ -132,7 +134,11 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         const response = await this.client.authorizeWallpadPasscode(passcode);
         switch(response) {
             case ClientResponseCode.SUCCESS: {
+                await this.signIn(rests);
                 break;
+            }
+            default: {
+                this.server.pushEvent("invalid-wallpad-passcode", {});
             }
         }
     }

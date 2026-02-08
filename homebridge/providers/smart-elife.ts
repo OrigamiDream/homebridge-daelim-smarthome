@@ -31,6 +31,8 @@ export default class SmartELifeProvider extends AbstractProvider {
             username: config["username"],
             password: config["password"],
             uuid: config["uuid"],
+            roomKey: config["roomKey"], // nullable
+            userKey: config["userKey"], // nullable
             version: Utils.currentSemanticVersion(),
             devices: config["devices"] || [],
         };
@@ -58,7 +60,7 @@ export default class SmartELifeProvider extends AbstractProvider {
             },
             credentials: undefined,
         });
-        this.client = new SmartELifeClient(this.log, this.config, push);
+        this.client = SmartELifeClient.create(this.log, this.config, push);
 
         const response = await this.client.signIn();
         if(response !== ClientResponseCode.SUCCESS) {
