@@ -1,9 +1,8 @@
-import SmartELifeClient from "../../../core/smart-elife/smart-elife-client";
+import SmartELifeClient, {Listener} from "../../../core/smart-elife/smart-elife-client";
 import {API, Logging, PlatformAccessory, Service} from "homebridge";
 import {Device, DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {WithUUID} from "hap-nodejs";
 import {Utils} from "../../../core/utils";
-import {Listener} from "../../../core/smart-elife/ws-scheduler";
 
 export interface AccessoryInterface {
     displayName: string
@@ -177,7 +176,7 @@ export default class Accessories<T extends AccessoryInterface> {
 
     protected async sendWsJson(payload: any) {
         const { userKey, roomKey } = this.client.getRoomAndUserKeys();
-        await this.client.sendWebSocketJson({
+        await this.client.sendJson({
             roomKey, userKey,
             accessToken: Utils.SMART_ELIFE_WEB_SOCKET_TOKEN,
             data: payload,
@@ -189,7 +188,7 @@ export default class Accessories<T extends AccessoryInterface> {
     }
 
     protected addListener(listener: Listener) {
-        this.client.addWebSocketListener(this.deviceType, listener);
+        this.client.addListener(this.deviceType, listener);
     }
 
     register() {

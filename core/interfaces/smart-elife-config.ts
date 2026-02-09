@@ -25,6 +25,7 @@ export enum DeviceType {
     LIGHT = "light",
     GAS = "gas",
     AIR_CONDITIONER = "aircon",
+    AIR_CONDITIONER_2 = "aircon2",
     VENT = "vent",
     ALL_OFF_SWITCH = "alloffswitch",
 }
@@ -37,6 +38,7 @@ export namespace DeviceType {
             case "light": return DeviceType.LIGHT;
             case "gas": return DeviceType.GAS;
             case "aircon": return DeviceType.AIR_CONDITIONER;
+            case "aircon2": return DeviceType.AIR_CONDITIONER_2;
             case "vent": return DeviceType.VENT;
             case "alloffswitch": return DeviceType.ALL_OFF_SWITCH;
             default:

@@ -3,19 +3,12 @@ import {LoggerBase, Utils} from "../utils";
 import {ClientResponseCode} from "./responses";
 import {Logging} from "homebridge";
 import SmartELifeClient from "./smart-elife-client";
-import {DeviceType} from "../interfaces/smart-elife-config";
 
 export interface WebSocketInjector {
     getJSessionId(client: SmartELifeClient): string | undefined;
     onRefresh(client: SmartELifeClient): Promise<ClientResponseCode>;
     onResilient(client: SmartELifeClient): Promise<ClientResponseCode>;
-}
-
-export type Listener = (data: any) => void;
-
-interface ListenerInfo {
-    deviceType: DeviceType
-    listener: Listener
+    onMessage(client: SmartELifeClient, json: any): void;
 }
 
 export default class WebSocketScheduler {
@@ -27,8 +20,6 @@ export default class WebSocketScheduler {
     private wsClosedByUser: boolean = false;
     private wsLastAuthRefreshAtMs: number = 0;
     private wsConnectPromise?: Promise<void>;
-
-    private readonly listeners: ListenerInfo[] = [];
 
     constructor(
         private readonly client: SmartELifeClient,
@@ -122,10 +113,6 @@ export default class WebSocketScheduler {
             ws.on("error", onError);
             ws.on("close", onClose);
         });
-    }
-
-    public addListener(deviceType: DeviceType, listener: Listener) {
-        this.listeners.push({ deviceType, listener });
     }
 
     public async wsSendJson(payload: any): Promise<void> {
@@ -233,13 +220,7 @@ export default class WebSocketScheduler {
 
                     const json = Utils.parseJsonSafe(text);
                     this.log.debug(`[WebSocket] message (JSON): ${JSON.stringify(json)}`);
-
-                    const header = json["header"];
-                    for(const info of this.listeners) {
-                        if(info.deviceType.toString() === header["type"]) {
-                            info.listener(json["data"]);
-                        }
-                    }
+                    this.injector.onMessage(this.client, json);
                 });
 
                 ws.on("close", (code: number, reason: Buffer) => {

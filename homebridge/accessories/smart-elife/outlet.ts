@@ -70,7 +70,7 @@ export default class OutletAccessories extends Accessories<OutletAccessoryInterf
     register() {
         super.register();
 
-        this.addListener((data) => {
+        this.addListener((data: any) => {
             const devices = this.parseDevices(data);
             for(const device of devices) {
                 const accessory = this.addOrGetAccessory({

@@ -6,7 +6,14 @@ import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
 import {SmartELifeComplex, SmartELifeUserInfo} from "../interfaces/smart-elife-complex";
 import {parseDeviceList, parseRoomAndUserKey, WsKeys} from "./parsers";
-import WebSocketScheduler, {Listener as WebSocketListener} from "./ws-scheduler";
+import WebSocketScheduler from "./ws-scheduler";
+
+export type Listener = (data: any) => void;
+
+interface ListenerInfo {
+    deviceType: DeviceType
+    listener: Listener
+}
 
 export default class SmartELifeClient {
 
@@ -38,6 +45,7 @@ export default class SmartELifeClient {
     private serverSideRenderedHTML?: string;
 
     private readonly ws?: WebSocketScheduler;
+    private readonly listeners: ListenerInfo[] = [];
 
     private readonly baseUrl = Utils.SMART_ELIFE_BASE_URL;
     private readonly key = Utils.SMART_ELIFE_AES_KEY;
@@ -73,6 +81,25 @@ export default class SmartELifeClient {
                     return await client.signIn();
                 }
                 return ClientResponseCode.SUCCESS;
+            },
+            async onMessage(client: SmartELifeClient, json: any) {
+                const header = json["header"];
+                const action = json["action"];
+                let deviceType;
+                if(!!header) {
+                    deviceType = DeviceType.parse(header["type"]);
+                } else if(!!action && action.startsWith("event_")) {
+                    deviceType = DeviceType.parse(action.trimStart("event_"));
+                } else {
+                    client.log.warn("Unexpected message format: %s", JSON.stringify(json));
+                    return;
+                }
+
+                for(const info of client.listeners) {
+                    if(info.deviceType === deviceType) {
+                        info.listener(json["data"]);
+                    }
+                }
             }
         });
     }
@@ -412,9 +439,9 @@ export default class SmartELifeClient {
         return Utils.aes256Base64(this.config.uuid, this.key, this.iv);
     }
 
-    async serve() {
+    private async configurePushNotification() {
         if(this.push) {
-            this.log("Setting up Push notification receiver...");
+            this.log("Configuring Push");
 
             this.push.onNotification((notification) => {
                 const orig = notification.message;
@@ -443,6 +470,12 @@ export default class SmartELifeClient {
                 this.log.error("Could not update Push token.");
             }
         }
+    }
+
+    async serve() {
+        this.configurePushNotification().then(() => {
+            this.log("Push notification configured.");
+        });
         this.complex = await this.fetchComplex();
         if(this.complex) {
             this.log(`Complex: ${this.complex.complexDisplayName}`);
@@ -494,7 +527,7 @@ export default class SmartELifeClient {
             return;
         }
         const deviceList = parseDeviceList(await this.fetchServerSideRenderedHTML());
-        await this.sendWebSocketJson({
+        await this.sendJson({
             "roomKey": this.roomKey,
             "userKey": this.userKey,
             "accessToken": Utils.SMART_ELIFE_WEB_SOCKET_TOKEN,
@@ -552,11 +585,11 @@ export default class SmartELifeClient {
         return response["result"] as boolean;
     }
 
-    async sendWebSocketJson(payload: any) {
+    async sendJson(payload: any) {
         await this.ws?.wsSendJson(payload);
     }
 
-    addWebSocketListener(deviceType: DeviceType, listener: WebSocketListener) {
-        this.ws?.addListener(deviceType, listener);
+    addListener(deviceType: DeviceType, listener: Listener) {
+        this.listeners.push({ deviceType, listener });
     }
 }
