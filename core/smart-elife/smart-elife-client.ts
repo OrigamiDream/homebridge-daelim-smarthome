@@ -89,7 +89,7 @@ export default class SmartELifeClient {
                 if(!!header) {
                     deviceType = DeviceType.parse(header["type"]);
                 } else if(!!action && action.startsWith("event_")) {
-                    deviceType = DeviceType.parse(action.trimStart("event_"));
+                    deviceType = DeviceType.parse(action.slice("event_".length));
                 } else {
                     client.log.warn("Unexpected message format: %s", JSON.stringify(json));
                     return;
