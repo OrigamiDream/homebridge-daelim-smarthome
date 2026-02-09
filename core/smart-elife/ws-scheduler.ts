@@ -3,6 +3,7 @@ import {LoggerBase, Utils} from "../utils";
 import {ClientResponseCode} from "./responses";
 import {Logging} from "homebridge";
 import SmartELifeClient from "./smart-elife-client";
+import {DeviceType} from "../interfaces/smart-elife-config";
 
 export interface WebSocketInjector {
     getJSessionId(client: SmartELifeClient): string | undefined;
@@ -13,8 +14,7 @@ export interface WebSocketInjector {
 export type Listener = (data: any) => void;
 
 interface ListenerInfo {
-    category: string
-    type: string
+    deviceType: DeviceType
     listener: Listener
 }
 
@@ -124,8 +124,8 @@ export default class WebSocketScheduler {
         });
     }
 
-    public addListener(category: string, type: string, listener: Listener) {
-        this.listeners.push({ category, type, listener });
+    public addListener(deviceType: DeviceType, listener: Listener) {
+        this.listeners.push({ deviceType, listener });
     }
 
     public async wsSendJson(payload: any): Promise<void> {
@@ -137,7 +137,7 @@ export default class WebSocketScheduler {
         await this.waitForWebSocketOpen(ws, 10_000);
 
         await new Promise<void>((resolve, reject) => {
-            this.log.debug(`WEBSOCKET :: Send :: ${JSON.stringify(payload)}`)
+            this.log.debug(`[WebSocket] :: Send :: ${JSON.stringify(payload)}`)
             ws.send(JSON.stringify(payload), (err?: Error) => {
                 if(err) {
                     reject(err);
@@ -236,7 +236,7 @@ export default class WebSocketScheduler {
 
                     const header = json["header"];
                     for(const info of this.listeners) {
-                        if(info.category === header["category"] && info.type === header["type"]) {
+                        if(info.deviceType.toString() === header["type"]) {
                             info.listener(json["data"]);
                         }
                     }

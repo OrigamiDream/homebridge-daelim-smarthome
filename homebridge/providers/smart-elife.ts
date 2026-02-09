@@ -5,10 +5,12 @@ import {Utils} from "../../core/utils";
 import PushReceiver from "@eneris/push-receiver";
 import SmartELifeClient from "../../core/smart-elife/smart-elife-client";
 import {ClientResponseCode} from "../../core/smart-elife/responses";
+import Accessories, {AccessoryInterface} from "../accessories/smart-elife/accessories";
 
 export default class SmartELifeProvider extends AbstractProvider {
 
     private readonly config?: SmartELifeConfig;
+    private readonly accessories: Accessories<AccessoryInterface>[] = [];
     private client?: SmartELifeClient;
 
     constructor(log: Logging, platformConfig: PlatformConfig, api: API) {
@@ -39,7 +41,17 @@ export default class SmartELifeProvider extends AbstractProvider {
     }
 
     configureAccessory(accessory: PlatformAccessory) {
-        // TODO: Implement `configureAccessory()`
+        for(const accessories of this.accessories) {
+            if(accessories.deviceType !== accessory.context.deviceType) {
+                continue;
+            }
+            const services = accessories.serviceTypes.map((service) => {
+                return accessory.getService(service) || accessory.addService(service, accessory.displayName, service.UUID);
+            });
+            if(services.length > 0) {
+                accessories.configureAccessory(accessory, services);
+            }
+        }
     }
 
     protected async serve(): Promise<void> {
@@ -68,7 +80,10 @@ export default class SmartELifeProvider extends AbstractProvider {
             return;
         }
 
-        // TODO: Add accessories.
+        this.accessories.forEach(accessories => {
+            accessories.client = this.client!;
+            accessories.register();
+        });
 
         await this.client.serve();
     }

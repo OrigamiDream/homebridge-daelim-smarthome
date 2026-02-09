@@ -1,6 +1,6 @@
 import fetch, {Response} from "node-fetch";
 import {LoggerBase, Utils} from "../utils";
-import {Device, DeviceItemType, DeviceType, SmartELifeConfig} from "../interfaces/smart-elife-config";
+import {Device, DeviceType, SmartELifeConfig} from "../interfaces/smart-elife-config";
 import {ClientResponseCode} from "./responses";
 import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
@@ -305,8 +305,7 @@ export default class SmartELifeClient {
             this.roomKey = this.config.roomKey;
             return;
         }
-        const html = await this.fetchServerSideRenderedHTML();
-        const { userKey, roomKey } = parseRoomAndUserKey(html);
+        const { userKey, roomKey } = parseRoomAndUserKey(await this.fetchServerSideRenderedHTML());
 
         // Inject.
         this.userKey = userKey;
@@ -494,9 +493,7 @@ export default class SmartELifeClient {
         if(!this.ws) {
             return;
         }
-        const html = await this.fetchServerSideRenderedHTML();
-        const deviceList = parseDeviceList(html);
-
+        const deviceList = parseDeviceList(await this.fetchServerSideRenderedHTML());
         await this.sendWebSocketJson({
             "roomKey": this.roomKey,
             "userKey": this.userKey,
@@ -506,28 +503,24 @@ export default class SmartELifeClient {
     }
 
     async fetchDevices(): Promise<Device[]> {
-        const response = await this.fetchJson(`${this.baseUrl}/api/widget`, {
-            method: "POST",
-            headers: {
-                ...this.httpHeaders,
-                "Authorization": `Bearer ${this.getAccessToken()}`,
-            },
-            body: JSON.stringify({
-                "method": "devices",
-            }),
-        });
-        const data = response["data"] as any[];
-        return data
-            .map((e: any) => {
-                return {
-                    displayName: e["alias"],
-                    deviceType: DeviceType.parse(e["type"]),
-                    deviceItemType: DeviceItemType.parse(e["item"]),
-                    uid: e["uid"],
+        const deviceList: any[] = parseDeviceList(await this.fetchServerSideRenderedHTML());
+        const fetchedDevices: Device[] = [];
+        for(const deviceGroup of deviceList) {
+            const deviceType = DeviceType.parse(deviceGroup["type"]);
+            if(deviceType === DeviceType.ALL_OFF_SWITCH) continue;
+
+            for(const device of deviceGroup["devices"]) {
+                this.log.info(JSON.stringify(device));
+                fetchedDevices.push({
+                    displayName: `${device["location_name"]} ${device["device_name"]}`,
+                    name: device["device_name"],
+                    deviceType: deviceType,
+                    deviceId: device["uid"],
                     disabled: false,
-                }
-            })
-            .filter((dev) => dev.deviceType === DeviceType.DEVICE);
+                });
+            }
+        }
+        return fetchedDevices;
     }
 
     private async fetchComplex() {
@@ -542,11 +535,28 @@ export default class SmartELifeClient {
         return complexOne[0];
     }
 
+    async sendDeviceControl(device: Device, op: any): Promise<boolean> {
+        const response = await this.fetchJson(`${this.baseUrl}/device/control.ajax`, {
+            method: "POST",
+            headers: {
+                ...this.httpHeaders,
+                "_csrf": await this.getCsrfToken(),
+                "daelim_elife": this.accessToken,
+            },
+            data: JSON.stringify({
+                type: device.deviceType.toString(),
+                uid: device.deviceId,
+                operation: op,
+            }),
+        });
+        return response["result"] as boolean;
+    }
+
     async sendWebSocketJson(payload: any) {
         await this.ws?.wsSendJson(payload);
     }
 
-    addWebSocketListener(category: string, type: string, listener: WebSocketListener) {
-        this.ws?.addListener(category, type, listener);
+    addWebSocketListener(deviceType: DeviceType, listener: WebSocketListener) {
+        this.ws?.addListener(deviceType, listener);
     }
 }
