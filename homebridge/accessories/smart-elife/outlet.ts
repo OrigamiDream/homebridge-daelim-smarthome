@@ -62,6 +62,7 @@ export default class OutletAccessories extends Accessories<OutletAccessoryInterf
                 const context = this.getAccessoryInterface(accessory);
                 if(!context.init) {
                     callback(new Error("Not initialized."));
+                    return;
                 }
                 callback(undefined, context.on);
             });
@@ -77,16 +78,13 @@ export default class OutletAccessories extends Accessories<OutletAccessoryInterf
                     deviceId: device.deviceId,
                     deviceType: device.deviceType,
                     displayName: device.displayName,
-                    init: false,
-                    on: false,
+                    init: true,
+                    on: device.op["status"] === "on",
                 });
                 if(!accessory)
                     continue;
 
                 const context = this.getAccessoryInterface(accessory);
-                context.on = device.op["status"] === "on";
-                context.init = true;
-
                 const service = accessory.getService(this.api.hap.Service.Outlet);
                 service?.setCharacteristic(this.api.hap.Characteristic.On, context.on);
             }
