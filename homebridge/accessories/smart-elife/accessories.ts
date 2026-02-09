@@ -15,6 +15,7 @@ export interface DeviceWithOp extends Device {
     op: any;
 }
 
+export type DeviceListener = (devices: DeviceWithOp[]) => void;
 export type ServiceType = WithUUID<typeof Service>;
 
 const POLLING_INTERVAL_MILLISECONDS = 60 * 1000;
@@ -191,6 +192,12 @@ export default class Accessories<T extends AccessoryInterface> {
 
     protected addListener(listener: Listener) {
         this.client.addListener(this.deviceType, listener);
+    }
+
+    protected addDeviceListener(deviceListener: DeviceListener) {
+        this.addListener((data: any) => {
+            deviceListener(this.parseDevices(data));
+        });
     }
 
     protected defer(deviceId: string, task: Promise<boolean>) {

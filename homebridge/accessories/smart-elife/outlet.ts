@@ -13,8 +13,7 @@ export default class OutletAccessories extends SwitchableAccessories<OutletAcces
     register() {
         super.register();
 
-        this.addListener((data: any) => {
-            const devices = this.parseDevices(data);
+        this.addDeviceListener((devices) => {
             for(const device of devices) {
                 const accessory = this.addOrGetAccessory({
                     deviceId: device.deviceId,

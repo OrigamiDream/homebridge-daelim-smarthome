@@ -175,8 +175,7 @@ export default class LightbulbAccessories extends SwitchableAccessories<Lightbul
     register() {
         super.register();
 
-        this.addListener((data: any) => {
-            const devices = this.parseDevices(data);
+        this.addDeviceListener((devices) => {
             for(const device of devices) {
                 const values = this.parseLightbulbValue(device.op["value"]);
                 const accessory = this.addOrGetAccessory({
