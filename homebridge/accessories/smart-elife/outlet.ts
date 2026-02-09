@@ -1,71 +1,13 @@
-import Accessories, {AccessoryInterface} from "./accessories";
 import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
-import {
-    API, CharacteristicEventTypes, CharacteristicGetCallback,
-    CharacteristicSetCallback, CharacteristicValue, Logging, PlatformAccessory, Service
-} from "homebridge";
+import {API, Logging} from "homebridge";
+import {SwitchableAccessories, SwitchableAccessoryInterface} from "./switchable-accessories";
 
-interface OutletAccessoryInterface extends AccessoryInterface {
-    on: boolean
-}
+interface OutletAccessoryInterface extends SwitchableAccessoryInterface {}
 
-export default class OutletAccessories extends Accessories<OutletAccessoryInterface> {
+export default class OutletAccessories extends SwitchableAccessories<OutletAccessoryInterface> {
+
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
-        super(log, api, config, DeviceType.WALL_SOCKET, [api.hap.Service.Outlet]);
-    }
-
-    async identify(accessory: PlatformAccessory): Promise<void> {
-        await super.identify(accessory);
-
-        const context = this.getAccessoryInterface(accessory);
-        for(const on of [ !context.on, context.on ]) {
-            const device = this.findDevice(context.deviceId);
-            if(!device) continue;
-
-            const success = await this.setDeviceState({
-                ...device, op: { control: on ? "on" : "off" },
-            });
-            if(!success) {
-                this.log.warn("The accessory %s does not respond.", accessory.displayName);
-                break;
-            }
-        }
-    }
-
-    configureAccessory(accessory: PlatformAccessory, services: Service[]) {
-        super.configureAccessory(accessory, services);
-
-        this.getService(this.api.hap.Service.Outlet, services)
-            .getCharacteristic(this.api.hap.Characteristic.On)
-            .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
-                if(context.on === value) {
-                    callback(undefined);
-                    return;
-                }
-                const device = this.findDevice(context.deviceId);
-                if(!device) {
-                    callback(new Error(`Unknown device: ${context.deviceId}`));
-                    return;
-                }
-                const success = await this.setDeviceState({
-                    ...device, op: { control: value ? "on" : "off" },
-                });
-                if(!success) {
-                    callback(new Error("Failed to set the device state."));
-                    return;
-                }
-                context.on = value as boolean;
-                callback(undefined);
-            })
-            .on(CharacteristicEventTypes.GET, async (callback: CharacteristicGetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
-                if(!context.init) {
-                    callback(new Error("Not initialized."));
-                    return;
-                }
-                callback(undefined, context.on);
-            });
+        super(log, api, config, DeviceType.WALL_SOCKET, [api.hap.Service.Outlet], api.hap.Service.Outlet);
     }
 
     register() {

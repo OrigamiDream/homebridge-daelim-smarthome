@@ -1,13 +1,12 @@
-import Accessories, {AccessoryInterface} from "./accessories";
 import {
     API, CharacteristicEventTypes, CharacteristicGetCallback,
     CharacteristicSetCallback, CharacteristicValue, Logging, PlatformAccessory, Service
 } from "homebridge";
 import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {Utils} from "../../../core/utils";
+import {SwitchableAccessories, SwitchableAccessoryInterface} from "./switchable-accessories";
 
-interface LightbulbAccessoryInterface extends AccessoryInterface {
-    on: boolean
+interface LightbulbAccessoryInterface extends SwitchableAccessoryInterface {
     prefix: string
     brightness: number
     brightnessAdjustable: boolean
@@ -29,51 +28,15 @@ interface LightbulbAccessoryInterface extends AccessoryInterface {
 const MIRED_MIN_VALUE = 140;
 const MIRED_MAX_VALUE = 500;
 
-export default class LightbulbAccessories extends Accessories<LightbulbAccessoryInterface> {
+export default class LightbulbAccessories extends SwitchableAccessories<LightbulbAccessoryInterface> {
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
-        super(log, api, config, DeviceType.LIGHT, [api.hap.Service.Lightbulb]);
-    }
-
-    async identify(accessory: PlatformAccessory): Promise<void> {
-        await super.identify(accessory);
+        super(log, api, config, DeviceType.LIGHT, [api.hap.Service.Lightbulb], api.hap.Service.Lightbulb);
     }
 
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
         super.configureAccessory(accessory, services);
         const context = this.getAccessoryInterface(accessory);
 
-        this.getService(this.api.hap.Service.Lightbulb, services)
-            .getCharacteristic(this.api.hap.Characteristic.On)
-            .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
-                if(context.on === value) {
-                    callback(undefined);
-                    return;
-                }
-
-                const device = this.findDevice(context.deviceId);
-                if(!device) {
-                    callback(new Error(`Unknown device: ${context.deviceId}`));
-                    return;
-                }
-                const success = await this.setDeviceState({
-                    ...device, op: { control: value ? "on" : "off" },
-                });
-                if(!success) {
-                    callback(new Error("Failed to set the device state."));
-                    return;
-                }
-                context.on = value as boolean;
-                callback(undefined);
-            })
-            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
-                if(!context.init) {
-                    callback(new Error("Not initialized."));
-                    return;
-                }
-                callback(undefined, context.on);
-            });
         if(context.brightnessAdjustable) {
             this.getService(this.api.hap.Service.Lightbulb, services)
                 .getCharacteristic(this.api.hap.Characteristic.Brightness)
@@ -97,11 +60,11 @@ export default class LightbulbAccessories extends Accessories<LightbulbAccessory
                     }
                     context.brightness = brightness;
 
-                    // this.defer(device.deviceId, this.setDeviceState({
-                    //     ...device, op: {
-                    //         value: this.createLightbulbValue(context),
-                    //     },
-                    // }));
+                    this.defer(device.deviceId, this.setDeviceState({
+                        ...device, op: {
+                            value: this.createLightbulbValue(context),
+                        },
+                    }));
 
                     callback(undefined);
                 })

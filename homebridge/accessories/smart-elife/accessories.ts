@@ -15,7 +15,7 @@ export interface DeviceWithOp extends Device {
     op: any;
 }
 
-type ServiceType = WithUUID<typeof Service>;
+export type ServiceType = WithUUID<typeof Service>;
 
 const POLLING_INTERVAL_MILLISECONDS = 60 * 1000;
 const DEFERRED_TASKS_MILLISECONDS = 500;
@@ -110,7 +110,7 @@ export default class Accessories<T extends AccessoryInterface> {
         this.accessories.push(accessory);
     }
 
-    async identify(accessory: PlatformAccessory) {
+    protected async identify(accessory: PlatformAccessory) {
         this.log.info("Identifying %s", accessory.displayName);
     }
 
