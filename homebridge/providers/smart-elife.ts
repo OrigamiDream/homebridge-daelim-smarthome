@@ -6,6 +6,7 @@ import PushReceiver from "@eneris/push-receiver";
 import SmartELifeClient from "../../core/smart-elife/smart-elife-client";
 import {ClientResponseCode} from "../../core/smart-elife/responses";
 import Accessories, {AccessoryInterface} from "../accessories/smart-elife/accessories";
+import OutletAccessories from "../accessories/smart-elife/outlet";
 
 export default class SmartELifeProvider extends AbstractProvider {
 
@@ -17,7 +18,7 @@ export default class SmartELifeProvider extends AbstractProvider {
         super(log, api);
         this.config = this.loadConfig(platformConfig);
         if(this.config) {
-            // TODO: Add accessory registrars
+            this.accessories.push(new OutletAccessories(log, api, this.config));
         }
     }
 
