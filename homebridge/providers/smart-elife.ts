@@ -8,6 +8,7 @@ import {ClientResponseCode} from "../../core/smart-elife/responses";
 import Accessories, {AccessoryInterface} from "../accessories/smart-elife/accessories";
 import OutletAccessories from "../accessories/smart-elife/outlet";
 import LightbulbAccessories from "../accessories/smart-elife/lightbulb";
+import VentAccessories from "../accessories/smart-elife/vent";
 
 export default class SmartELifeProvider extends AbstractProvider {
 
@@ -21,6 +22,7 @@ export default class SmartELifeProvider extends AbstractProvider {
         if(this.config) {
             this.accessories.push(new OutletAccessories(log, api, this.config));
             this.accessories.push(new LightbulbAccessories(log, api, this.config));
+            this.accessories.push(new VentAccessories(log, api, this.config));
         }
     }
 
