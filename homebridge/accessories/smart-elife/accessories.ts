@@ -18,9 +18,11 @@ export interface DeviceWithOp extends Device {
 type ServiceType = WithUUID<typeof Service>;
 
 const POLLING_INTERVAL_MILLISECONDS = 60 * 1000;
+const DEFERRED_TASKS_MILLISECONDS = 500;
 
 export default class Accessories<T extends AccessoryInterface> {
     protected _client?: SmartELifeClient;
+    protected deferredTasks: Record<string, Promise<boolean>> = {};
     protected readonly accessories: PlatformAccessory[] = [];
 
     constructor(protected readonly log: Logging,
@@ -191,6 +193,10 @@ export default class Accessories<T extends AccessoryInterface> {
         this.client.addListener(this.deviceType, listener);
     }
 
+    protected defer(deviceId: string, task: Promise<boolean>) {
+        this.deferredTasks[deviceId] = task;
+    }
+
     register() {
         setInterval(async () => {
             this.log.info("Polling device state :: %s (%d accessories)", this.deviceType.toString(), this.accessories.length);
@@ -198,5 +204,17 @@ export default class Accessories<T extends AccessoryInterface> {
                 type: this.deviceType.toString(),
             }]);
         }, POLLING_INTERVAL_MILLISECONDS);
+        setInterval(async () => {
+            const tasks = [];
+            for(const deviceId in this.deferredTasks) {
+                tasks.push(this.deferredTasks[deviceId]);
+            }
+            if(!tasks.length) {
+                return;
+            }
+            await Promise.all(tasks);
+            this.deferredTasks = {}; // clear
+            this.log.debug("%d deferred tasks are proceeded.", tasks.length);
+        }, DEFERRED_TASKS_MILLISECONDS);
     }
 }

@@ -271,6 +271,11 @@ export class Utils {
             .toUpperCase();
     }
 
+    static addPadding(num: number, width: number) {
+        const numString = num + "";
+        return numString.length >= width ? numString : new Array(width - numString.length + 1).join("0") + numString;
+    }
+
     static aes256Base64(plaintext: string, key: string, iv: string, algorithm: string = "aes-256-cbc") {
         const cipher = crypto.createCipheriv(
             algorithm,
