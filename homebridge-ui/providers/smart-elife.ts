@@ -7,6 +7,7 @@ import {ClientResponseCode} from "../../core/smart-elife/responses";
 import {Logging} from "homebridge";
 import Timeout = NodeJS.Timeout;
 import {WALLPAD_VERSION_3_0} from "../../core/smart-elife/parsers/version-parsers";
+import {ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
 
 export default class SmartELifeUiServer extends AbstractUiProvider {
 
@@ -23,8 +24,9 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
     }
 
     async configureInitialDevices(): Promise<Device[]> {
-        // TODO: Add initial devices (elevator, motion sensors, etc.)
-        return await this.fetchIndoorAirQualityDevices();
+        const devices = await this.fetchIndoorAirQualityDevices();
+        devices.push(ELEVATOR_DEVICE);
+        return devices;
     }
 
     configure() {

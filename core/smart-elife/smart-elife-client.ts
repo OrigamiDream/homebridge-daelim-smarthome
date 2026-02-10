@@ -9,6 +9,7 @@ import WebSocketScheduler from "./ws-scheduler";
 import {parseRoomAndUserKey, WsKeys} from "./parsers/room-parsers";
 import {parseDeviceList} from "./parsers/device-parsers";
 import {HTMLCandidate, parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0} from "./parsers/version-parsers";
+import {ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
 
 export type Listener = (data: any) => void;
 
@@ -625,6 +626,31 @@ export default class SmartELifeClient {
             },
             body: JSON.stringify(p),
         });
+    }
+
+    async sendElevatorCallQuery(): Promise<boolean> {
+        const response = await this.fetchJson(`${this.baseUrl}/common/data.ajax`, {
+            method: "POST",
+            headers: {
+                ...this.httpHeaders,
+                "_csrf": await this.getCsrfToken(),
+                "daelim_elife": this.accessToken,
+            },
+            body: JSON.stringify({
+                header: {
+                    category: "elevator",
+                    type: "call",
+                    command: "control_request",
+                },
+                data: {
+                    uid: ELEVATOR_DEVICE.deviceId,
+                    operation: {
+                        control: "down",
+                    },
+                },
+            }),
+        });
+        return !!response["result"] && response["result"]["status"] === "000";
     }
 
     async sendControlQuery(queryType: string) {

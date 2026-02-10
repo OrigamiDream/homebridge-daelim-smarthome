@@ -18,6 +18,14 @@ export interface Device {
     disabled: boolean
     deviceType: DeviceType
     deviceId: string
+    duration?: DeviceDuration
+}
+
+export interface DeviceDuration {
+    elevator?: number
+    vehicle?: number
+    door?: number
+    camera?: number
 }
 
 export enum DeviceType {
@@ -30,6 +38,7 @@ export enum DeviceType {
     VENT = "vent",
     ALL_OFF_SWITCH = "alloffswitch",
     INDOOR_AIR_QUALITY = "indoorair",
+    ELEVATOR = "elevator",
 }
 
 export namespace DeviceType {
