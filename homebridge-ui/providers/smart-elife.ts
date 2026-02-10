@@ -116,8 +116,9 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
 
         // Set up devices
-        const devices = await this.configureInitialDevices();
         const fetchedDevices = await this.client.fetchDevices();
+
+        const devices = await this.configureInitialDevices();
         for(const device of fetchedDevices) {
             devices.push(device);
         }

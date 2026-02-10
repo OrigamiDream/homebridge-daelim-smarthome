@@ -754,9 +754,8 @@ class CompletePane extends Pane {
                 && oldDevice.deviceType === newDevice.deviceType;
         } else {
             return oldDevice.deviceType === newDevice.deviceType
-                && oldDevice.deviceItemType === newDevice.deviceItemType
-                && oldDevice.alias === newDevice.alias
-                && oldDevice.uid === newDevice.uid;
+                && oldDevice.name === newDevice.name
+                && oldDevice.deviceId === newDevice.deviceId;
         }
     }
 

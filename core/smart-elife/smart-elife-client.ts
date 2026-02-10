@@ -588,7 +588,6 @@ export default class SmartELifeClient {
             if(deviceType === DeviceType.ALL_OFF_SWITCH) continue;
 
             for(const device of deviceGroup["devices"]) {
-                this.log.info(JSON.stringify(device));
                 fetchedDevices.push({
                     displayName: `${device["location_name"]} ${device["device_name"]}`,
                     name: device["device_name"],

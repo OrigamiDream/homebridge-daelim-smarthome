@@ -75,6 +75,8 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
     }
 
     async fetchAirQuality() {
+        this.log.info(`Polling device state :: ${this.deviceType.toString()} (${this.accessories.length} accessories)`);
+
         const response = await this.client.sendHttpJson("/monitoring/getAirList.ajax", { location: "all" });
         const devices = response["data"]["list"];
         let index = 0;
