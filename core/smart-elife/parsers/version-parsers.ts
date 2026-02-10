@@ -251,7 +251,7 @@ export function parseWallPadVersionFromHtmlCandidates(
     const allEvidence: WallPadVersionEvidence[] = [];
 
     for (const c of candidates) {
-        if (!c || typeof c.html !== "string") continue;
+        if (!c) continue;
         allEvidence.push(...collectWallpadVersionEvidenceFromHtml(c.name, c.html));
     }
 
