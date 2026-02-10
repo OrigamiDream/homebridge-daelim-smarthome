@@ -4,8 +4,7 @@ import {
     CharacteristicEventTypes,
     CharacteristicGetCallback, CharacteristicSetCallback, CharacteristicValue,
     Logging,
-    PlatformAccessory,
-    Service
+    PlatformAccessory
 } from "homebridge";
 import ActiveAccessories, {ActiveAccessoryInterface} from "./active-accessories";
 
@@ -32,7 +31,7 @@ interface VentAccessoryInterface extends ActiveAccessoryInterface {
 
 export default class VentAccessories extends ActiveAccessories<VentAccessoryInterface> {
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
-        super(log, api, config, DeviceType.VENT, [api.hap.Service.AirPurifier], api.hap.Service.AirPurifier);
+        super(log, api, config, DeviceType.VENT, [api.hap.Service.AirPurifier, api.hap.Service.AirQualitySensor], api.hap.Service.AirPurifier);
     }
 
     private homebridgeToRotationSpeed(value: number): RotationSpeed {
@@ -57,10 +56,10 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         return op;
     }
 
-    configureAccessory(accessory: PlatformAccessory, services: Service[]) {
-        super.configureAccessory(accessory, services);
+    configureAccessory(accessory: PlatformAccessory) {
+        super.configureAccessory(accessory);
 
-        this.getService(this.api.hap.Service.AirPurifier, services)
+        this.getService(accessory, this.api.hap.Service.AirPurifier)
             .getCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
@@ -110,7 +109,7 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                         break;
                 }
             });
-        this.getService(this.api.hap.Service.AirPurifier, services)
+        this.getService(accessory, this.api.hap.Service.AirPurifier)
             .getCharacteristic(this.api.hap.Characteristic.CurrentAirPurifierState)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
@@ -122,7 +121,7 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                     ? this.api.hap.Characteristic.CurrentAirPurifierState.PURIFYING_AIR
                     : this.api.hap.Characteristic.CurrentAirPurifierState.INACTIVE);
             });
-        this.getService(this.api.hap.Service.AirPurifier, services)
+        this.getService(accessory, this.api.hap.Service.AirPurifier)
             .getCharacteristic(this.api.hap.Characteristic.RotationSpeed)
             .setProps({
                 format: this.api.hap.Formats.FLOAT,

@@ -2,7 +2,7 @@ import Accessories, {AccessoryInterface, ServiceType} from "./accessories";
 import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {
     API, CharacteristicEventTypes, CharacteristicGetCallback,
-    CharacteristicSetCallback, CharacteristicValue, Logging, PlatformAccessory, Service
+    CharacteristicSetCallback, CharacteristicValue, Logging, PlatformAccessory
 } from "homebridge";
 
 export interface ActiveAccessoryInterface extends AccessoryInterface {
@@ -35,10 +35,10 @@ export default abstract class ActiveAccessories<T extends ActiveAccessoryInterfa
 
     onSetActivityOp(value: boolean, op: Record<string, any>): any {}
 
-    configureAccessory(accessory: PlatformAccessory, services: Service[]) {
-        super.configureAccessory(accessory, services);
+    configureAccessory(accessory: PlatformAccessory) {
+        super.configureAccessory(accessory);
 
-        this.getService(this.activeServiceType, services)
+        this.getService(accessory, this.activeServiceType)
             .getCharacteristic(this.api.hap.Characteristic.Active)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const context = this.getAccessoryInterface(accessory);

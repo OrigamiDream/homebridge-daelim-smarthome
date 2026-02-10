@@ -3,6 +3,7 @@ import {API, Logging, PlatformAccessory, Service} from "homebridge";
 import {Device, DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {WithUUID} from "hap-nodejs";
 import {Utils} from "../../../core/utils";
+import {getWallPadCapabilities, WallPadCapabilities} from "../../../core/smart-elife/parsers/version-parsers";
 
 export interface AccessoryInterface {
     displayName: string
@@ -25,6 +26,7 @@ export default class Accessories<T extends AccessoryInterface> {
     protected _client?: SmartELifeClient;
     protected deferredTasks: Record<string, Promise<boolean>> = {};
     protected readonly accessories: PlatformAccessory[] = [];
+    protected readonly capabilities: WallPadCapabilities;
 
     constructor(protected readonly log: Logging,
                 protected readonly api: API,
@@ -32,6 +34,7 @@ export default class Accessories<T extends AccessoryInterface> {
                 readonly deviceType: DeviceType,
                 readonly serviceTypes: ServiceType[]) {
         this.serviceTypes.push(this.api.hap.Service.AccessoryInformation);
+        this.capabilities = getWallPadCapabilities(this.config.wallpadVersion);
     }
 
     get client(): SmartELifeClient {
@@ -74,15 +77,14 @@ export default class Accessories<T extends AccessoryInterface> {
             accessory.context = context;
             accessory.context.init = false;
 
-            const services = this.serviceTypes.map((service) => accessory.getService(service) || accessory.addService(service, context.displayName, service.UUID));
             this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [accessory]);
 
-            this.configureAccessory(accessory, services);
+            this.configureAccessory(accessory);
             return accessory;
         }
     }
 
-    configureAccessory(accessory: PlatformAccessory, services: Service[]) {
+    configureAccessory(accessory: PlatformAccessory) {
         this.log.info("Configuring accessory %s :: %s", this.deviceType, accessory.displayName);
 
         accessory.on("identify", async () => {
@@ -91,7 +93,7 @@ export default class Accessories<T extends AccessoryInterface> {
         });
 
         const context = this.getAccessoryInterface(accessory);
-        const info = this.getService(this.api.hap.Service.AccessoryInformation, services);
+        const info = this.getService(accessory, this.api.hap.Service.AccessoryInformation);
         info.setCharacteristic(this.api.hap.Characteristic.Manufacturer, Utils.MANUFACTURER_NAME);
         info.setCharacteristic(this.api.hap.Characteristic.Model, `${this.config.complex}-${accessory.context.displayName}`);
         info.setCharacteristic(this.api.hap.Characteristic.SerialNumber, context.displayName);
@@ -133,19 +135,12 @@ export default class Accessories<T extends AccessoryInterface> {
         return false;
     }
 
-    protected getService(serviceType: ServiceType, services: Service[]): Service {
+    protected getService(accessory: PlatformAccessory, serviceType: ServiceType): Service {
         if(!this.isSupportedServiceType(serviceType)) {
             throw new Error(`Service \`${serviceType.name}\` is not registered as a supported service type in \`${this.deviceType.toString()}\` accessories.`);
         }
-        for(const service of services) {
-            if(service.UUID === serviceType.UUID) {
-                return service;
-            }
-        }
-        const j = services
-            .map((s) => s.displayName)
-            .join(", ");
-        throw new Error(`Invalid service type \`${serviceType.name}\` in services: ${j}`);
+        const context = this.getAccessoryInterface(accessory);
+        return accessory.getService(serviceType.UUID) || accessory.addService(serviceType, context.displayName, serviceType.UUID);
     }
 
     protected findDevice(deviceId: string): Device | undefined {

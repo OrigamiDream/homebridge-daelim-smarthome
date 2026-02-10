@@ -52,12 +52,7 @@ export default class SmartELifeProvider extends AbstractProvider {
             if(accessories.deviceType !== accessory.context.deviceType) {
                 continue;
             }
-            const services = accessories.serviceTypes.map((service) => {
-                return accessory.getService(service) || accessory.addService(service, accessory.displayName, service.UUID);
-            });
-            if(services.length > 0) {
-                accessories.configureAccessory(accessory, services);
-            }
+            accessories.configureAccessory(accessory);
         }
     }
 

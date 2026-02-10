@@ -8,10 +8,7 @@ import {SmartELifeComplex, SmartELifeUserInfo} from "../interfaces/smart-elife-c
 import WebSocketScheduler from "./ws-scheduler";
 import {parseRoomAndUserKey, WsKeys} from "./parsers/room-parsers";
 import {parseDeviceList} from "./parsers/device-parsers";
-import {
-    getWallPadCapabilities, HTMLCandidate,
-    parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0, WallPadCapabilities,
-} from "./parsers/version-parsers";
+import {HTMLCandidate, parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0} from "./parsers/version-parsers";
 
 export type Listener = (data: any) => void;
 
@@ -48,7 +45,6 @@ export default class SmartELifeClient {
     private userKey?: string;
     private roomKey?: string;
     private serverSideRenderedHTML?: string;
-    private capabilities: WallPadCapabilities;
 
     private readonly ws?: WebSocketScheduler;
     private readonly listeners: ListenerInfo[] = [];
@@ -72,7 +68,6 @@ export default class SmartELifeClient {
         if(useWebSocket) {
             this.ws = this.createWebSocketScheduler();
         }
-        this.capabilities = getWallPadCapabilities(this.config.wallpadVersion);
     }
 
     private createWebSocketScheduler() {

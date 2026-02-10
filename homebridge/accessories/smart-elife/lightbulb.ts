@@ -1,6 +1,6 @@
 import {
     API, CharacteristicEventTypes, CharacteristicGetCallback,
-    CharacteristicSetCallback, CharacteristicValue, Logging, PlatformAccessory, Service
+    CharacteristicSetCallback, CharacteristicValue, Logging, PlatformAccessory
 } from "homebridge";
 import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {Utils} from "../../../core/utils";
@@ -33,12 +33,12 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
         super(log, api, config, DeviceType.LIGHT, [api.hap.Service.Lightbulb], api.hap.Service.Lightbulb);
     }
 
-    configureAccessory(accessory: PlatformAccessory, services: Service[]) {
-        super.configureAccessory(accessory, services);
+    configureAccessory(accessory: PlatformAccessory) {
+        super.configureAccessory(accessory);
         const context = this.getAccessoryInterface(accessory);
 
         if(context.brightnessAdjustable) {
-            this.getService(this.api.hap.Service.Lightbulb, services)
+            this.getService(accessory, this.api.hap.Service.Lightbulb)
                 .getCharacteristic(this.api.hap.Characteristic.Brightness)
                 .setProps({
                     format: this.api.hap.Formats.UINT16,
@@ -78,7 +78,7 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
                 });
         }
         if(context.colorTemperatureAdjustable) {
-            this.getService(this.api.hap.Service.Lightbulb, services)
+            this.getService(accessory, this.api.hap.Service.Lightbulb)
                 .getCharacteristic(this.api.hap.Characteristic.ColorTemperature)
                 .setProps({
                     // HomeKit ColorTemperature is an integer mired value.
