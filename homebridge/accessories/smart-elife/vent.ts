@@ -1,4 +1,3 @@
-import Accessories, {AccessoryInterface} from "./accessories";
 import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {
     API,
@@ -8,6 +7,7 @@ import {
     PlatformAccessory,
     Service
 } from "homebridge";
+import ActiveAccessories, {ActiveAccessoryInterface} from "./active-accessories";
 
 enum RotationSpeed {
     OFF = "off",
@@ -23,16 +23,16 @@ enum Mode {
 
 const ROTATION_SPEED_STEP = 100 / 3.0;
 
-interface VentAccessoryInterface extends AccessoryInterface {
+interface VentAccessoryInterface extends ActiveAccessoryInterface {
     active: boolean
     rotationSpeed: RotationSpeed
     mode: Mode
     modeHw: string
 }
 
-export default class VentAccessories extends Accessories<VentAccessoryInterface> {
+export default class VentAccessories extends ActiveAccessories<VentAccessoryInterface> {
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
-        super(log, api, config, DeviceType.VENT, [api.hap.Service.AirPurifier]);
+        super(log, api, config, DeviceType.VENT, [api.hap.Service.AirPurifier], api.hap.Service.AirPurifier);
     }
 
     private homebridgeToRotationSpeed(value: number): RotationSpeed {
@@ -51,45 +51,15 @@ export default class VentAccessories extends Accessories<VentAccessoryInterface>
         }
     }
 
+    onSetActivityOp(value: boolean, op: Record<string, any>): any {
+        if(value)
+            op["off_rsv_time"] = "0";
+        return op;
+    }
+
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
         super.configureAccessory(accessory, services);
 
-        this.getService(this.api.hap.Service.AirPurifier, services)
-            .getCharacteristic(this.api.hap.Characteristic.Active)
-            .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
-                if(context.active === value) {
-                    callback(undefined);
-                    return;
-                }
-                const device = this.findDevice(context.deviceId);
-                if(!device) {
-                    callback(new Error(`Unknown device: ${context.deviceId}`));
-                    return;
-                }
-                const op: Record<string, string> = {
-                    control: value ? "on" : "off",
-                };
-                if(value) {
-                    // Turn off-reserve off when AirPurifier is active.
-                    op["off_rsv_time"] = "0"
-                }
-                const success = await this.setDeviceState({ ...device, op });
-                if(!success) {
-                    callback(new Error("Failed to set the device state."));
-                    return;
-                }
-                context.active = value as boolean;
-                callback(undefined);
-            })
-            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
-                if(!context.init) {
-                    callback(new Error("Not initialized."));
-                    return;
-                }
-                callback(undefined, context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
-            });
         this.getService(this.api.hap.Service.AirPurifier, services)
             .getCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -148,11 +118,9 @@ export default class VentAccessories extends Accessories<VentAccessoryInterface>
                     callback(new Error("Not initialized."));
                     return;
                 }
-                if(context.active) {
-                    callback(undefined, this.api.hap.Characteristic.CurrentAirPurifierState.PURIFYING_AIR);
-                } else {
-                    callback(undefined, this.api.hap.Characteristic.CurrentAirPurifierState.INACTIVE);
-                }
+                callback(undefined, context.active
+                    ? this.api.hap.Characteristic.CurrentAirPurifierState.PURIFYING_AIR
+                    : this.api.hap.Characteristic.CurrentAirPurifierState.INACTIVE);
             });
         this.getService(this.api.hap.Service.AirPurifier, services)
             .getCharacteristic(this.api.hap.Characteristic.RotationSpeed)
@@ -187,7 +155,7 @@ export default class VentAccessories extends Accessories<VentAccessoryInterface>
                     this.log.debug(`Vent :: SET :: Automatically turned on Vent.`);
                     await this.setDeviceState({
                         ...device, op: { control: "on" },
-                    })
+                    });
                 } else if(newSpeed === RotationSpeed.OFF) {
                     // HomeKit automatically emits INACTIVE when rotation speed is 0.
                     callback(undefined);
@@ -243,7 +211,9 @@ export default class VentAccessories extends Accessories<VentAccessoryInterface>
 
                 const context = this.getAccessoryInterface(accessory);
                 const service = accessory.getService(this.api.hap.Service.AirPurifier);
-                service?.setCharacteristic(this.api.hap.Characteristic.Active, context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
+                service?.setCharacteristic(this.api.hap.Characteristic.Active, context.active
+                    ? this.api.hap.Characteristic.Active.ACTIVE
+                    : this.api.hap.Characteristic.Active.INACTIVE);
                 switch(context.mode) {
                     case Mode.AUTO_DRIVING:
                         service?.setCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState, this.api.hap.Characteristic.TargetAirPurifierState.AUTO);
