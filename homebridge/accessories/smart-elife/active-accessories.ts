@@ -42,7 +42,8 @@ export default abstract class ActiveAccessories<T extends ActiveAccessoryInterfa
             .getCharacteristic(this.api.hap.Characteristic.Active)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                if(context.active === value) {
+                const active = value === this.api.hap.Characteristic.Active.ACTIVE;
+                if(context.active === active) {
                     callback(undefined);
                     return;
                 }
@@ -52,16 +53,14 @@ export default abstract class ActiveAccessories<T extends ActiveAccessoryInterfa
                     return;
                 }
 
-                const op = this.onSetActivityOp(
-                    value as boolean,
-                    { control: value ? "on" : "off" });
+                const op = this.onSetActivityOp(active, { control: active ? "on" : "off" });
 
                 const success = await this.setDeviceState({ ...device, op });
                 if(!success) {
                     callback(new Error("Failed to set the device state."));
                     return;
                 }
-                context.active = value as boolean;
+                context.active = active;
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, async (callback: CharacteristicGetCallback) => {
