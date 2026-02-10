@@ -5,13 +5,13 @@ import {
 } from "homebridge";
 import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 
-export interface SwitchableAccessoryInterface extends AccessoryInterface {
+export interface OnOffAccessoryInterface extends AccessoryInterface {
     on: boolean
 }
 
-export class SwitchableAccessories<T extends SwitchableAccessoryInterface> extends Accessories<T> {
-    constructor(log: Logging, api: API, config: SmartELifeConfig, deviceType: DeviceType, serviceTypes: ServiceType[],
-                protected readonly switchableServiceType: ServiceType) {
+export abstract class OnOffAccessories<T extends OnOffAccessoryInterface> extends Accessories<T> {
+    protected constructor(log: Logging, api: API, config: SmartELifeConfig, deviceType: DeviceType, serviceTypes: ServiceType[],
+                          protected readonly onOffServiceType: ServiceType) {
         super(log, api, config, deviceType, serviceTypes);
     }
 
@@ -36,7 +36,7 @@ export class SwitchableAccessories<T extends SwitchableAccessoryInterface> exten
     configureAccessory(accessory: PlatformAccessory, services: Service[]) {
         super.configureAccessory(accessory, services);
 
-        this.getService(this.switchableServiceType, services)
+        this.getService(this.onOffServiceType, services)
             .getCharacteristic(this.api.hap.Characteristic.On)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const context = this.getAccessoryInterface(accessory);

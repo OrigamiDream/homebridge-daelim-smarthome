@@ -4,9 +4,9 @@ import {
 } from "homebridge";
 import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {Utils} from "../../../core/utils";
-import {SwitchableAccessories, SwitchableAccessoryInterface} from "./switchable-accessories";
+import {OnOffAccessories, OnOffAccessoryInterface} from "./on-off-accessories";
 
-interface LightbulbAccessoryInterface extends SwitchableAccessoryInterface {
+interface LightbulbAccessoryInterface extends OnOffAccessoryInterface {
     prefix: string
     brightness: number
     brightnessAdjustable: boolean
@@ -28,7 +28,7 @@ interface LightbulbAccessoryInterface extends SwitchableAccessoryInterface {
 const MIRED_MIN_VALUE = 140;
 const MIRED_MAX_VALUE = 500;
 
-export default class LightbulbAccessories extends SwitchableAccessories<LightbulbAccessoryInterface> {
+export default class LightbulbAccessories extends OnOffAccessories<LightbulbAccessoryInterface> {
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
         super(log, api, config, DeviceType.LIGHT, [api.hap.Service.Lightbulb], api.hap.Service.Lightbulb);
     }

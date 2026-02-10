@@ -1,10 +1,10 @@
 import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {API, Logging} from "homebridge";
-import {SwitchableAccessories, SwitchableAccessoryInterface} from "./switchable-accessories";
+import {OnOffAccessories, OnOffAccessoryInterface} from "./on-off-accessories";
 
-interface OutletAccessoryInterface extends SwitchableAccessoryInterface {}
+interface OutletAccessoryInterface extends OnOffAccessoryInterface {}
 
-export default class OutletAccessories extends SwitchableAccessories<OutletAccessoryInterface> {
+export default class OutletAccessories extends OnOffAccessories<OutletAccessoryInterface> {
 
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
         super(log, api, config, DeviceType.WALL_SOCKET, [api.hap.Service.Outlet], api.hap.Service.Outlet);
