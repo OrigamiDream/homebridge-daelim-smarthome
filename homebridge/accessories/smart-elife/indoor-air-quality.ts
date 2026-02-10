@@ -85,7 +85,7 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
             const device = this.findDevice(deviceId);
             if(!device) continue;
 
-            const accessory = this.addOrGetAccessory({
+            this.addOrGetAccessory({
                 deviceId: device.deviceId,
                 deviceType: device.deviceType,
                 displayName: device.displayName,
@@ -97,11 +97,6 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
                 temperature: Number(info["temp"]),
                 humidity: Number(info["humi"]),
             });
-            if(!accessory) return;
-
-            const context = this.getAccessoryInterface(accessory);
-            accessory.getService(this.api.hap.Service.AirQualitySensor)
-                ?.setCharacteristic(this.api.hap.Characteristic.AirQuality, this.getAirQuality(context));
         }
     }
 
