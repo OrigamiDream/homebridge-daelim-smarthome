@@ -5,14 +5,25 @@ import {ClientResponseCode} from "./responses";
 import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
 import {SmartELifeComplex, SmartELifeUserInfo} from "../interfaces/smart-elife-complex";
-import {parseDeviceList, parseRoomAndUserKey, WsKeys} from "./parsers";
 import WebSocketScheduler from "./ws-scheduler";
+import {parseRoomAndUserKey, WsKeys} from "./parsers/room-parsers";
+import {parseDeviceList} from "./parsers/device-parsers";
+import {
+    getWallPadCapabilities, HTMLCandidate,
+    parseWallPadVersionFromHtmlCandidates, WallPadCapabilities, WallPadVersion,
+} from "./parsers/version-parsers";
 
 export type Listener = (data: any) => void;
 
 interface ListenerInfo {
     deviceType: DeviceType
     listener: Listener
+}
+
+export interface WallPadVersionInfo {
+    version: WallPadVersion | null
+    confidence: number
+    capabilities: WallPadCapabilities
 }
 
 export default class SmartELifeClient {
@@ -43,6 +54,7 @@ export default class SmartELifeClient {
     private userKey?: string;
     private roomKey?: string;
     private serverSideRenderedHTML?: string;
+    private version?: WallPadVersionInfo;
 
     private readonly ws?: WebSocketScheduler;
     private readonly listeners: ListenerInfo[] = [];
@@ -490,33 +502,74 @@ export default class SmartELifeClient {
                 this.userInfo.apartment.unit);
             this.log.debug("JSON: %s", JSON.stringify(this.userInfo, null, 2));
         }
-
+        await this.parseOrGetWallPadVersionInfo();
         if(this.ws) {
             await this.ws.serve();
             await this.refreshDeviceStatus();
         }
     }
 
+    private async createDocumentHeaters(): Promise<Record<string, string>> {
+        return {
+            "User-Agent": Utils.SMART_ELIFE_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Sec-Fetch-Site": "none",
+            "Accept-Language": "ko-KR,ko;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Sec-Fetch-Mode": "navigate",
+            "Host": "smartelife.apt.co.kr",
+            "Connection": "keep-alive",
+            "Sec-Fetch-Dest": "document",
+            "_csrf": await this.getCsrfToken(),
+            "Authorization": `Bearer ${this.getAccessToken()}`,
+            "dpk": this.getDevicePrimaryKey(),
+        };
+    }
+
+    private async parseOrGetWallPadVersionInfo(): Promise<WallPadVersionInfo> {
+        if(!!this.version) {
+            return this.version;
+        }
+        this.log.debug("Configuring WallPad version");
+        const paths = [
+            "/controls/vent.do",
+            "/controls/heat.do",
+            "/controls/visitorCar.do",
+            "/mode/home.do",
+            "/mode/condition.do",
+            "/mode/actionModify.do",
+            "/monitoring/charge.do",
+            "/monitoring/energy.do",
+        ]
+        const tasks = paths.map(async (path) => this.fetchWithJSessionId(`${this.baseUrl}${path}`, {
+                method: "GET",
+                headers: await this.createDocumentHeaters(),
+            }).then((response) => response.text()));
+        const htmls = await Promise.all(tasks);
+        const candidates: HTMLCandidate[] = paths.map((path, i): HTMLCandidate => {
+            return {
+                name: path,
+                html: htmls[i],
+            };
+        });
+        const r = parseWallPadVersionFromHtmlCandidates(candidates);
+        const capabilities = getWallPadCapabilities(r.version);
+        this.version = {
+            version: r.version,
+            confidence: r.confidence,
+            capabilities,
+        };
+        this.log.info(`Installed WallPad is on CVNET ${this.version.version} (conf = ${this.version.confidence.toFixed(2)}).`);
+        return this.version;
+    }
+
     private async fetchServerSideRenderedHTML() {
-        if(this.serverSideRenderedHTML) {
+        if(!!this.serverSideRenderedHTML) {
             return this.serverSideRenderedHTML;
         }
         const html = await this.fetchWithJSessionId(`${this.baseUrl}/main/home.do`, {
             method: "GET",
-            headers: {
-                "User-Agent": Utils.SMART_ELIFE_USER_AGENT,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Sec-Fetch-Site": "none",
-                "Accept-Language": "ko-KR,ko;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Sec-Fetch-Mode": "navigate",
-                "Host": "smartelife.apt.co.kr",
-                "Connection": "keep-alive",
-                "Sec-Fetch-Dest": "document",
-                "_csrf": await this.getCsrfToken(),
-                "Authorization": `Bearer ${this.getAccessToken()}`,
-                "dpk": this.getDevicePrimaryKey(),
-            }
+            headers: await this.createDocumentHeaters(),
         }).then((response) => response.text());
         this.serverSideRenderedHTML = html;
         return html;
