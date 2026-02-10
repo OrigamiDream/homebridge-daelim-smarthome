@@ -1,33 +1,4 @@
-export type WsKeys = { roomKey: string, userKey: string };
-
-export function parseDeviceList(html: string) {
-    let from = 0;
-    while (true) {
-        const idx = html.indexOf("_deviceListByType", from);
-        if (idx === -1) return null;
-        from = idx + "_deviceListByType".length;
-
-        // Try to parse an assignment near this occurrence.
-        const parsed = tryParseAssignmentAt(html, from);
-        if (parsed) {
-            try {
-                return JSON.parse(parsed.jsonText);
-            } catch {
-                // keep scanning; there can be multiple occurrences
-            }
-        }
-    }
-}
-
-export function parseRoomAndUserKey(html: string): WsKeys {
-    const roomKey = findJsStringProp(html, "roomKey");
-    const userKey = findJsStringProp(html, "userKey");
-    if(!roomKey) throw new Error("`roomKey` not found");
-    if(!userKey) throw new Error("`userKey` not found");
-    return { roomKey, userKey };
-}
-
-function findJsStringProp(src: string, prop: string): string | undefined {
+export function findJsStringProp(src: string, prop: string): string | undefined {
     const re = new RegExp(
         String.raw`(?:^|[{\s,])["']?${escapeRe(prop)}["']?\s*:\s*(["'])(?<val>(?:\\.|(?!\1)[\s\S])*)\1`,
         "m",
@@ -40,11 +11,11 @@ function findJsStringProp(src: string, prop: string): string | undefined {
     return unescapeJsString(raw);
 }
 
-function escapeRe(s: string): string {
+export function escapeRe(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function tryParseAssignmentAt(s: string, startIdx: number) {
+export function tryParseAssignmentAt(s: string, startIdx: number) {
     let i = startIdx;
 
     // Skip identifier tail (in case we matched in a longer token)
@@ -75,7 +46,7 @@ function tryParseAssignmentAt(s: string, startIdx: number) {
     return null;
 }
 
-function skipWsAndComments(s: string, i: number) {
+export function skipWsAndComments(s: string, i: number) {
     while (i < s.length) {
         // whitespace
         while (i < s.length && /\s/.test(s[i])) i++;
@@ -101,7 +72,7 @@ function skipWsAndComments(s: string, i: number) {
     return i;
 }
 
-function parseQuotedJsStringLiteral(s: string, i: number) {
+export function parseQuotedJsStringLiteral(s: string, i: number) {
     const quote = s[i];
     i++; // after opening quote
     let raw = "";
@@ -122,7 +93,7 @@ function parseQuotedJsStringLiteral(s: string, i: number) {
 }
 
 // Handles JSON text assigned directly: _deviceListByType = [ ... ] or { ... }
-function parseBalancedJsonLike(s: string, i: number) {
+export function parseBalancedJsonLike(s: string, i: number) {
     const open = s[i];
     const close = open === "[" ? "]" : "}";
     let depth = 0;
@@ -172,7 +143,7 @@ function parseBalancedJsonLike(s: string, i: number) {
  * Minimal JS string-literal unescaper for content inside quotes.
  * Supports: \\ \n \r \t \' \" \` \/ \xNN \uNNNN \u{...}
  */
-function unescapeJsString(s: string) {
+export function unescapeJsString(s: string) {
     let out = "";
     for (let i = 0; i < s.length; i++) {
         const c = s[i];
