@@ -605,6 +605,7 @@ class AuthorizationPane extends Pane {
             if(this.provider === "smart-elife") {
                 newOptions["roomKey"] = event["data"].roomKey;
                 newOptions["userKey"] = event["data"].userKey;
+                newOptions["wallpadVersion"] = event["data"].version;
             }
             await this.advance(newOptions, this.nextPane());
         });
@@ -700,6 +701,7 @@ class WallpadPasscodePane extends Pane {
             if(this.provider === "smart-elife") {
                 newOptions["roomKey"] = event["data"].roomKey;
                 newOptions["userKey"] = event["data"].userKey;
+                newOptions["wallpadVersion"] = event["data"].version;
             }
             await this.advance(newOptions, this.nextPane());
         });

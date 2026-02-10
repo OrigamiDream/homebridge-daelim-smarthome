@@ -10,7 +10,7 @@ import {parseRoomAndUserKey, WsKeys} from "./parsers/room-parsers";
 import {parseDeviceList} from "./parsers/device-parsers";
 import {
     getWallPadCapabilities, HTMLCandidate,
-    parseWallPadVersionFromHtmlCandidates, WallPadCapabilities, WallPadVersion,
+    parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0, WallPadCapabilities,
 } from "./parsers/version-parsers";
 
 export type Listener = (data: any) => void;
@@ -18,12 +18,6 @@ export type Listener = (data: any) => void;
 interface ListenerInfo {
     deviceType: DeviceType
     listener: Listener
-}
-
-export interface WallPadVersionInfo {
-    version: WallPadVersion | null
-    confidence: number
-    capabilities: WallPadCapabilities
 }
 
 export default class SmartELifeClient {
@@ -54,7 +48,7 @@ export default class SmartELifeClient {
     private userKey?: string;
     private roomKey?: string;
     private serverSideRenderedHTML?: string;
-    private version?: WallPadVersionInfo;
+    private capabilities: WallPadCapabilities;
 
     private readonly ws?: WebSocketScheduler;
     private readonly listeners: ListenerInfo[] = [];
@@ -78,6 +72,7 @@ export default class SmartELifeClient {
         if(useWebSocket) {
             this.ws = this.createWebSocketScheduler();
         }
+        this.capabilities = getWallPadCapabilities(this.config.wallpadVersion);
     }
 
     private createWebSocketScheduler() {
@@ -502,7 +497,9 @@ export default class SmartELifeClient {
                 this.userInfo.apartment.unit);
             this.log.debug("JSON: %s", JSON.stringify(this.userInfo, null, 2));
         }
-        await this.parseOrGetWallPadVersionInfo();
+
+        this.log.info(`Installed WallPad version is on CVNET ${this.config.wallpadVersion}.`);
+
         if(this.ws) {
             await this.ws.serve();
             await this.refreshDeviceStatus();
@@ -526,10 +523,7 @@ export default class SmartELifeClient {
         };
     }
 
-    private async parseOrGetWallPadVersionInfo(): Promise<WallPadVersionInfo> {
-        if(!!this.version) {
-            return this.version;
-        }
+    async parseWallPadVersion() {
         this.log.debug("Configuring WallPad version");
         const paths = [
             "/controls/vent.do",
@@ -553,14 +547,12 @@ export default class SmartELifeClient {
             };
         });
         const r = parseWallPadVersionFromHtmlCandidates(candidates);
-        const capabilities = getWallPadCapabilities(r.version);
-        this.version = {
-            version: r.version,
-            confidence: r.confidence,
-            capabilities,
-        };
-        this.log.info(`Installed WallPad is on CVNET ${this.version.version} (conf = ${this.version.confidence.toFixed(2)}).`);
-        return this.version;
+        if(!r.version) {
+            this.log.debug(`Due to low confidence, fallback the WallPad version back to ${WALLPAD_VERSION_3_0}`);
+            r.version = WALLPAD_VERSION_3_0;
+        }
+        this.log.info(`Installed WallPad is on CVNET ${r.version} (conf = ${r.confidence.toFixed(2)}).`);
+        return r.version;
     }
 
     private async fetchServerSideRenderedHTML() {

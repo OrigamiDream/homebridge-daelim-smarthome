@@ -6,6 +6,7 @@ import {Device, SmartELifeConfig} from "../../core/interfaces/smart-elife-config
 import {ClientResponseCode} from "../../core/smart-elife/responses";
 import {Logging} from "homebridge";
 import Timeout = NodeJS.Timeout;
+import {WALLPAD_VERSION_3_0} from "../../core/smart-elife/parsers/version-parsers";
 
 export default class SmartELifeUiServer extends AbstractUiProvider {
 
@@ -68,6 +69,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
 
         const config: SmartELifeConfig = {
             complex, username, password, uuid,
+            wallpadVersion: WALLPAD_VERSION_3_0,
             version: Utils.currentSemanticVersion(),
             devices: this.devices,
         };
@@ -108,9 +110,10 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         }
 
         const { roomKey, userKey } = this.client.getRoomAndUserKeys();
+        const version = await this.client.parseWallPadVersion();
 
         // On success
-        this.server.pushEvent("complete", { uuid, roomKey, userKey });
+        this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
 
         // Set up devices
         const devices = this.configureInitialDevices();

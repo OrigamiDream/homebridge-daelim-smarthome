@@ -9,6 +9,7 @@ import Accessories, {AccessoryInterface} from "../accessories/smart-elife/access
 import OutletAccessories from "../accessories/smart-elife/outlet";
 import LightbulbAccessories from "../accessories/smart-elife/lightbulb";
 import VentAccessories from "../accessories/smart-elife/vent";
+import {WALLPAD_VERSION_3_0} from "../../core/smart-elife/parsers/version-parsers";
 
 export default class SmartELifeProvider extends AbstractProvider {
 
@@ -41,6 +42,7 @@ export default class SmartELifeProvider extends AbstractProvider {
             roomKey: config["roomKey"], // nullable
             userKey: config["userKey"], // nullable
             version: Utils.currentSemanticVersion(),
+            wallpadVersion: WALLPAD_VERSION_3_0,
             devices: config["devices"] || [],
         };
     }

@@ -8,6 +8,7 @@ export interface SmartELifeConfig {
     roomKey?: string
     userKey?: string
     version: SemanticVersion
+    wallpadVersion: string
     devices: Device[]
 }
 
