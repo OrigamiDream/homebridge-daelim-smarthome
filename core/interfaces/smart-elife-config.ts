@@ -29,6 +29,7 @@ export enum DeviceType {
     AIR_CONDITIONER_2 = "aircon2",
     VENT = "vent",
     ALL_OFF_SWITCH = "alloffswitch",
+    INDOOR_AIR_QUALITY = "indoorair",
 }
 
 export namespace DeviceType {
@@ -42,6 +43,7 @@ export namespace DeviceType {
             case "aircon2": return DeviceType.AIR_CONDITIONER_2;
             case "vent": return DeviceType.VENT;
             case "alloffswitch": return DeviceType.ALL_OFF_SWITCH;
+            case "indoorair": return DeviceType.INDOOR_AIR_QUALITY;
             default:
                 throw new Error(`Could not parse device type from string: ${deviceType}`);
         }

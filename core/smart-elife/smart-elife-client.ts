@@ -211,7 +211,7 @@ export default class SmartELifeClient {
             const opts: any = { ...baseOptions, headers: { ...baseHeaders } };
             if(needsRetry) {
                 if(numAttempts === 1) {
-                    this.log.debug("Could not perform the request (seams token expiration). Retrying immediately.");
+                    this.log.debug("Could not perform the request (seems token expiration). Retrying immediately.");
                 } else if(numAttempts <= 5) {
                     this.log.debug(`Could not perform the request over ${numAttempts} attempts. Retrying within 5 seconds.`);
                     await Utils.sleep(5000);
@@ -222,14 +222,16 @@ export default class SmartELifeClient {
                 if("_csrf" in opts.headers) {
                     opts.headers["_csrf"] = await this.getCsrfToken(true);
                 }
-                if("Authorization" in opts.headers) {
+                if("daelim_elife" in opts.headers || "Authorization" in opts.headers) {
                     const response = await this.signIn();
                     if(response !== ClientResponseCode.SUCCESS) {
                         throw new Error(`Could not re-establish authentication.`);
                     }
-                    const token = this.getAccessToken();
-                    if(token) {
-                        opts.headers["Authorization"] = `Bearer ${token}`;
+                    if("daelim_elife" in opts.headers) {
+                        opts.headers["daelim_elife"] = this.accessToken;
+                    }
+                    if("Authorization" in opts.headers) {
+                        opts.headers["Authorization"] = this.getAccessToken();
                     }
                 }
             }
@@ -237,13 +239,16 @@ export default class SmartELifeClient {
             text = await response.text();
 
             needsRetry = !response.ok || response.status !== 200 || text === "requireLoginForAjax";
+            if(needsRetry) {
+                this.log.debug(`[Error response] ${text}`);
+            }
             numAttempts += 1;
         } while(needsRetry);
 
         const json = Utils.parseJsonSafe(text);
 
         // Debug purpose.
-        this.log.debug(`[Response from ${options.method} ${url}]\n${JSON.stringify(json, null, 2)}`);
+        this.log.debug(`[Response from ${options.method} ${url}]\n${JSON.stringify(json)}`);
 
         return json;
     }
@@ -304,7 +309,7 @@ export default class SmartELifeClient {
             case ClientResponseCode.SUCCESS: {
                 const homeList = response["homeList"] || [];
                 if(homeList.length > 0) {
-                    this.log.warn(`You may registered multiple homes. Requires to choose a home: ${JSON.stringify(homeList, null, 2)}`);
+                    this.log.warn(`You may registered multiple homes. Requires to choose a home: ${JSON.stringify(homeList)}`);
                     return ClientResponseCode.INCOMPLETE_USER_INFO;
                 }
                 const responseCode = this.updateAuthorizationAndUserInfo(response);
@@ -482,7 +487,7 @@ export default class SmartELifeClient {
         if(this.complex) {
             this.log(`Complex: ${this.complex.complexDisplayName}`);
             const { dongs, ...redacted } = this.complex;
-            this.log.debug("JSON: %s", JSON.stringify(redacted, null, 2));
+            this.log.debug("JSON: %s", JSON.stringify(redacted));
         }
 
         if(this.userInfo) {
@@ -490,7 +495,7 @@ export default class SmartELifeClient {
                 this.userInfo.username,
                 this.userInfo.apartment.building,
                 this.userInfo.apartment.unit);
-            this.log.debug("JSON: %s", JSON.stringify(this.userInfo, null, 2));
+            this.log.debug("JSON: %s", JSON.stringify(this.userInfo));
         }
 
         this.log.info(`Installed WallPad version is on CVNET ${this.config.wallpadVersion}.`);
@@ -608,6 +613,40 @@ export default class SmartELifeClient {
         return complexOne[0];
     }
 
+    async sendHttpJson(path: string, p: any) {
+        return await this.fetchJson(`${this.baseUrl}${path}`, {
+            method: "POST",
+            headers: {
+                ...this.httpHeaders,
+                "_csrf": await this.getCsrfToken(),
+                "daelim_elife": this.accessToken,
+            },
+            body: JSON.stringify(p),
+        });
+    }
+
+    async sendControlQuery(queryType: string) {
+        return await this.fetchJson(`${this.baseUrl}/common/data.ajax`, {
+            method: "POST",
+            headers: {
+                ...this.httpHeaders,
+                "_csrf": await this.getCsrfToken(),
+                "daelim_elife": this.accessToken,
+            },
+            body: JSON.stringify({
+                header: {
+                    category: "control",
+                    type: queryType,
+                    command: "query_request",
+                },
+                data: {
+                    roomkey: this.roomKey,
+                    userkey: this.userKey,
+                },
+            })
+        });
+    }
+
     async sendDeviceControl(device: Device, op: any): Promise<boolean> {
         const response = await this.fetchJson(`${this.baseUrl}/device/control.ajax`, {
             method: "POST",
@@ -616,7 +655,7 @@ export default class SmartELifeClient {
                 "_csrf": await this.getCsrfToken(),
                 "daelim_elife": this.accessToken,
             },
-            data: JSON.stringify({
+            body: JSON.stringify({
                 type: device.deviceType.toString(),
                 uid: device.deviceId,
                 operation: op,

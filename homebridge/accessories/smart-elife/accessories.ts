@@ -37,6 +37,10 @@ export default class Accessories<T extends AccessoryInterface> {
         this.capabilities = getWallPadCapabilities(this.config.wallpadVersion);
     }
 
+    doPoll() {
+        return true;
+    }
+
     get client(): SmartELifeClient {
         if(!this._client) {
             throw new Error("The client has not been initialized on Accessories.");
@@ -200,12 +204,16 @@ export default class Accessories<T extends AccessoryInterface> {
     }
 
     register() {
-        setInterval(async () => {
-            this.log.info("Polling device state :: %s (%d accessories)", this.deviceType.toString(), this.accessories.length);
-            await this.sendWsJson([{
-                type: this.deviceType.toString(),
-            }]);
-        }, POLLING_INTERVAL_MILLISECONDS);
+        if(this.doPoll()) {
+            setInterval(async () => {
+                this.log.info("Polling device state :: %s (%d accessories)", this.deviceType.toString(), this.accessories.length);
+                await this.sendWsJson([{
+                    type: this.deviceType.toString(),
+                }]);
+            }, POLLING_INTERVAL_MILLISECONDS);
+        } else {
+            this.log.debug(`Polling on device %s is disabled.`, this.deviceType.toString());
+        }
         setInterval(async () => {
             const tasks = [];
             for(const deviceId in this.deferredTasks) {

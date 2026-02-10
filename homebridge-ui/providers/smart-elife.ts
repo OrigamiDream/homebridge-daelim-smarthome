@@ -2,7 +2,7 @@ import AbstractUiProvider from "./ui-provider";
 import {HomebridgePluginUiServer} from "@homebridge/plugin-ui-utils";
 import {LoggerBase, Semaphore, Utils} from "../../core/utils";
 import SmartELifeClient from "../../core/smart-elife/smart-elife-client";
-import {Device, SmartELifeConfig} from "../../core/interfaces/smart-elife-config";
+import {Device, DeviceType, SmartELifeConfig} from "../../core/interfaces/smart-elife-config";
 import {ClientResponseCode} from "../../core/smart-elife/responses";
 import {Logging} from "homebridge";
 import Timeout = NodeJS.Timeout;
@@ -22,9 +22,9 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         super(server, log);
     }
 
-    configureInitialDevices(): Device[] {
+    async configureInitialDevices(): Promise<Device[]> {
         // TODO: Add initial devices (elevator, motion sensors, etc.)
-        return [];
+        return await this.fetchIndoorAirQualityDevices();
     }
 
     configure() {
@@ -116,7 +116,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
 
         // Set up devices
-        const devices = this.configureInitialDevices();
+        const devices = await this.configureInitialDevices();
         const fetchedDevices = await this.client.fetchDevices();
         for(const device of fetchedDevices) {
             devices.push(device);
@@ -144,5 +144,27 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
                 this.server.pushEvent("invalid-wallpad-passcode", {});
             }
         }
+    }
+
+    async fetchIndoorAirQualityDevices(): Promise<Device[]> {
+        const response = await this.client?.sendHttpJson(
+            "/monitoring/getAirList.ajax", { location: "all" });
+        if(!response["data"]) {
+            return [];
+        }
+        const devices: Device[] = [];
+        let index = 0;
+        for(const device of response["data"]["list"] as any[]) {
+            index++;
+            const name = `공기질 센서 ${index}`;
+            devices.push({
+                displayName: `${device['location']} ${name}`,
+                name: name,
+                deviceType: DeviceType.INDOOR_AIR_QUALITY,
+                deviceId: `CMFIAQ${Utils.addPadding(index, 3)}`,
+                disabled: false,
+            });
+        }
+        return devices;
     }
 }
