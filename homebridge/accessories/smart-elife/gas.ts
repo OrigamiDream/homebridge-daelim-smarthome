@@ -50,8 +50,10 @@ export default class GasAccessories extends Accessories<GasAccessoryInterface> {
                 if(!secured) {
                     // Could not unsecure the Cooktop because of human security.
                     // Update the LockMechanism characteristic immediately.
-                    this.getService(accessory, this.api.hap.Service.LockMechanism)
-                        .setCharacteristic(this.api.hap.Characteristic.LockTargetState, this.api.hap.Characteristic.LockTargetState.SECURED);
+                    setTimeout(() => {
+                        this.getService(accessory, this.api.hap.Service.LockMechanism)
+                            .setCharacteristic(this.api.hap.Characteristic.LockTargetState, this.api.hap.Characteristic.LockTargetState.SECURED);
+                    }, 0);
                     callback(undefined);
                     return;
                 }
