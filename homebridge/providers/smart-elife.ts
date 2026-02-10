@@ -11,6 +11,7 @@ import LightbulbAccessories from "../accessories/smart-elife/lightbulb";
 import VentAccessories from "../accessories/smart-elife/vent";
 import {WALLPAD_VERSION_3_0} from "../../core/smart-elife/parsers/version-parsers";
 import IndoorAirQualityAccessories from "../accessories/smart-elife/indoor-air-quality";
+import HeaterAccessories from "../accessories/smart-elife/heater";
 
 export default class SmartELifeProvider extends AbstractProvider {
 
@@ -26,6 +27,7 @@ export default class SmartELifeProvider extends AbstractProvider {
             this.accessories.push(new LightbulbAccessories(log, api, this.config));
             this.accessories.push(new VentAccessories(log, api, this.config));
             this.accessories.push(new IndoorAirQualityAccessories(log, api, this.config));
+            this.accessories.push(new HeaterAccessories(log, api, this.config));
         }
     }
 

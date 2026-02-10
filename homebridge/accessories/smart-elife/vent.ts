@@ -23,7 +23,6 @@ enum Mode {
 const ROTATION_SPEED_STEP = 100 / 3.0;
 
 interface VentAccessoryInterface extends ActiveAccessoryInterface {
-    active: boolean
     rotationSpeed: RotationSpeed
     mode: Mode
     modeHw: string

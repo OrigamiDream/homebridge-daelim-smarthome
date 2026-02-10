@@ -33,7 +33,9 @@ export default abstract class ActiveAccessories<T extends ActiveAccessoryInterfa
         }
     }
 
-    onSetActivityOp(value: boolean, op: Record<string, any>): any {}
+    onSetActivityOp(value: boolean, op: Record<string, any>): any {
+        return op;
+    }
 
     configureAccessory(accessory: PlatformAccessory) {
         super.configureAccessory(accessory);
