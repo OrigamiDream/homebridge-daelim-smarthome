@@ -588,10 +588,13 @@ export default class SmartELifeClient {
             if(deviceType === DeviceType.ALL_OFF_SWITCH) continue;
 
             for(const device of deviceGroup["devices"]) {
+                let name = device["device_name"];
+                if(deviceType === DeviceType.GAS && device["options"] === "gas_02") {
+                    name = "쿡탑";
+                }
+                const displayName = `${device["location_name"]} ${name}`;
                 fetchedDevices.push({
-                    displayName: `${device["location_name"]} ${device["device_name"]}`,
-                    name: device["device_name"],
-                    deviceType: deviceType,
+                    displayName, name, deviceType,
                     deviceId: device["uid"],
                     disabled: false,
                 });
@@ -646,7 +649,24 @@ export default class SmartELifeClient {
         });
     }
 
-    async sendDeviceControl(device: Device, op: any): Promise<boolean> {
+    async sendDeviceControl(device: Device, control: string): Promise<boolean> {
+        const response = await this.fetchJson(`${this.baseUrl}/device/control/all.ajax`, {
+            method: "POST",
+            headers: {
+                ...this.httpHeaders,
+                "_csrf": await this.getCsrfToken(),
+                "daelim_elife": this.accessToken,
+            },
+            body: JSON.stringify({
+                type: device.deviceType.toString(),
+                uid: device.deviceId,
+                control,
+            }),
+        });
+        return response["result"] as boolean;
+    }
+
+    async sendDeviceControlOp(device: Device, op: any): Promise<boolean> {
         const response = await this.fetchJson(`${this.baseUrl}/device/control.ajax`, {
             method: "POST",
             headers: {
