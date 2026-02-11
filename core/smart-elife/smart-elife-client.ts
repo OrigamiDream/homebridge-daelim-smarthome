@@ -109,9 +109,13 @@ export default class SmartELifeClient {
                 const action = json["action"];
                 let deviceType;
                 if(!!header) {
-                    deviceType = DeviceType.parse(header["type"]);
+                    deviceType = header["type"] as DeviceType || DeviceType.UNKNOWN;
+                    if(deviceType === DeviceType.UNKNOWN)
+                        client.log.warn("Unknown device type: %s", header["type"]);
                 } else if(!!action && action.startsWith("event_")) {
-                    deviceType = DeviceType.parse(action.slice("event_".length));
+                    deviceType = action.slice("event_".length) as DeviceType || DeviceType.UNKNOWN;
+                    if(deviceType === DeviceType.UNKNOWN)
+                        client.log.warn("Unknown device type: %s", header["type"]);
                 } else {
                     client.log.warn("Unexpected message format: %s", JSON.stringify(json));
                     return;
@@ -672,7 +676,12 @@ export default class SmartELifeClient {
         const deviceList: any[] = parseDeviceList(await this.fetchServerSideRenderedHTML());
         const fetchedDevices: Device[] = [];
         for(const deviceGroup of deviceList) {
-            const deviceType = DeviceType.parse(deviceGroup["type"]);
+            const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
+            if(deviceType === DeviceType.UNKNOWN) {
+                this.log.warn(`Unknown device type: ${deviceGroup["type"]}`);
+                continue;
+            }
+
             if(deviceType === DeviceType.ALL_OFF_SWITCH) continue;
 
             for(const device of deviceGroup["devices"]) {

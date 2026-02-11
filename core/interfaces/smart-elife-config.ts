@@ -35,6 +35,7 @@ export enum ControlQueryCategory {
 }
 
 export enum DeviceType {
+    UNKNOWN = "unknown",
     HEATER = "heat",
     WALL_SOCKET = "wallsocket",
     LIGHT = "light",
@@ -45,24 +46,6 @@ export enum DeviceType {
     ALL_OFF_SWITCH = "alloffswitch",
     INDOOR_AIR_QUALITY = "indoorair",
     ELEVATOR = "elevator",
-}
-
-export namespace DeviceType {
-    export function parse(deviceType: string): DeviceType {
-        switch(deviceType) {
-            case "heat": return DeviceType.HEATER;
-            case "wallsocket": return DeviceType.WALL_SOCKET;
-            case "light": return DeviceType.LIGHT;
-            case "gas": return DeviceType.GAS;
-            case "aircon": return DeviceType.AIR_CONDITIONER;
-            case "aircon2": return DeviceType.AIR_CONDITIONER_2;
-            case "vent": return DeviceType.VENT;
-            case "alloffswitch": return DeviceType.ALL_OFF_SWITCH;
-            case "indoorair": return DeviceType.INDOOR_AIR_QUALITY;
-            default:
-                throw new Error(`Could not parse device type from string: ${deviceType}`);
-        }
-    }
 }
 
 export interface PushItem {
