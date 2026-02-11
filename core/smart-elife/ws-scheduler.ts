@@ -57,6 +57,18 @@ export default class WebSocketScheduler {
         }
     }
 
+    private isSocketClosedDuringSendError(err: unknown): boolean {
+        if(!err) {
+            return false;
+        }
+        const message = `${(err as any)?.message || err}`.toLowerCase();
+        return message.includes("socket was closed")
+            || message.includes("closed while data was being compressed")
+            || message.includes("websocket is not open")
+            || message.includes("readystate 2")
+            || message.includes("readystate 3");
+    }
+
     private scheduleWebSocketReconnect(reason: string) {
         if(this.wsClosedByUser) {
             return;
@@ -116,23 +128,36 @@ export default class WebSocketScheduler {
     }
 
     public async wsSendJson(payload: any): Promise<void> {
-        await this.connectWebSocket();
-        const ws = this.ws;
-        if(!ws) {
-            return;
-        }
-        await this.waitForWebSocketOpen(ws, 10_000);
+        try {
+            await this.connectWebSocket();
+            const ws = this.ws;
+            if(!ws) {
+                return;
+            }
+            await this.waitForWebSocketOpen(ws, 10_000);
+            if(ws.readyState !== WebSocket.OPEN) {
+                this.scheduleWebSocketReconnect("send while not open");
+                return;
+            }
 
-        await new Promise<void>((resolve, reject) => {
-            this.log.debug(`[WebSocket] :: Send :: ${JSON.stringify(payload)}`)
-            ws.send(JSON.stringify(payload), (err?: Error) => {
-                if(err) {
-                    reject(err);
-                } else {
-                    resolve();
-                }
+            await new Promise<void>((resolve, reject) => {
+                this.log.debug(`[WebSocket] :: Send :: ${JSON.stringify(payload)}`);
+                ws.send(JSON.stringify(payload), (err?: Error) => {
+                    if(err) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
             });
-        });
+        } catch (err) {
+            if(this.isSocketClosedDuringSendError(err)) {
+                this.log.warn(`[WebSocket] send skipped due to socket close race: ${(err as any)?.message || err}`);
+                this.scheduleWebSocketReconnect("send on closed socket");
+                return;
+            }
+            throw err;
+        }
     }
 
     private async refreshAuthForWebSocket() {
@@ -190,7 +215,10 @@ export default class WebSocketScheduler {
                     // ignore
                 }
 
-                const ws = new WebSocket(url, { headers } as any);
+                const ws = new WebSocket(url, {
+                    headers,
+                    perMessageDeflate: false,
+                } as any);
                 this.ws = ws;
                 this.wsClosedByUser = false;
 
@@ -226,6 +254,9 @@ export default class WebSocketScheduler {
                 ws.on("close", (code: number, reason: Buffer) => {
                     const reasonText = reason?.toString("utf8") || "";
                     this.log.warn(`[WebSocket] closed (code=${code}${reasonText ? `, reason=${reasonText}` : ""})`);
+                    if(this.ws === ws) {
+                        this.ws = undefined;
+                    }
                     if(!this.wsClosedByUser) {
                         this.scheduleWebSocketReconnect(`closed:${code}`);
                     }
