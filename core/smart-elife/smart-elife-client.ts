@@ -82,13 +82,6 @@ export default class SmartELifeClient {
         }
     }
 
-    getComplexName(): string {
-        if(!this.complex) {
-            throw new Error("Complex info is not yet init.");
-        }
-        return this.complex.complexDisplayName;
-    }
-
     private createWebSocketScheduler() {
         return new WebSocketScheduler(this, this.baseUrl, this.log, {
             getJSessionId(client: SmartELifeClient): string | undefined {
