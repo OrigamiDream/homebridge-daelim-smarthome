@@ -82,6 +82,13 @@ export default class SmartELifeClient {
         }
     }
 
+    getComplexName(): string {
+        if(!this.complex) {
+            throw new Error("Complex info is not yet init.");
+        }
+        return this.complex.complexDisplayName;
+    }
+
     private createWebSocketScheduler() {
         return new WebSocketScheduler(this, this.baseUrl, this.log, {
             getJSessionId(client: SmartELifeClient): string | undefined {
@@ -692,11 +699,14 @@ export default class SmartELifeClient {
     }
 
     private async fetchComplex() {
+        if(!this.userInfo) {
+            throw new Error("`UserInfo` must be init prior to fetch complex info.");
+        }
         const complexes = await fetch(Utils.SMART_ELIFE_COMPLEX_URL)
             .then((response) => response.json())
             .then((json) => json as SmartELifeComplex[]);
         const complexOne = complexes
-            .filter((complex) => complex.complexKey === this.config.complex);
+            .filter((complex) => complex.complexCode === this.userInfo?.complexCode);
         if(!complexOne) {
             return undefined;
         }

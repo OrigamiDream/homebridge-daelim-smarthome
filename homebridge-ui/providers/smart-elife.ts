@@ -51,9 +51,9 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
     }
 
     async signIn(p: any) {
-        const { complex, username, password } = p;
+        const { username, password } = p;
 
-        this.log.info(`complex = ${complex}, username: ${username}`);
+        this.log.info(`username: ${username}`);
 
         const uuid = Utils.sha256(Utils.generateUUID(username), "daelim");
 
@@ -70,7 +70,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         this.log.info("Starting up Smart eLife...");
 
         const config: SmartELifeConfig = {
-            complex, username, password, uuid,
+            username, password, uuid,
             wallpadVersion: WALLPAD_VERSION_3_0,
             version: Utils.currentSemanticVersion(),
             devices: this.devices,

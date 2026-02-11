@@ -45,7 +45,6 @@ export default class SmartELifeProvider extends AbstractProvider {
             }
         }
         return {
-            complex: config["complex"],
             username: config["username"],
             password: config["password"],
             uuid: config["uuid"],

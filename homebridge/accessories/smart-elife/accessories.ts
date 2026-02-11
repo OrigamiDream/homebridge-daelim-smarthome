@@ -99,8 +99,8 @@ export default class Accessories<T extends AccessoryInterface> {
         const context = this.getAccessoryInterface(accessory);
         const info = this.getService(accessory, this.api.hap.Service.AccessoryInformation);
         info.setCharacteristic(this.api.hap.Characteristic.Manufacturer, Utils.MANUFACTURER_NAME);
-        info.setCharacteristic(this.api.hap.Characteristic.Model, `${this.config.complex}-${accessory.context.displayName}`);
-        info.setCharacteristic(this.api.hap.Characteristic.SerialNumber, context.displayName);
+        info.setCharacteristic(this.api.hap.Characteristic.Model, context.displayName);
+        info.setCharacteristic(this.api.hap.Characteristic.SerialNumber, context.deviceId);
 
         const removals = [];
         for(const service of accessory.services) {

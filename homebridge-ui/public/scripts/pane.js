@@ -258,7 +258,8 @@ class ProviderPane extends Pane {
         if(provider === "daelim") {
             return new RegionPane(this.element, this.config);
         } else if(provider === "smart-elife") {
-            return new ComplexPane(this.element, this.config, "smart-elife");
+            // Smart eLife does not need complex info.
+            return new AuthorizationPane(this.element, this.config, provider);
         } else {
             console.error(`Prohibited provider: ${provider}`);
         }
@@ -534,7 +535,13 @@ class AuthorizationPane extends Pane {
     }
 
     prevPane() {
-        return new ComplexPane(this.element, this.config, this.provider);
+        if(this.provider === "daelim") {
+            return new ComplexPane(this.element, this.config, this.provider);
+        } else if(this.provider === "smart-elife") {
+            return new ProviderPane(this.element, this.config);
+        } else {
+            console.error(`Prohibited provider: ${this.provider}`);
+        }
     }
 
     nextPane() {
@@ -606,6 +613,7 @@ class AuthorizationPane extends Pane {
                 newOptions["roomKey"] = event["data"].roomKey;
                 newOptions["userKey"] = event["data"].userKey;
                 newOptions["wallpadVersion"] = event["data"].version;
+                newOptions["complex"] = event["data"].complex;
             }
             await this.advance(newOptions, this.nextPane());
         });
