@@ -28,6 +28,13 @@ export interface DeviceDuration {
     camera?: number
 }
 
+export enum ControlQueryCategory {
+    USER_MODE = "user_mode",
+    ELEVATOR = "elevator",
+    CONTROL = "control",
+    BOARD = "board",
+}
+
 export enum DeviceType {
     HEATER = "heat",
     WALL_SOCKET = "wallsocket",
@@ -57,4 +64,41 @@ export namespace DeviceType {
                 throw new Error(`Could not parse device type from string: ${deviceType}`);
         }
     }
+}
+
+export interface PushItem {
+    kind: PushItemKind
+    name: string
+    hasSmartdoor: boolean
+    enabled: boolean
+    desc?: string
+}
+
+export enum PushItemKind {
+    UNKNOWN = "unknown",
+    GAS = "gas",
+    FAMILY_ENTER = "familyenter",
+    NEW_BOARD = "boardnew",
+    ENTRANCE_PASSWORD_CHANGE = "entpw",
+    NEW_NOTICE = "notice",
+    HEATING = "heating",
+    WALL_SOCKET = "wallsocket",
+    SMART_DOOR_STATUS = "smartdoorstatus",
+    SECURITY = "OUTING",
+    SECURITY_PASSWORD_CHANGE = "secpw",
+    VISITOR = "visitor",
+    MODE_RUNNING = "moderun",
+    AIR_CONDITIONER = "aircon",
+    EMS = "ems",
+    ELEVATOR = "elevator",
+    ALL_OFF_SWITCH = "allofswitch",
+    ONE_TIME_KEY = "onetimekey",
+    CAR = "car",
+    LIGHT = "light",
+    DOOR = "door",
+    CARE_SERVICE = "careservice",
+    PARCEL = "parcel",
+    VENT = "vent",
+    NEW_USER = "usernew",
+    UNREGISTER_USER = "userout",
 }

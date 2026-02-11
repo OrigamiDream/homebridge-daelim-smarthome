@@ -1,6 +1,13 @@
 import fetch, {Response} from "node-fetch";
 import {LoggerBase, Utils} from "../utils";
-import {Device, DeviceType, SmartELifeConfig} from "../interfaces/smart-elife-config";
+import {
+    ControlQueryCategory,
+    Device,
+    DeviceType,
+    PushItem,
+    PushItemKind,
+    SmartELifeConfig
+} from "../interfaces/smart-elife-config";
 import {ClientResponseCode} from "./responses";
 import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
@@ -466,11 +473,7 @@ export default class SmartELifeClient {
             this.log("Configuring Push");
 
             this.push.onNotification((notification) => {
-                const orig = notification.message;
-                if(!orig || !orig.data) {
-                    return;
-                }
-                this.log.info(`[Push] onNotify (JSON): ${JSON.stringify(orig.data, null, 2)}`);
+                this.log.info(`[Push] onNotify (JSON): ${JSON.stringify(notification.message, null, 2)}`);
             });
             await this.push.connect();
 
@@ -494,10 +497,80 @@ export default class SmartELifeClient {
         }
     }
 
-    async serve() {
-        this.configurePushNotification().then(() => {
-            this.log("Push notification configured.");
+    private async checkPushSettings() {
+        const response = await this.sendHttpJson("/mypage/pushList.ajax", {
+            roomkey: this.wsCredentials?.roomKey,
+            userkey: this.wsCredentials?.userKey,
+            item: "all",
         });
+        if(!response || !response["result"] || response["result"]["status"] !== "000") {
+            this.log.warn("Could not check Push notification settings.");
+            return [];
+        }
+
+        const elements = response["data"]["list"];
+        const items: PushItem[] = [];
+        for(const element of elements) {
+            const kind = element["item"] as PushItemKind || PushItemKind.UNKNOWN;
+            if(kind === PushItemKind.UNKNOWN) {
+                continue;
+            }
+            items.push({
+                enabled: element["is_use"] === "y",
+                hasSmartdoor: element["hasSmartdoor"] === "y",
+                kind: kind,
+                name: element["name"],
+                desc: element["desc"],
+            });
+        }
+        return items;
+    }
+
+    async setPushActive(items: PushItem[], kinds: PushItemKind[]) {
+        const inactives = [];
+        for(const item of items) {
+            if(!kinds.includes(item.kind)) continue;
+            if(item.enabled) {
+                this.log.info("Push for %s is already enabled.", item.kind.toString());
+                continue;
+            }
+            inactives.push(item);
+        }
+        if(!inactives.length) {
+            return true;
+        }
+        const response = await this.sendHttpJson("/mypage/pushSetting.ajax", {
+            type: "daelim",
+            list: inactives.map((item) => {
+                return {
+                    "item": item.kind.toString(),
+                    "is_use": "y",
+                }
+            }),
+        });
+        if(response["result"]["status"] !== "000") {
+            return false;
+        }
+        for(const item of inactives) {
+            this.log.info("Push for %s is enabled.", item.kind.toString());
+        }
+        return true;
+    }
+
+    async serve() {
+        this.configurePushNotification().then(async () => {
+            this.log("Push notification configured.");
+
+            const items = await this.checkPushSettings();
+            await this.setPushActive(items, [
+                PushItemKind.VISITOR,
+                PushItemKind.CAR,
+                PushItemKind.DOOR,
+                PushItemKind.FAMILY_ENTER,
+                PushItemKind.SMART_DOOR_STATUS,
+            ]);
+        });
+
         this.complex = await this.fetchComplex();
         if(this.complex) {
             this.log(`Complex: ${this.complex.complexDisplayName}`);
@@ -643,31 +716,21 @@ export default class SmartELifeClient {
     }
 
     async sendElevatorCallQuery(): Promise<boolean> {
-        const response = await this.fetchJson(`${this.baseUrl}/common/data.ajax`, {
-            method: "POST",
-            headers: {
-                ...this.httpHeaders,
-                "_csrf": await this.getCsrfToken(),
-                "daelim_elife": this.accessToken,
+        const response = await this.sendControlQuery(ControlQueryCategory.ELEVATOR, "call", {
+            uid: ELEVATOR_DEVICE.deviceId,
+            operation: {
+                control: "down",
             },
-            body: JSON.stringify({
-                header: {
-                    category: "elevator",
-                    type: "call",
-                    command: "control_request",
-                },
-                data: {
-                    uid: ELEVATOR_DEVICE.deviceId,
-                    operation: {
-                        control: "down",
-                    },
-                },
-            }),
         });
         return !!response["result"] && response["result"]["status"] === "000";
     }
 
-    async sendControlQuery(queryType: string) {
+    async sendControlQuery(
+        category: ControlQueryCategory,
+        type: string,
+        data: any,
+        command: string = "control_request",
+    ) {
         return await this.fetchJson(`${this.baseUrl}/common/data.ajax`, {
             method: "POST",
             headers: {
@@ -677,14 +740,10 @@ export default class SmartELifeClient {
             },
             body: JSON.stringify({
                 header: {
-                    category: "control",
-                    type: queryType,
-                    command: "query_request",
+                    category: category.toString(),
+                    type, command,
                 },
-                data: {
-                    roomkey: this.wsCredentials?.roomKey,
-                    userkey: this.wsCredentials?.userKey,
-                },
+                data,
             })
         });
     }
