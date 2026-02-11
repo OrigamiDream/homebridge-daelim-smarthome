@@ -6,12 +6,17 @@ import PushReceiver from "@eneris/push-receiver";
 import {Logging} from "homebridge";
 import {SmartELifeComplex, SmartELifeUserInfo} from "../interfaces/smart-elife-complex";
 import WebSocketScheduler from "./ws-scheduler";
-import {parseRoomAndUserKey, WsKeys} from "./parsers/room-parsers";
+import {parseWebSocketCredentials, WebSocketCredentials} from "./parsers/ws-creds-parsers";
 import {parseDeviceList} from "./parsers/device-parsers";
 import {HTMLCandidate, parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0} from "./parsers/version-parsers";
 import {ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
 
-export type Listener = (data: any) => void;
+export interface ListenerError {
+    code: number
+    message: string
+}
+
+export type Listener = (data: any | undefined, error: ListenerError) => void;
 
 interface ListenerInfo {
     deviceType: DeviceType
@@ -43,8 +48,7 @@ export default class SmartELifeClient {
     private accessToken?: string;
 
     // WallPad authorization temporary keys
-    private userKey?: string;
-    private roomKey?: string;
+    private wsCredentials?: WebSocketCredentials;
     private serverSideRenderedHTML?: string;
 
     private readonly ws?: WebSocketScheduler;
@@ -86,6 +90,14 @@ export default class SmartELifeClient {
                 return ClientResponseCode.SUCCESS;
             },
             async onMessage(client: SmartELifeClient, json: any) {
+                const result = json["result"];
+                if(!result) {
+                    client.log.warn("Unexpected message format: %s", JSON.stringify(json));
+                    return;
+                }
+                const status = result["status"];
+                const message = result["message"];
+
                 const header = json["header"];
                 const action = json["action"];
                 let deviceType;
@@ -100,7 +112,7 @@ export default class SmartELifeClient {
 
                 for(const info of client.listeners) {
                     if(info.deviceType === deviceType) {
-                        info.listener(json["data"]);
+                        info.listener(json["data"], { code: Number(status), message });
                     }
                 }
             }
@@ -314,13 +326,16 @@ export default class SmartELifeClient {
                     return ClientResponseCode.INCOMPLETE_USER_INFO;
                 }
                 const responseCode = this.updateAuthorizationAndUserInfo(response);
-                await this.attemptsParsingRoomAndUserKeys();
+                await this.attemptsParsingWebSocketCredentials();
                 return responseCode;
             }
             case ClientResponseCode.UNCERTIFIED_WALLPAD: {
-                this.userKey = response["userkey"];
-                this.roomKey = response["roomkey"];
-                this.log.info(`Received user-key = ${this.userKey}, room-key = ${this.roomKey} prior to wallpad authorization.`);
+                this.wsCredentials = {
+                    userKey: response["userkey"],
+                    roomKey: response["roomkey"],
+                    accessToken: "",
+                }
+                this.log.info(`Received user-key = ${this.wsCredentials.userKey}, room-key = ${this.wsCredentials.roomKey} prior to wallpad authorization.`);
 
                 // Ask for preparing the Wallpad authorization.
                 const success = await this.requestWallpadAuthorization();
@@ -334,27 +349,26 @@ export default class SmartELifeClient {
         return code;
     }
 
-    private async attemptsParsingRoomAndUserKeys() {
-        if(this.config.userKey && this.config.roomKey) {
-            this.userKey = this.config.userKey;
-            this.roomKey = this.config.roomKey;
-            return;
-        }
-        const { userKey, roomKey } = parseRoomAndUserKey(await this.fetchServerSideRenderedHTML());
+    private async attemptsParsingWebSocketCredentials() {
+        let { userKey, roomKey, accessToken } = parseWebSocketCredentials(await this.fetchServerSideRenderedHTML());
 
-        // Inject.
-        this.userKey = userKey;
-        this.roomKey = roomKey;
+        userKey = userKey || this.config.userKey || "";
+        roomKey = roomKey || this.config.roomKey || "";
+
+        if(!this.wsCredentials) {
+            this.wsCredentials = { userKey, roomKey, accessToken };
+        } else {
+            this.wsCredentials.userKey = userKey;
+            this.wsCredentials.roomKey = roomKey;
+            this.wsCredentials.accessToken = accessToken;
+        }
     }
 
-    public getRoomAndUserKeys(): WsKeys {
+    public getWebSocketCredentials(): WebSocketCredentials {
         // This variables will be initialized after `sign-in` succeeded.
-        if(!this.userKey) throw new Error("`userKey` not parsed yet.");
-        if(!this.roomKey) throw new Error("`roomKey` not parsed yet.");
-        return {
-            userKey: this.userKey,
-            roomKey: this.roomKey,
-        }
+        if(!this.wsCredentials)
+            throw new Error("`WebSocketCredentials` not yet init.");
+        return this.wsCredentials;
     }
 
     private async requestWallpadAuthorization() {
@@ -367,8 +381,8 @@ export default class SmartELifeClient {
             body: JSON.stringify({
                 ...this.httpBody,
                 "flag": "login",
-                "input_userkey": this.userKey,
-                "input_roomkey": this.roomKey,
+                "input_userkey": this.wsCredentials?.userKey,
+                "input_roomkey": this.wsCredentials?.roomKey,
                 "input_errtype": "DEFAULT",
                 "input_wallpad_key": "", // This field must be empty when I ask for preparing the wallpad authorization.
             }),
@@ -386,8 +400,8 @@ export default class SmartELifeClient {
             body: JSON.stringify({
                 ...this.httpBody,
                 "flag": "login",
-                "input_userkey": this.userKey,
-                "input_roomkey": this.roomKey,
+                "input_userkey": this.wsCredentials?.userKey,
+                "input_roomkey": this.wsCredentials?.roomKey,
                 "input_errtype": "DEFAULT",
                 "input_wallpad_key": passcode,
             }),
@@ -574,9 +588,9 @@ export default class SmartELifeClient {
         }
         const deviceList = parseDeviceList(await this.fetchServerSideRenderedHTML());
         await this.sendJson({
-            "roomKey": this.roomKey,
-            "userKey": this.userKey,
-            "accessToken": Utils.SMART_ELIFE_WEB_SOCKET_TOKEN,
+            "roomKey": this.wsCredentials?.roomKey,
+            "userKey": this.wsCredentials?.userKey,
+            "accessToken": this.wsCredentials?.accessToken,
             "data": deviceList,
         });
     }
@@ -668,8 +682,8 @@ export default class SmartELifeClient {
                     command: "query_request",
                 },
                 data: {
-                    roomkey: this.roomKey,
-                    userkey: this.userKey,
+                    roomkey: this.wsCredentials?.roomKey,
+                    userkey: this.wsCredentials?.userKey,
                 },
             })
         });

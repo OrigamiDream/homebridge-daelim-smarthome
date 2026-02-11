@@ -111,7 +111,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
             }
         }
 
-        const { roomKey, userKey } = this.client.getRoomAndUserKeys();
+        const { roomKey, userKey } = this.client.getWebSocketCredentials();
         const version = await this.client.parseWallPadVersion();
 
         // On success

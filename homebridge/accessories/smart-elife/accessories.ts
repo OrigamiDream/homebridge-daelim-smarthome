@@ -177,10 +177,9 @@ export default class Accessories<T extends AccessoryInterface> {
     }
 
     protected async sendWsJson(payload: any) {
-        const { userKey, roomKey } = this.client.getRoomAndUserKeys();
+        const { userKey, roomKey, accessToken } = this.client.getWebSocketCredentials();
         await this.client.sendJson({
-            roomKey, userKey,
-            accessToken: Utils.SMART_ELIFE_WEB_SOCKET_TOKEN,
+            roomKey, userKey, accessToken,
             data: payload,
         });
     }
@@ -196,8 +195,15 @@ export default class Accessories<T extends AccessoryInterface> {
     }
 
     protected addDeviceListener(deviceListener: DeviceListener) {
-        this.addListener((data: any) => {
-            deviceListener(this.parseDevices(data));
+        this.addListener((data, error) => {
+            let devices: DeviceWithOp[];
+            if(!data || !data["devices"]) {
+                this.log.warn(`Devices (${this.deviceType.toString()}) not found: (${error.code}) ${error.message}`);
+                devices = [];
+            } else {
+                devices = this.parseDevices(data);
+            }
+            deviceListener(devices);
         });
     }
 

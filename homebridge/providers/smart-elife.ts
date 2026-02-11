@@ -14,6 +14,7 @@ import IndoorAirQualityAccessories from "../accessories/smart-elife/indoor-air-q
 import HeaterAccessories from "../accessories/smart-elife/heater";
 import GasAccessories from "../accessories/smart-elife/gas";
 import ElevatorAccessories from "../accessories/smart-elife/elevator";
+import AirConditionerAccessories from "../accessories/smart-elife/air-conditioner";
 
 export default class SmartELifeProvider extends AbstractProvider {
 
@@ -32,6 +33,7 @@ export default class SmartELifeProvider extends AbstractProvider {
             this.accessories.push(new HeaterAccessories(log, api, this.config));
             this.accessories.push(new GasAccessories(log, api, this.config));
             this.accessories.push(new ElevatorAccessories(log, api, this.config));
+            this.accessories.push(new AirConditionerAccessories(log, api, this.config));
         }
     }
 
