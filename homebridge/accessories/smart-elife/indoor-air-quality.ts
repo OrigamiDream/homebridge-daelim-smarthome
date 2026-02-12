@@ -55,6 +55,9 @@ namespace AirQuality {
 const INDOOR_AIR_QUALITY_POLLING_INTERVAL_MILLISECONDS = 60 * 1000;
 
 export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQualityAccessoryInterface> {
+
+    private skippedFirstPollingMessage: boolean = false;
+
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
         super(log, api, config, DeviceType.INDOOR_AIR_QUALITY, [
             api.hap.Service.AirQualitySensor,
@@ -76,7 +79,10 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
     }
 
     async fetchAirQuality() {
-        this.log.info(`Polling device state :: ${this.deviceType.toString()} (${this.accessories.length} accessories)`);
+        if(this.skippedFirstPollingMessage) {
+            this.log.info(`Polling device state :: ${this.deviceType.toString()} (${this.accessories.length} accessories)`);
+        }
+        this.skippedFirstPollingMessage = true;
 
         const response = await this.client.sendHttpJson("/monitoring/getAirList.ajax", { location: "all" });
         if(!response["data"]) {
