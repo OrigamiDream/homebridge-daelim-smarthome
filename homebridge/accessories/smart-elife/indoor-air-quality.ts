@@ -9,6 +9,7 @@ import {
 } from "homebridge";
 import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {Utils} from "../../../core/utils";
+import {setGlobalIndoorRelativeHumidity} from "./indoor-air-quality-cache";
 
 interface IndoorAirQualityAccessoryInterface extends AccessoryInterface {
     pm10: DensityWithQuality
@@ -79,10 +80,14 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
 
         const response = await this.client.sendHttpJson("/monitoring/getAirList.ajax", { location: "all" });
         if(!response["data"]) {
-            this.log.warn("Air Quality data not found.");
+            const message = response["result"]["errorMessage"].replace(/(<br\/>)/gi, " ");
+            const code = response["result"]["status"];
+            this.log.warn("Devices (%s) not found: (%s) %s", this.deviceType.toString(), code, message);
             return;
         }
         const devices = response["data"]["list"];
+        let humiditySum = 0;
+        let humidityCount = 0;
         let index = 0;
         for(const info of devices) {
             index++;
@@ -90,6 +95,12 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
             const deviceId = `CMFIAQ${Utils.addPadding(index, 3)}`;
             const device = this.findDevice(deviceId);
             if(!device) continue;
+
+            const humidity = Number(info["humi"]);
+            if(Number.isFinite(humidity)) {
+                humiditySum += humidity;
+                humidityCount += 1;
+            }
 
             this.addOrGetAccessory({
                 deviceId: device.deviceId,
@@ -101,8 +112,11 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
                 co2: { density: info["co2"]["value"], quality: AirQuality.parse(info["co2"]["css"]) },
                 vocs: { density: info["vocs"]["value"], quality: AirQuality.parse(info["vocs"]["css"]) },
                 temperature: Number(info["temp"]),
-                humidity: Number(info["humi"]),
+                humidity,
             });
+        }
+        if(humidityCount > 0) {
+            setGlobalIndoorRelativeHumidity(humiditySum / humidityCount);
         }
     }
 
