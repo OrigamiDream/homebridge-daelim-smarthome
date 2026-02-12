@@ -20,7 +20,7 @@ import {ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator
 
 export interface ListenerError {
     code: number
-    message: string
+    message?: string
 }
 
 export type Listener = (data: any | undefined, error: ListenerError) => void;
@@ -97,20 +97,17 @@ export default class SmartELifeClient {
                 return ClientResponseCode.SUCCESS;
             },
             async onMessage(client: SmartELifeClient, json: any) {
-                const result = json["result"];
-                if(!result) {
-                    client.log.warn("Unexpected message format: %s", JSON.stringify(json));
-                    return;
-                }
-                const status = result["status"];
-                const message = result["message"];
-
                 const header = json["header"];
                 const action = json["action"];
 
-                let deviceTypeString;
+                let status = "000";
+                let deviceTypeString, message;
                 if(!!header) {
                     deviceTypeString = header["type"];
+                    if(json["result"]) {
+                        status = json["result"]["status"];
+                        message = json["result"]["message"];
+                    }
                 } else if(!!action && action.startsWith("event_")) {
                     deviceTypeString = action.slice("event_".length);
                 } else {

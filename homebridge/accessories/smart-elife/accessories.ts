@@ -198,7 +198,7 @@ export default class Accessories<T extends AccessoryInterface> {
         this.addListener((data, error) => {
             let devices: DeviceWithOp[];
             if(!data || !data["devices"]) {
-                this.log.warn(`Devices (${this.deviceType.toString()}) not found: (${error.code}) ${error.message}`);
+                this.log.warn(`Devices (${this.deviceType.toString()}) not found: (${error.code}) ${error.message ?? "unknown reason"}`);
                 devices = [];
             } else {
                 devices = this.parseDevices(data);
