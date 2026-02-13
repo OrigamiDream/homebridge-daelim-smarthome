@@ -1,6 +1,6 @@
-import SmartELifeClient, {Listener} from "../../../core/smart-elife/smart-elife-client";
+import SmartELifeClient, {Listener, PushListener} from "../../../core/smart-elife/smart-elife-client";
 import {API, Logging, PlatformAccessory, Service} from "homebridge";
-import {Device, DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
+import {Device, DeviceType, PushType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {WithUUID} from "hap-nodejs";
 import {Utils} from "../../../core/utils";
 import {getWallPadCapabilities, WallPadCapabilities} from "../../../core/smart-elife/parsers/version-parsers";
@@ -205,6 +205,10 @@ export default class Accessories<T extends AccessoryInterface> {
             }
             deviceListener(devices);
         });
+    }
+
+    protected addPushListener(pushType: PushType, listener: PushListener) {
+        this.client.addPushListener(pushType, listener);
     }
 
     protected defer(deviceId: string, task: Promise<boolean>) {
