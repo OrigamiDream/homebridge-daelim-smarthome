@@ -8,21 +8,20 @@ interface DoorAccessoryInterface extends AccessoryInterface {
     motionDetected: boolean
 }
 
-export const FRONT_DOOR: Device = {
+export const FRONT_DOOR_DEVICE: Device = {
     displayName: "외부 세대현관",
     name: "세대현관",
     deviceType: DeviceType.DOOR,
     deviceId: "CMFDOR001",
     disabled: false,
 };
-export const EXTERIOR_DOOR: Device = {
+export const EXTERIOR_DOOR_DEVICE: Device = {
     displayName: "외부 공동현관",
     name: "공동현관",
     deviceType: DeviceType.DOOR,
     deviceId: "CMFDOR002",
     disabled: false,
 }
-export const DOOR_DEVICES: Device[] = [ FRONT_DOOR, EXTERIOR_DOOR ];
 export const DOOR_TIMEOUT_DURATION_SECONDS = 5; // 5 seconds
 
 export default class DoorAccessories extends Accessories<DoorAccessoryInterface> {
@@ -84,10 +83,10 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
 
     register() {
         super.register();
-        this.registerPushListener(PushType.FRONT_DOOR, FRONT_DOOR);
+        this.registerPushListener(PushType.FRONT_DOOR, FRONT_DOOR_DEVICE);
 
         setTimeout(() => {
-            for(const device of DOOR_DEVICES) {
+            for(const device of [FRONT_DOOR_DEVICE, EXTERIOR_DOOR_DEVICE]) {
                 if(!this.findDevice(device.deviceId))
                     continue;
 
