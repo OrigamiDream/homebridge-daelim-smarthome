@@ -15,6 +15,7 @@ import HeaterAccessories from "../accessories/smart-elife/heater";
 import GasAccessories from "../accessories/smart-elife/gas";
 import ElevatorAccessories from "../accessories/smart-elife/elevator";
 import AirConditionerAccessories from "../accessories/smart-elife/air-conditioner";
+import PushReceiverStateStore from "./push-receiver-state-store";
 
 export default class SmartELifeProvider extends AbstractProvider {
 
@@ -71,18 +72,22 @@ export default class SmartELifeProvider extends AbstractProvider {
             return;
         }
 
+        const store = new PushReceiverStateStore(this.log, this.api, "smart-elife");
+        const { credentials, persistentIds } = store.load();
+
         // firebase cloud messaging
         const push = new PushReceiver({
             debug: false,
-            persistentIds: [],
+            persistentIds,
             firebase: {
                 apiKey: Utils.SMART_ELIFE_FCM_API_KEY,
                 appId: Utils.SMART_ELIFE_FCM_APP_ID,
                 projectId: Utils.SMART_ELIFE_FCM_PROJECT_ID,
                 messagingSenderId: Utils.SMART_ELIFE_FCM_SENDER_ID,
             },
-            credentials: undefined,
+            credentials,
         });
+        store.bind(push, credentials);
         this.client = SmartELifeClient.create(this.log, this.config, push);
 
         const response = await this.client.signIn();

@@ -15,6 +15,7 @@ import {ElevatorAccessories} from "../accessories/daelim/elevator";
 import {DoorAccessories} from "../accessories/daelim/door";
 import {VehicleAccessories} from "../accessories/daelim/vehicle";
 import {CameraAccessories} from "../accessories/daelim/camera";
+import PushReceiverStateStore from "./push-receiver-state-store";
 
 export default class DaelimProvider extends AbstractProvider {
 
@@ -78,18 +79,22 @@ export default class DaelimProvider extends AbstractProvider {
             return;
         }
 
+        const store = new PushReceiverStateStore(this.log, this.api, "daelim");
+        const { credentials, persistentIds } = store.load();
+
         // firebase cloud messaging
         const push = new PushReceiver({
             debug: false,
-            persistentIds: [],
+            persistentIds,
             firebase: {
                 apiKey: Utils.DAELIM_FCM_API_KEY,
                 appId: Utils.DAELIM_FCM_APP_ID,
                 projectId: Utils.DAELIM_FCM_PROJECT_ID,
                 messagingSenderId: Utils.DAELIM_FCM_SENDER_ID,
             },
-            credentials: undefined,
+            credentials,
         })
+        store.bind(push, credentials);
         this.client = new DaelimClient(this.log, this.config, push);
         await this.client.prepareService();
 
