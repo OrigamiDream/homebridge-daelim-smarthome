@@ -6,6 +6,7 @@ import {
     DeviceType,
     PushItem,
     PushItemKind,
+    PushType,
     SmartELifeConfig
 } from "../interfaces/smart-elife-config";
 import {ClientResponseCode} from "./responses";
@@ -24,10 +25,16 @@ export interface ListenerError {
 }
 
 export type Listener = (data: any | undefined, error: ListenerError) => void;
+export type PushListener = (title: string | undefined, message: string | undefined) => void;
 
 interface ListenerInfo {
     deviceType: DeviceType
     listener: Listener
+}
+
+interface PushListenerInfo {
+    pushType: PushType
+    listener: PushListener
 }
 
 export default class SmartELifeClient {
@@ -60,6 +67,7 @@ export default class SmartELifeClient {
 
     private readonly ws?: WebSocketScheduler;
     private readonly listeners: ListenerInfo[] = [];
+    private readonly pushListeners: PushListenerInfo[] = [];
 
     private readonly baseUrl = Utils.SMART_ELIFE_BASE_URL;
     private readonly key = Utils.SMART_ELIFE_AES_KEY;
@@ -475,6 +483,32 @@ export default class SmartELifeClient {
 
             this.push.onNotification((notification) => {
                 this.log.info(`[Push] onNotify (JSON): ${JSON.stringify(notification.message, null, 2)}`);
+                const data = notification.message.data;
+                if(!data || !data["data"]) {
+                    this.log.warn("Unexpected Push message (no data): %s", JSON.stringify(notification.message));
+                    return;
+                }
+                const payload = JSON.parse(data["data"] as string);
+                if(!payload) {
+                    this.log.warn("Unexpected Push message (not JSON): %s", JSON.stringify(notification.message));
+                    return;
+                }
+                const pushTypeString = ["data1", "data2", "data3", "data4"]
+                    .map((key) => payload[key])
+                    .filter((value) => !!value)
+                    .join("-");
+                const pushType = pushTypeString as PushType || PushType.UNKNOWN;
+                if(pushType === PushType.UNKNOWN) {
+                    this.log.warn("Unexpected Push message (unknown payload): %s", JSON.stringify(notification.message));
+                    return;
+                }
+                const title = notification.message.notification?.title;
+                const body = notification.message.notification?.body;
+
+                for(const listener of this.pushListeners) {
+                    if(listener.pushType !== pushType) continue;
+                    listener.listener(title, body);
+                }
             });
             await this.push.connect();
 
@@ -797,5 +831,9 @@ export default class SmartELifeClient {
 
     addListener(deviceType: DeviceType, listener: Listener) {
         this.listeners.push({ deviceType, listener });
+    }
+
+    addPushListener(pushType: PushType, listener: PushListener) {
+        this.pushListeners.push({ pushType, listener });
     }
 }

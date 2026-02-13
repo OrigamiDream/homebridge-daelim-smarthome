@@ -84,3 +84,10 @@ export enum PushItemKind {
     NEW_USER = "usernew",
     UNREGISTER_USER = "userout",
 }
+
+export enum PushType {
+    UNKNOWN = "unknown",
+    VISITOR = "5-32",
+    CAR = "5-46",
+    FRONT_DOOR = "5-61-9",
+}
