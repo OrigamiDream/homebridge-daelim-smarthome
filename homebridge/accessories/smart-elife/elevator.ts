@@ -67,7 +67,7 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
                         context.called = false;
                         this.getService(accessory, this.api.hap.Service.Switch)
                             .setCharacteristic(this.api.hap.Characteristic.On, false);
-                    }, device.duration?.elevator || 30 * 1000); // 30s as default.
+                    }, (device.duration?.elevator || 30) * 1000); // 30s as default.
                 }
                 context.called = called;
                 callback(undefined);
