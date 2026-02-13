@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {API, Logging} from "homebridge";
 import PushReceiver from "@eneris/push-receiver";
-import {Utils} from "../../core/utils";
+import {Utils} from "./utils";
 
 const FILE_SCHEMA_VERSION = 1;
 const MAX_PERSISTENT_IDS = 512;
