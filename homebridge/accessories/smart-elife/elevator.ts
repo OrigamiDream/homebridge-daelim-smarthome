@@ -11,8 +11,11 @@ import {Device, DeviceType, SmartELifeConfig} from "../../../core/interfaces/sma
 import Timeout = NodeJS.Timeout;
 
 interface ElevatorAccessoryInterface extends AccessoryInterface {
-    timeoutId: Timeout | number
-    called: boolean
+    switchTimer: number | Timeout
+    switchLocked: boolean
+
+    motionTimer: number | Timeout
+    motionDetected: boolean
 }
 
 export const EXTERIOR_ELEVATOR_DEVICE: Device = {
@@ -22,10 +25,11 @@ export const EXTERIOR_ELEVATOR_DEVICE: Device = {
     deviceId: "CMF990100",
     disabled: false,
 };
+const ELEVATOR_MOTION_DURATION_TIMEOUT_SECONDS = 5; // 5 seconds
 
 export default class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface> {
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
-        super(log, api, config, DeviceType.ELEVATOR, [api.hap.Service.Switch]);
+        super(log, api, config, DeviceType.ELEVATOR, [api.hap.Service.Switch, api.hap.Service.MotionSensor]);
     }
 
     doPoll(): boolean {
@@ -42,7 +46,7 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
                 if(!called) {
                     setTimeout(() => {
                         this.getService(accessory, this.api.hap.Service.Switch)
-                            .setCharacteristic(this.api.hap.Characteristic.On, context.called);
+                            .setCharacteristic(this.api.hap.Characteristic.On, context.switchLocked);
                     }, 0);
                     callback(undefined);
                     return;
@@ -58,28 +62,67 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
                         callback(new Error("Failed to set the device state."));
                         return;
                     }
-                    if(context.timeoutId !== -1) clearTimeout(context.timeoutId);
+                    if(context.switchTimer !== -1) clearTimeout(context.switchTimer);
 
-                    context.timeoutId = setTimeout(() => {
-                        if(context.timeoutId !== -1) clearTimeout(context.timeoutId);
+                    context.switchTimer = setTimeout(() => {
+                        if(context.switchTimer !== -1) clearTimeout(context.switchTimer);
 
-                        context.timeoutId = -1;
-                        context.called = false;
+                        context.switchTimer = -1;
+                        context.switchLocked = false;
                         this.getService(accessory, this.api.hap.Service.Switch)
                             .setCharacteristic(this.api.hap.Characteristic.On, false);
                     }, (device.duration?.elevator || 30) * 1000); // 30s as default.
                 }
-                context.called = called;
+                context.switchLocked = called;
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                callback(undefined, context.called);
+                callback(undefined, context.switchLocked);
+            });
+
+        this.getService(accessory, this.api.hap.Service.MotionSensor)
+            .getCharacteristic(this.api.hap.Characteristic.MotionDetected)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                callback(undefined, context.motionDetected);
             });
     }
 
     register() {
         super.register();
+
+        this.addListener((data) => {
+            if(!data) return;
+            if(!["unprogressing", "down", "up"].includes(data["rerection"])) return;
+
+            const device = this.findDevice(EXTERIOR_ELEVATOR_DEVICE.deviceId);
+            if(!device) return;
+
+            const accessory = this.findAccessory(device.deviceId);
+            if(!accessory) return;
+
+            const context = this.getAccessoryInterface(accessory);
+            if(context.switchTimer !== -1)
+                clearTimeout(context.switchTimer);
+            context.switchLocked = false;
+            context.switchTimer = -1;
+
+            context.motionDetected = true;
+            context.motionTimer = setTimeout(() => {
+                const context = this.getAccessoryInterface(accessory);
+                if(context.motionTimer !== -1)
+                    clearTimeout(context.motionTimer);
+                context.motionTimer = -1;
+                context.motionDetected = false;
+
+                accessory.getService(this.api.hap.Service.MotionSensor)
+                    ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+            }, ELEVATOR_MOTION_DURATION_TIMEOUT_SECONDS * 1000);
+
+            accessory.getService(this.api.hap.Service.MotionSensor)
+                ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+        });
 
         setTimeout(async () => {
             if(!this.findDevice(EXTERIOR_ELEVATOR_DEVICE.deviceId)) {
@@ -91,8 +134,10 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
                 deviceType: device.deviceType,
                 displayName: device.displayName,
                 init: true,
-                timeoutId: -1,
-                called: false,
+                switchTimer: -1,
+                switchLocked: false,
+                motionTimer: -1,
+                motionDetected: false,
             });
         }, 1000);
     }

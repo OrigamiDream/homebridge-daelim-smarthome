@@ -118,6 +118,9 @@ export default class SmartELifeClient {
                     }
                 } else if(!!action && action.startsWith("event_")) {
                     deviceTypeString = action.slice("event_".length);
+                } else if(!!action && action.startsWith("elevator_call_")) {
+                    // Special condition for elevator arrival notification via MotionSensor.
+                    deviceTypeString = "elevator";
                 } else {
                     client.log.warn("Unexpected message format: %s", JSON.stringify(json));
                     return;
