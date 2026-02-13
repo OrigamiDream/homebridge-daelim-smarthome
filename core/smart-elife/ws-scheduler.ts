@@ -231,7 +231,7 @@ export default class WebSocketScheduler {
                     const text = WebSocketScheduler.wsRawDataToString(data).trim();
 
                     // Mirror the HTTP retry logic: refresh auth when the server indicates login is required.
-                    if(text === "requireLoginForAjax" || /requireLogin/i.test(text)) {
+                    if(text === "accountError2" || text === "requireLoginForAjax" || /requireLogin/i.test(text)) {
                         this.log.warn("[WebSocket] server requested re-authentication; reconnecting.");
                         try {
                             await this.refreshAuthForWebSocket();
