@@ -89,6 +89,8 @@ export enum PushItemKind {
 
 export enum PushType {
     UNKNOWN = "unknown",
+
+    // The following values are built from: data1-data2-data3-data4, filtering out empty data.
     VISITOR = "5-32",
     CAR = "5-46",
     FRONT_DOOR = "5-61-9",

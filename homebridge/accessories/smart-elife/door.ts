@@ -84,6 +84,7 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
     register() {
         super.register();
         this.registerPushListener(PushType.FRONT_DOOR, EXTERIOR_FRONT_DOOR_DEVICE);
+        // TODO: register for communal door after discovers communal door type.
 
         setTimeout(() => {
             for(const device of [EXTERIOR_FRONT_DOOR_DEVICE, EXTERIOR_COMMUNAL_DOOR_DEVICE]) {
