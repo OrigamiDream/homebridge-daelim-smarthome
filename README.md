@@ -10,7 +10,7 @@
 
 e편한세상 및 아크로 계열 아파트 단지를 위한 [Homebridge](https://github.com/homebridge/homebridge) 인증된 플러그인
 
-다음의 기능들을 지원합니다.
+**e편한세상 스마트홈 2.0** 및 **Smart eLife** 앱 사용자 대상으로 다음의 기능들을 지원합니다.
 1. 전등<sup>[1](#lightbulb)</sup>
 2. 난방
 3. 콘센트
@@ -22,9 +22,6 @@ e편한세상 및 아크로 계열 아파트 단지를 위한 [Homebridge](https
 9. 입차 모션 센서
 10. 세대현관 및 공동현관 방문자 이미지 표시<sup>[3](#hksv)</sup>
 11. 세대현관 및 공동현관 방문자 알림
-
-###### DL건설에서 새로 출시한 [스마트 eLife](https://apps.apple.com/kr/app/%EC%8A%A4%EB%A7%88%ED%8A%B8-elife/id1551248421) 앱과 호환되지 않습니다.<br>해당 아파트 거주민 중 개발을 도와주실 의향이 있으시다면 [새 이슈 작성](https://github.com/OrigamiDream/homebridge-daelim-smarthome/issues/new)을 해 주시기 바랍니다.
-
 
 ## 설치 요구사항
 
