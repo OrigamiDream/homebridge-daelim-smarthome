@@ -8,14 +8,14 @@ interface DoorAccessoryInterface extends AccessoryInterface {
     motionDetected: boolean
 }
 
-export const FRONT_DOOR_DEVICE: Device = {
+export const EXTERIOR_FRONT_DOOR_DEVICE: Device = {
     displayName: "외부 세대현관",
     name: "세대현관",
     deviceType: DeviceType.DOOR,
     deviceId: "CMFDOR001",
     disabled: false,
 };
-export const EXTERIOR_DOOR_DEVICE: Device = {
+export const EXTERIOR_COMMUNAL_DOOR_DEVICE: Device = {
     displayName: "외부 공동현관",
     name: "공동현관",
     deviceType: DeviceType.DOOR,
@@ -83,10 +83,10 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
 
     register() {
         super.register();
-        this.registerPushListener(PushType.FRONT_DOOR, FRONT_DOOR_DEVICE);
+        this.registerPushListener(PushType.FRONT_DOOR, EXTERIOR_FRONT_DOOR_DEVICE);
 
         setTimeout(() => {
-            for(const device of [FRONT_DOOR_DEVICE, EXTERIOR_DOOR_DEVICE]) {
+            for(const device of [EXTERIOR_FRONT_DOOR_DEVICE, EXTERIOR_COMMUNAL_DOOR_DEVICE]) {
                 if(!this.findDevice(device.deviceId))
                     continue;
 

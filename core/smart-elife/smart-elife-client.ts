@@ -17,7 +17,7 @@ import WebSocketScheduler from "./ws-scheduler";
 import {parseWebSocketCredentials, WebSocketCredentials} from "./parsers/ws-creds-parsers";
 import {parseDeviceList} from "./parsers/device-parsers";
 import {HTMLCandidate, parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0} from "./parsers/version-parsers";
-import {ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
+import {EXTERIOR_ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
 
 export interface ListenerError {
     code: number
@@ -760,7 +760,7 @@ export default class SmartELifeClient {
 
     async sendElevatorCallQuery(): Promise<boolean> {
         const response = await this.sendControlQuery(ControlQueryCategory.ELEVATOR, "call", {
-            uid: ELEVATOR_DEVICE.deviceId,
+            uid: EXTERIOR_ELEVATOR_DEVICE.deviceId,
             operation: {
                 control: "down",
             },

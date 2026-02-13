@@ -15,7 +15,7 @@ interface ElevatorAccessoryInterface extends AccessoryInterface {
     called: boolean
 }
 
-export const ELEVATOR_DEVICE: Device = {
+export const EXTERIOR_ELEVATOR_DEVICE: Device = {
     displayName: "외부 엘리베이터",
     name: "엘리베이터",
     deviceType: DeviceType.ELEVATOR,
@@ -47,7 +47,7 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
                     callback(undefined);
                     return;
                 }
-                const device = this.findDevice(ELEVATOR_DEVICE.deviceId);
+                const device = this.findDevice(EXTERIOR_ELEVATOR_DEVICE.deviceId);
                 if(!device) {
                     callback(new Error(`Unknown device: ${context.deviceId}`));
                     return;
@@ -82,10 +82,10 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
         super.register();
 
         setTimeout(async () => {
-            if(!this.findDevice(ELEVATOR_DEVICE.deviceId)) {
+            if(!this.findDevice(EXTERIOR_ELEVATOR_DEVICE.deviceId)) {
                 return;
             }
-            const device = ELEVATOR_DEVICE;
+            const device = EXTERIOR_ELEVATOR_DEVICE;
             this.addOrGetAccessory({
                 deviceId: device.deviceId,
                 deviceType: device.deviceType,
