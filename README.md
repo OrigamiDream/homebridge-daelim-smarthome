@@ -23,6 +23,11 @@ e편한세상 및 아크로 계열 아파트 단지를 위한 [Homebridge](https
 10. 세대현관 및 공동현관 방문자 이미지 표시<sup>[3](#hksv)</sup>
 11. 세대현관 및 공동현관 방문자 알림
 
+> [!WARNING]
+> e편한세상 스마트홈 2.0 및 Smart eLife 앱은 동시접속 및 다중 로그인을 지원하지 않습니다.
+> 따라서 이 플러그인에 사용하실 계정을 위해 세대원 계정을 하나 더 추가하시거나, 기존 계정을 로그아웃하신 후 사용하시기 바랍니다.
+> 위 주의사항을 따르지 않을 시 로그인/로그아웃이 무한정 반복되며 정상적인 이용이 불가능할 수 있습니다.
+
 ## 설치 요구사항
 
 <img alt="node" src="https://img.shields.io/badge/node-%3E%3D14.15-brightgreen"> <img alt="homebridge" src="https://img.shields.io/badge/homebridge-%3E%3D1.5.1-brightgreen"> <img alt="iOS" src="https://img.shields.io/badge/iOS-%3E%3D12.0.0-brightgreen">
