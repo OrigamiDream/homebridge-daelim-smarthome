@@ -30,7 +30,9 @@ export default class PushReceiverStateStore {
     constructor(private readonly log: Logging,
                 private readonly api: API,
                 namespace: string) {
-        this.dirPath = path.join(this.api.user.persistPath(), Utils.PLUGIN_NAME);
+        // `persistPath()` is reserved for HAP/node-persist internals.
+        // Creating plugin directories there can crash Homebridge startup with EISDIR.
+        this.dirPath = path.join(this.api.user.storagePath(), Utils.PLUGIN_NAME);
         this.filePath = path.join(this.dirPath, `push-receiver-${namespace}.json`);
     }
 
