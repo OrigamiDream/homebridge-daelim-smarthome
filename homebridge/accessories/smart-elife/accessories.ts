@@ -185,9 +185,7 @@ export default class Accessories<T extends AccessoryInterface> {
     }
 
     async setDeviceState(device: DeviceWithOp): Promise<boolean> {
-        this.log.info("setDeviceState: %s", JSON.stringify(device));
-        // return await this.client.sendDeviceControlOp(device, device.op);
-        return true;
+        return await this.client.sendDeviceControlOp(device, device.op);
     }
 
     protected addListener(listener: Listener) {
