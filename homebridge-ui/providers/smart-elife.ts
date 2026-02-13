@@ -9,6 +9,7 @@ import Timeout = NodeJS.Timeout;
 import {WALLPAD_VERSION_3_0} from "../../core/smart-elife/parsers/version-parsers";
 import {EXTERIOR_ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
 import {EXTERIOR_COMMUNAL_DOOR_DEVICE, EXTERIOR_FRONT_DOOR_DEVICE} from "../../homebridge/accessories/smart-elife/door";
+import {EXTERIOR_VEHICLE_BARRIER_DEVICE} from "../../homebridge/accessories/smart-elife/vehicle";
 
 export default class SmartELifeUiServer extends AbstractUiProvider {
 
@@ -29,6 +30,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         devices.push(EXTERIOR_ELEVATOR_DEVICE);
         devices.push(EXTERIOR_FRONT_DOOR_DEVICE);
         devices.push(EXTERIOR_COMMUNAL_DOOR_DEVICE);
+        devices.push(EXTERIOR_VEHICLE_BARRIER_DEVICE);
         return devices;
     }
 

@@ -47,6 +47,7 @@ export enum DeviceType {
     INDOOR_AIR_QUALITY = "indoorair",
     ELEVATOR = "elevator",
     DOOR = "door",
+    VEHICLE = "vehicle",
 }
 
 export interface PushItem {
