@@ -18,6 +18,7 @@ import {parseWebSocketCredentials, WebSocketCredentials} from "./parsers/ws-cred
 import {parseDeviceList} from "./parsers/device-parsers";
 import {HTMLCandidate, parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0} from "./parsers/version-parsers";
 import {EXTERIOR_ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
+import {setInterval} from "timers";
 
 export interface ListenerError {
     code: number
@@ -36,6 +37,8 @@ interface PushListenerInfo {
     pushType: PushType
     listener: PushListener
 }
+
+const POLLING_INTERVAL_MILLISECONDS = 30 * 1000;
 
 export default class SmartELifeClient {
 
@@ -630,6 +633,11 @@ export default class SmartELifeClient {
             await this.ws.serve();
             await this.refreshDeviceStatus();
         }
+
+        setInterval(async () => {
+            this.log.info("Polling device state");
+            await this.refreshDeviceStatus(true);
+        }, POLLING_INTERVAL_MILLISECONDS);
     }
 
     private async createDocumentHeaters(): Promise<Record<string, string>> {
@@ -681,8 +689,8 @@ export default class SmartELifeClient {
         return r.version;
     }
 
-    private async fetchServerSideRenderedHTML() {
-        if(!!this.serverSideRenderedHTML) {
+    private async fetchServerSideRenderedHTML(forceFetch: boolean = false) {
+        if(!!this.serverSideRenderedHTML && !forceFetch) {
             return this.serverSideRenderedHTML;
         }
         const html = await this.fetchWithJSessionId(`${this.baseUrl}/main/home.do`, {
@@ -693,17 +701,29 @@ export default class SmartELifeClient {
         return html;
     }
 
-    private async refreshDeviceStatus() {
+    private async refreshDeviceStatus(forceFetch: boolean = false) {
         if(!this.ws) {
             return;
         }
-        const deviceList = parseDeviceList(await this.fetchServerSideRenderedHTML());
+        const deviceList: any[] = parseDeviceList(await this.fetchServerSideRenderedHTML(forceFetch));
         await this.sendJson({
             "roomKey": this.wsCredentials?.roomKey,
             "userKey": this.wsCredentials?.userKey,
             "accessToken": this.wsCredentials?.accessToken,
             "data": deviceList,
         });
+
+        for(const deviceGroup of deviceList) {
+            const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
+            if(deviceType === DeviceType.UNKNOWN)
+                this.log.warn("Unknown device type: %s", deviceGroup["type"]);
+
+            for(const listener of this.listeners) {
+                if(listener.deviceType !== deviceType)
+                    continue;
+                listener.listener(deviceGroup, { code: Number("000"), message: undefined });
+            }
+        }
     }
 
     async fetchDevices(): Promise<Device[]> {

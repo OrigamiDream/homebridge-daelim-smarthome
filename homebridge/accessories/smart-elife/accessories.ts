@@ -19,7 +19,6 @@ export interface DeviceWithOp extends Device {
 export type DeviceListener = (devices: DeviceWithOp[]) => void;
 export type ServiceType = WithUUID<typeof Service>;
 
-const POLLING_INTERVAL_MILLISECONDS = 60 * 1000;
 const DEFERRED_TASKS_MILLISECONDS = 500;
 
 export default class Accessories<T extends AccessoryInterface> {
@@ -35,10 +34,6 @@ export default class Accessories<T extends AccessoryInterface> {
                 readonly serviceTypes: ServiceType[]) {
         this.serviceTypes.push(this.api.hap.Service.AccessoryInformation);
         this.capabilities = getWallPadCapabilities(this.config.wallpadVersion);
-    }
-
-    doPoll() {
-        return true;
     }
 
     get client(): SmartELifeClient {
@@ -214,16 +209,6 @@ export default class Accessories<T extends AccessoryInterface> {
     }
 
     register() {
-        if(this.doPoll()) {
-            setInterval(async () => {
-                this.log.info("Polling device state :: %s (%d accessories)", this.deviceType.toString(), this.accessories.length);
-                await this.sendWsJson([{
-                    type: this.deviceType.toString(),
-                }]);
-            }, POLLING_INTERVAL_MILLISECONDS);
-        } else {
-            this.log.debug(`Polling on device %s is disabled.`, this.deviceType.toString());
-        }
         setInterval(async () => {
             const tasks = [];
             for(const deviceId in this.deferredTasks) {

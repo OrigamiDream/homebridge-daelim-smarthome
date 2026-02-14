@@ -66,10 +66,6 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
         ]);
     }
 
-    doPoll(): boolean {
-        return false;
-    }
-
     getAirQuality(context: IndoorAirQualityAccessoryInterface): CharacteristicValue {
         const q = [ context.pm10, context.pm2_5, context.co2, context.vocs ]
             .map((q) => AirQuality.score(q.quality));

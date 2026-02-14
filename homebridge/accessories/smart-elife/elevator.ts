@@ -32,10 +32,6 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
         super(log, api, config, DeviceType.ELEVATOR, [api.hap.Service.Switch, api.hap.Service.MotionSensor]);
     }
 
-    doPoll(): boolean {
-        return false;
-    }
-
     configureAccessory(accessory: PlatformAccessory) {
         super.configureAccessory(accessory);
         this.getService(accessory, this.api.hap.Service.Switch)
