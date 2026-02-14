@@ -13,12 +13,22 @@ import {
     SettingSubTypes,
     SystemSubTypes,
     Types
-} from "./fields";
-import {Complex, ComplexInfo} from "./interfaces/complex";
+} from "./daelim/fields";
+import {DaelimComplex, DaelimComplexInfo} from "./interfaces/daelim-complex";
 import * as fs from "fs";
 import {MenuItem} from "./interfaces/menu";
 import axios from "axios";
 import * as https from "node:https";
+import crypto from "crypto";
+import {createHash} from "node:crypto";
+
+export interface LoggerBase {
+    (message: string, ...parameters: any[]): void;
+    info(message: string, ...parameters: any[]): void;
+    warn(message: string, ...parameters: any[]): void;
+    error(message: string, ...parameters: any[]): void;
+    debug(message: string, ...parameters: any[]): void;
+}
 
 export interface SemanticVersion {
     major: number,
@@ -62,12 +72,26 @@ export class Utils {
     public static PLUGIN_NAME = "homebridge-daelim-smarthome";
     public static PLATFORM_NAME = "DaelimSmartHomePlatform";
     public static MANUFACTURER_NAME = "DL E&C Co.,Ltd.";
-    public static FCM_SENDER_ID = "251248256994";
-    public static FCM_PROJECT_ID = "daelim-smarthome";
-    public static FCM_APP_ID = "1:251248256994:android:4f4ccc5221a7b689";
-    public static FCM_API_KEY = "AIzaSyAm__JwMJS8utB54p36cDxl8lsKu2wHKNI";
 
-    public static COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/complexes.json";
+    public static DAELIM_FCM_SENDER_ID = "251248256994";
+    public static DAELIM_FCM_PROJECT_ID = "daelim-smarthome";
+    public static DAELIM_FCM_APP_ID = "1:251248256994:android:4f4ccc5221a7b689";
+    public static DAELIM_FCM_API_KEY = "AIzaSyAm__JwMJS8utB54p36cDxl8lsKu2wHKNI";
+
+    public static SMART_ELIFE_FCM_SENDER_ID = "277598878115";
+    public static SMART_ELIFE_FCM_PROJECT_ID = "elife-smarthome-fcm";
+    public static SMART_ELIFE_FCM_APP_ID = "1:277598878115:android:0cf9968e683237d23e4216";
+    public static SMART_ELIFE_FCM_API_KEY = "AIzaSyC_XtNnRG3Xk2hCV9EM8b_B1nb_bxIcYYs";
+
+    public static SMART_ELIFE_AES_KEY = "12345678901234567890123456789012";
+    public static SMART_ELIFE_AES_IV = "HrPtH4kvhKjVsPU=";
+    public static SMART_ELIFE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 9_2 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Mobile/13C75 DAELIM/IOS";
+    public static SMART_ELIFE_BASE_URL = "https://smartelife.apt.co.kr";
+    public static SMART_ELIFE_APP_VERSION = "1.2.11";
+    public static SMART_ELIFE_WEB_SOCKET_TOKEN = "ITJVlrLjVwhdRrevNsFC81pMJEqdyDkkDtlGyf3ikn";
+
+    public static DAELIM_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/feature/smart-elife/complexes/daelim/complexes.json";
+    public static SMART_ELIFE_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/feature/smart-elife/complexes/smart-elife/complexes.json";
     public static HOMEKIT_SECURE_VIDEO_IDLE_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/assets/hksv_camera_idle.png";
     public static MENU_INFO_URL = "https://smarthome.daelimcorp.co.kr/json/getApartMenuInfo.do";
 
@@ -122,6 +146,10 @@ export class Utils {
         );
     }
 
+    static sleep(ms: number) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
     static currentSemanticVersion(): SemanticVersion {
         return Utils.parseSemanticVersion(version);
     }
@@ -132,9 +160,9 @@ export class Utils {
         }
     }
 
-    static async fetchComplexInfo(): Promise<ComplexInfo> {
-        return await fetch(this.COMPLEX_URL)
-            .then(response => response.json() as ComplexInfo | any)
+    static async fetchDaelimComplexInfo(): Promise<DaelimComplexInfo> {
+        return await fetch(this.DAELIM_COMPLEX_URL)
+            .then(response => response.json() as DaelimComplexInfo | any)
             .catch(reason => {
                 console.error('Failed to parse complex info:');
                 console.error(reason);
@@ -144,7 +172,7 @@ export class Utils {
             });
     }
 
-    static async fetchSupportedMenus(complex: Complex): Promise<MenuItem[]> {
+    static async fetchSupportedMenus(complex: DaelimComplex): Promise<MenuItem[]> {
         const params = {
             apartId: complex.apartId,
             searchMenuGubun: "mobile"
@@ -176,8 +204,8 @@ export class Utils {
         });
     }
 
-    static async findMatchedComplex(regionName: string, complexName: string): Promise<Complex> {
-        const info = await Utils.fetchComplexInfo();
+    static async findMatchedComplex(regionName: string, complexName: string): Promise<DaelimComplex> {
+        const info = await Utils.fetchDaelimComplexInfo();
         const regions = info.complexes;
         if(regions.length == 0) {
             throw new Error('No regions are available');
@@ -227,4 +255,45 @@ export class Utils {
         }
     }
 
+    static parseJsonSafe(text: string): any {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            throw new Error(`Failed to parse JSON response: ${text}`);
+        }
+    }
+
+    static generateUUID(key: string): string {
+        return crypto
+            .createHash('md5')
+            .update(key)
+            .digest('hex')
+            .toUpperCase();
+    }
+
+    static addPadding(num: number, width: number) {
+        const numString = num + "";
+        return numString.length >= width ? numString : new Array(width - numString.length + 1).join("0") + numString;
+    }
+
+    static aes256Base64(plaintext: string, key: string, iv: string, algorithm: string = "aes-256-cbc") {
+        const cipher = crypto.createCipheriv(
+            algorithm,
+            Buffer.from(key, "utf8"),
+            Buffer.from(iv, "utf8"),
+        );
+        const out = Buffer.concat([
+            cipher.update(plaintext, "utf8"),
+            cipher.final(),
+        ]);
+        return out.toString("base64");
+    }
+
+    static sha256(a: string, b: string, enc: BufferEncoding = "utf8"): string {
+        const data = Buffer.concat([
+            Buffer.from(a, enc),
+            Buffer.from(b, enc),
+        ]);
+        return createHash("sha256").update(data).digest("hex");
+    }
 }

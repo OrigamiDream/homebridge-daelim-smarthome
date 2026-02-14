@@ -1,0 +1,38 @@
+name: Fetch Complex Info (Daelim)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Packages
+        run: npm install
+
+      - name: Run Cronjob
+        run: npm run refresh-daelim
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          add-paths: |
+            complexes/daelim/*.json
+          commit-message: '[Scheduled] Update Daelim complexes'
+          branch: fetch-complex-daelim-patch
+          title: '[Scheduled] Update Daelim complexes'
+          body: |
+            Complex info (Daelim) have been changed
+            
+            This is automatically generated Pull Request
+          reviewers: OrigamiDream

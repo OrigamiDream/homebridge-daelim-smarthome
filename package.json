@@ -18,14 +18,15 @@
     "build": "rimraf ./dist && tsc && cp -r ./homebridge-ui/public ./dist/homebridge-ui/public",
     "prepublishOnly": "npm run build",
     "postpublish": "npm run clean",
-    "refresh": "node complexes/index.js",
+    "refresh-daelim": "node complexes/daelim/index.js",
+    "refresh-smart-elife": "node complexes/smart-elife/index.js",
     "interface": "node homebridge-ui/server.js",
     "deployPi": "npm run build && python3 scripts/deploy.py"
   },
   "author": "OrigamiDream <hello@origamidream.me>",
   "engines": {
-    "node": "^18.20.4 || ^20.15.1 || ^22",
-    "homebridge": "^1.6.0 || ^2.0.0-beta.0"
+    "node": "^20.19.0 || ^22.12.0 || ^24.0.0",
+    "homebridge": "^1.8.0 || ^2.0.0 || ^2.0.0-alpha.0"
   },
   "license": "GPL-3.0-only",
   "repository": {
@@ -39,7 +40,8 @@
     "@types/node": "^14.15.0",
     "@types/node-fetch": "^2.5.8",
     "@types/readline-sync": "^1.4.3",
-    "canvas": "^2.11.2",
+    "@types/ws": "^8.18.1",
+    "canvas": "^3.2.1",
     "homebridge": "^1.5.1",
     "rimraf": "^3.0.2",
     "typescript": "^4.9.5"
@@ -48,10 +50,11 @@
     "@eneris/push-receiver": "^4.2.0",
     "@homebridge/plugin-ui-utils": "^0.0.19",
     "axios": "1.12.0",
-    "ffmpeg-for-homebridge": "^0.1.4",
+    "ffmpeg-for-homebridge": "^2.2.1",
     "node-fetch": "^2.6.1",
     "pick-port": "^1.0.1",
-    "readline-sync": "^1.4.10"
+    "readline-sync": "^1.4.10",
+    "ws": "^8.19.0"
   },
   "funding": [
     {
