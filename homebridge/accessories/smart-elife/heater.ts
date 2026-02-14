@@ -42,6 +42,7 @@ export default class HeaterAccessories extends ActiveAccessories<HeaterAccessory
         // TargetHeaterCoolerState
         this.getService(accessory, this.api.hap.Service.HeaterCooler)
             .getCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState)
+            .setValue(this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT)
             .setProps({
                 validValues: [this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT],
             })
@@ -52,12 +53,12 @@ export default class HeaterAccessories extends ActiveAccessories<HeaterAccessory
         // HeatingThresholdTemperature
         this.getService(accessory, this.api.hap.Service.HeaterCooler)
             .getCharacteristic(this.api.hap.Characteristic.HeatingThresholdTemperature)
+            .setValue(this.getThresholdTemperature(accessory))
             .setProps({
                 minValue: MIN_TEMPERATURE,
                 maxValue: MAX_TEMPERATURE,
                 minStep: 1,
             })
-            .setValue(this.getThresholdTemperature(accessory))
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
                 if(context.desiredTemperature === value || !context.active) {
