@@ -15,13 +15,13 @@ export const EXTERIOR_FRONT_DOOR_DEVICE: Device = {
     deviceId: "CMFDOR001",
     disabled: false,
 };
-export const EXTERIOR_COMMUNAL_DOOR_DEVICE: Device = {
-    displayName: "외부 공동현관",
-    name: "공동현관",
-    deviceType: DeviceType.DOOR,
-    deviceId: "CMFDOR002",
-    disabled: false,
-}
+// export const EXTERIOR_COMMUNAL_DOOR_DEVICE: Device = {
+//     displayName: "외부 공동현관",
+//     name: "공동현관",
+//     deviceType: DeviceType.DOOR,
+//     deviceId: "CMFDOR002",
+//     disabled: false,
+// }
 export const DOOR_TIMEOUT_DURATION_SECONDS = 5; // 5 seconds
 
 export default class DoorAccessories extends Accessories<DoorAccessoryInterface> {
@@ -83,10 +83,9 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
     register() {
         super.register();
         this.registerPushListener(PushType.FRONT_DOOR, EXTERIOR_FRONT_DOOR_DEVICE);
-        // TODO: register for communal door after discovers communal door type.
 
         setTimeout(() => {
-            for(const device of [EXTERIOR_FRONT_DOOR_DEVICE, EXTERIOR_COMMUNAL_DOOR_DEVICE]) {
+            for(const device of [EXTERIOR_FRONT_DOOR_DEVICE, /*EXTERIOR_COMMUNAL_DOOR_DEVICE*/]) {
                 if(!this.findDevice(device.deviceId))
                     continue;
 
