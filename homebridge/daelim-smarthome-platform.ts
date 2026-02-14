@@ -13,7 +13,7 @@ class DaelimSmartHomePlatform implements DynamicPlatformPlugin {
     private readonly provider?: AbstractProvider;
 
     constructor(log: Logging, config: PlatformConfig, api: API) {
-        const provider = config["provider"] || null;
+        const provider = config["provider"] || "daelim";
         if(!provider) {
             log.warn("Provider is not defined. (daelim | smart-elife)");
             return;
