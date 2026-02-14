@@ -45,8 +45,7 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
     }
 
     registerPushListener(pushType: PushType, doorDevice: Device) {
-        this.addPushListener(pushType, (title, message) => {
-            this.log.info("%s: title: %s, msg: %s", pushType.toString(), title, message);
+        this.addPushListener(pushType, () => {
             const device = this.findDevice(doorDevice.deviceId);
             if(!device) {
                 this.log.warn("Unknown device: %s", doorDevice.deviceId);

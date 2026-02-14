@@ -38,8 +38,7 @@ export default class VehicleAccessories extends Accessories<VehicleAccessoryInte
     }
 
     registerPushListener() {
-        this.addPushListener(PushType.CAR, (title, message) => {
-            this.log.info("car: title: %s, msg: %s", title, message);
+        this.addPushListener(PushType.CAR, () => {
             const deviceDef = EXTERIOR_VEHICLE_BARRIER_DEVICE;
             const device = this.findDevice(deviceDef.deviceId);
             if(!device) {

@@ -499,7 +499,7 @@ export default class SmartELifeClient {
                     this.log.warn("Unexpected Push message (not JSON): %s", JSON.stringify(notification.message));
                     return;
                 }
-                const pushTypeString = ["data1", "data2", "data3", "data4"]
+                const pushTypeString = ["data1", "data2", "data3"]
                     .map((key) => payload[key])
                     .filter((value) => !!value)
                     .join("-");
