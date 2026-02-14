@@ -18,6 +18,7 @@ import AirConditionerAccessories from "../accessories/smart-elife/air-conditione
 import PushReceiverStateStore from "../../core/push-receiver-state-store";
 import DoorAccessories from "../accessories/smart-elife/door";
 import VehicleAccessories from "../accessories/smart-elife/vehicle";
+import CameraAccessories from "../accessories/smart-elife/camera";
 
 export default class SmartELifeProvider extends AbstractProvider {
 
@@ -39,6 +40,7 @@ export default class SmartELifeProvider extends AbstractProvider {
             this.accessories.push(new AirConditionerAccessories(log, api, this.config));
             this.accessories.push(new DoorAccessories(log, api, this.config));
             this.accessories.push(new VehicleAccessories(log, api, this.config));
+            this.accessories.push(new CameraAccessories(log, api, this.config));
         }
     }
 

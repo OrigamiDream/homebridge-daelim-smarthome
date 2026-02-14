@@ -1,4 +1,5 @@
 import {SemanticVersion} from "../utils";
+import {CameraConfig, DeviceDuration} from "./config";
 
 export interface SmartELifeConfig {
     username: string
@@ -17,14 +18,8 @@ export interface Device {
     disabled: boolean
     deviceType: DeviceType
     deviceId: string
+    camera?: CameraConfig
     duration?: DeviceDuration
-}
-
-export interface DeviceDuration {
-    elevator?: number
-    vehicle?: number
-    door?: number
-    camera?: number
 }
 
 export enum ControlQueryCategory {
@@ -48,6 +43,7 @@ export enum DeviceType {
     ELEVATOR = "elevator",
     DOOR = "door",
     VEHICLE = "vehicle",
+    CAMERA = "camera",
 }
 
 export interface PushItem {
@@ -91,7 +87,7 @@ export enum PushType {
     UNKNOWN = "unknown",
 
     // The following values are built from: data1-data2-data3-data4, filtering out empty data.
-    VISITOR = "5-32",
-    CAR = "5-46",
+    VISITOR = "5-32-7",
+    CAR = "5-46-10",
     FRONT_DOOR = "5-61-9",
 }
