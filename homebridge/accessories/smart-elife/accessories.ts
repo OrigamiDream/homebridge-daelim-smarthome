@@ -196,6 +196,9 @@ export default class Accessories<T extends AccessoryInterface> {
             } else {
                 devices = this.parseDevices(data);
             }
+            if(devices.length === 0)
+                this.log.warn("No devices op received for %s. Are the devices disconnected from WallPad?", this.deviceType.toString());
+
             deviceListener(devices);
         });
     }
