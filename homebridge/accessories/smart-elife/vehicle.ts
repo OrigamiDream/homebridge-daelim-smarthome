@@ -4,7 +4,7 @@ import {Device, DeviceType, PushType, SmartELifeConfig} from "../../../core/inte
 import Timeout = NodeJS.Timeout;
 
 interface VehicleAccessoryInterface extends AccessoryInterface {
-    motionTimer: number | Timeout
+    motionTimer?: Timeout
     motionDetected: boolean
 }
 
@@ -53,17 +53,17 @@ export default class VehicleAccessories extends Accessories<VehicleAccessoryInte
             }
 
             const context = this.getAccessoryInterface(accessory);
-            if(context.motionTimer !== -1) {
+            if(context.motionTimer) {
                 clearTimeout(context.motionTimer);
             }
 
             context.motionDetected = true;
             context.motionTimer = setTimeout(() => {
                 const context = this.getAccessoryInterface(accessory);
-                if(context.motionTimer !== -1) {
+                if(context.motionTimer) {
                     clearTimeout(context.motionTimer);
                 }
-                context.motionTimer = -1;
+                context.motionTimer = undefined;
                 context.motionDetected = false;
 
                 accessory.getService(this.api.hap.Service.MotionSensor)
@@ -89,7 +89,7 @@ export default class VehicleAccessories extends Accessories<VehicleAccessoryInte
                 deviceType: device.deviceType,
                 displayName: device.displayName,
                 init: true,
-                motionTimer: -1,
+                motionTimer: undefined,
                 motionDetected: false,
             })
         }, 1000);

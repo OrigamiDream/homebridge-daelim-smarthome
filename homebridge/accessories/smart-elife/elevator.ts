@@ -11,10 +11,10 @@ import {Device, DeviceType, SmartELifeConfig} from "../../../core/interfaces/sma
 import Timeout = NodeJS.Timeout;
 
 interface ElevatorAccessoryInterface extends AccessoryInterface {
-    switchTimer: number | Timeout
+    switchTimer?: Timeout
     switchLocked: boolean
 
-    motionTimer: number | Timeout
+    motionTimer?: Timeout
     motionDetected: boolean
 }
 
@@ -58,12 +58,12 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
                         callback(new Error("Failed to set the device state."));
                         return;
                     }
-                    if(context.switchTimer !== -1) clearTimeout(context.switchTimer);
+                    if(context.switchTimer) clearTimeout(context.switchTimer);
 
                     context.switchTimer = setTimeout(() => {
-                        if(context.switchTimer !== -1) clearTimeout(context.switchTimer);
+                        if(context.switchTimer) clearTimeout(context.switchTimer);
 
-                        context.switchTimer = -1;
+                        context.switchTimer = undefined;
                         context.switchLocked = false;
                         this.getService(accessory, this.api.hap.Service.Switch)
                             .setCharacteristic(this.api.hap.Characteristic.On, false);
@@ -99,17 +99,17 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
             if(!accessory) return;
 
             const context = this.getAccessoryInterface(accessory);
-            if(context.switchTimer !== -1)
+            if(context.switchTimer)
                 clearTimeout(context.switchTimer);
             context.switchLocked = false;
-            context.switchTimer = -1;
+            context.switchTimer = undefined;
 
             context.motionDetected = true;
             context.motionTimer = setTimeout(() => {
                 const context = this.getAccessoryInterface(accessory);
-                if(context.motionTimer !== -1)
+                if(context.motionTimer)
                     clearTimeout(context.motionTimer);
-                context.motionTimer = -1;
+                context.motionTimer = undefined;
                 context.motionDetected = false;
 
                 accessory.getService(this.api.hap.Service.MotionSensor)
@@ -130,9 +130,9 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
                 deviceType: device.deviceType,
                 displayName: device.displayName,
                 init: true,
-                switchTimer: -1,
+                switchTimer: undefined,
                 switchLocked: false,
-                motionTimer: -1,
+                motionTimer: undefined,
                 motionDetected: false,
             });
         }, 1000);
