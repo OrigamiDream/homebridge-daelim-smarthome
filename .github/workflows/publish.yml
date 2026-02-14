@@ -13,6 +13,14 @@ on:
         type: string
         description: Branch name to publish beta from
         required: true
+      version:
+        type: choice
+        default: prerelease
+        description: Beta versioning
+        options:
+          - prerelease
+          - preminor
+          - premajor
 
 permissions:
   contents: write  # create GitHub Release
@@ -46,7 +54,7 @@ jobs:
       # Beta release flow
       - name: Bump beta version
         if: github.event_name == 'workflow_dispatch'
-        run: npm version prerelease --preid=beta
+        run: npm version ${{ inputs.version }} --preid=beta
       - name: Push beta version commit
         if: github.event_name == 'workflow_dispatch'
         run: git push origin "${{ github.event.inputs.branch }}"
