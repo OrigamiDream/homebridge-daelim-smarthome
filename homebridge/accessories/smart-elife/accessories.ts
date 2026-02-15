@@ -90,10 +90,11 @@ export default class Accessories<T extends AccessoryInterface> {
         });
 
         const context = this.getAccessoryInterface(accessory);
-        const info = this.getService(accessory, this.api.hap.Service.AccessoryInformation);
-        info.setCharacteristic(this.api.hap.Characteristic.Manufacturer, Utils.MANUFACTURER_NAME);
-        info.setCharacteristic(this.api.hap.Characteristic.Model, context.displayName);
-        info.setCharacteristic(this.api.hap.Characteristic.SerialNumber, context.deviceId);
+        accessory.getService(this.api.hap.Service.AccessoryInformation)!
+            .setCharacteristic(this.api.hap.Characteristic.Manufacturer, Utils.homekitString(Utils.MANUFACTURER_NAME))
+            .setCharacteristic(this.api.hap.Characteristic.Model, Utils.homekitString(context.displayName))
+            .setCharacteristic(this.api.hap.Characteristic.SerialNumber, Utils.homekitString(context.deviceId))
+            .setCharacteristic(this.api.hap.Characteristic.FirmwareRevision, Utils.homekitString(Utils.currentSemanticVersion().toString()));
 
         const removals = [];
         for(const service of accessory.services) {

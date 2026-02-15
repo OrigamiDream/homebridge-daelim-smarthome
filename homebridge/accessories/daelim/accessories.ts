@@ -263,9 +263,10 @@ export class Accessories<T extends AccessoryInterface> {
         });
         if(this.config.complex) {
             const accessoryInfo = this.ensureServiceAvailability(this.api.hap.Service.AccessoryInformation, services);
-            accessoryInfo.setCharacteristic(this.api.hap.Characteristic.Manufacturer, Utils.MANUFACTURER_NAME);
-            accessoryInfo.setCharacteristic(this.api.hap.Characteristic.Model, `${this.config.complex}-${accessory.context.displayName}`);
-            accessoryInfo.setCharacteristic(this.api.hap.Characteristic.SerialNumber, accessory.context.deviceID);
+            accessoryInfo.setCharacteristic(this.api.hap.Characteristic.Manufacturer, Utils.homekitString(Utils.MANUFACTURER_NAME));
+            accessoryInfo.setCharacteristic(this.api.hap.Characteristic.Model, Utils.homekitString(`${this.config.complex}-${accessory.context.displayName}`));
+            accessoryInfo.setCharacteristic(this.api.hap.Characteristic.SerialNumber, Utils.homekitString(accessory.context.deviceID));
+            accessoryInfo.setCharacteristic(this.api.hap.Characteristic.FirmwareRevision, Utils.homekitString(Utils.currentSemanticVersion().toString()));
         } else {
             throw 'The plugin must not reach here without configuration';
         }

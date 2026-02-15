@@ -94,6 +94,16 @@ export class Utils {
     public static HOMEKIT_SECURE_VIDEO_IDLE_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/assets/hksv_camera_idle.png";
     public static MENU_INFO_URL = "https://smarthome.daelimcorp.co.kr/json/getApartMenuInfo.do";
 
+    static homekitString(value: unknown, maxLen: number = 64): string {
+        let s = String(value ?? "");
+        // Replace control chars/newlines with spaces and collapse whitespace.
+        s = s.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+        if (maxLen > 0 && s.length > maxLen) {
+            s = s.slice(0, maxLen);
+        }
+        return s;
+    }
+
     static createSemanticVersion(major: number, minor: number, patch: number, beta: number = -1): SemanticVersion {
         return {
             major, minor, patch, beta,
