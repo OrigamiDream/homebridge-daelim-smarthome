@@ -125,9 +125,6 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         const { roomKey, userKey } = this.client.getWebSocketCredentials();
         const version = await this.client.parseWallPadVersion();
 
-        // On success
-        this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
-
         // Set up devices
         const fetchedDevices = await this.client.fetchDevices();
 
@@ -136,10 +133,10 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
             devices.push(device);
         }
         this.devices = devices;
-        this.server.pushEvent("devices-fetched", {
-            devices: this.devices,
-        });
         this.devicesFetched = true;
+
+        // On success
+        this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
     }
 
     async authorizePasscode(p: any) {

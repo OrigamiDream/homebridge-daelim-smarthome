@@ -794,6 +794,7 @@ class CompletePane extends Pane {
             }
             this.config.devices = availableDevices;
             await this.updatePluginConfig();
+            await this.savePluginConfig();
 
             this.advancedButton.removeAttribute("disabled");
         });
