@@ -102,7 +102,7 @@ export default class Accessories<T extends AccessoryInterface> {
             if(this.isSupportedService(service)) {
                 continue;
             }
-            this.log.debug("The service %s is no longer supported from accessory: %s (%s)", service.name, context.displayName, this.deviceType.toString());
+            this.log.debug("The service %s is no longer supported from accessory: %s (%s)", service.constructor.name, context.displayName, this.deviceType.toString());
             removals.push(service);
         }
         for(const service of removals) {
