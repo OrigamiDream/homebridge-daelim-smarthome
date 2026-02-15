@@ -229,12 +229,12 @@ class ProviderPane extends Pane {
             <div class="form-group">
                 <div class="d-flex justify-content-center align-items-start">
                     <label class="d-flex flex-column align-items-center m-3">
-                        <img class="img-fluid mb-2 w-25" style="border-radius: 24%" alt="DL E&C Smart Home" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/feature/smart-elife/branding/daeilm.png?raw=true">
+                        <img class="img-fluid mb-2 w-25" style="border-radius: 24%" alt="DL E&C Smart Home" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/v1.5.0-beta/branding/daeilm.png?raw=true">
                         <input class="form-check-input" type="radio" name="provider" value="daelim" checked>
                         <span>e편한세상 스마트홈 2.0</span>
                     </label>
                     <label class="d-flex flex-column align-items-center m-3">
-                        <img class="img-fluid mb-2 w-25" style="border-radius: 24%" alt="Smart eLife" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/feature/smart-elife/branding/smart-elife.png?raw=true">
+                        <img class="img-fluid mb-2 w-25" style="border-radius: 24%" alt="Smart eLife" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/v1.5.0-beta/branding/smart-elife.png?raw=true">
                         <input class="form-check-input" type="radio" name="provider" value="smart-elife">
                         <span>스마트 eLife</span>
                     </label>
@@ -380,7 +380,7 @@ class ComplexPane extends Pane {
     constructor(element, config, provider) {
         super(element, config);
         this.provider = provider;
-        this.url = `https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/feature/smart-elife/complexes/${provider}/complexes.json`
+        this.url = `https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/v1.5.0-beta/complexes/${provider}/complexes.json`
 
         this.pane = document.createElement("div");
         this.pane.classList.add("hidden");
