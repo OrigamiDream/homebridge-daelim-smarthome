@@ -70,10 +70,6 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
                 })
                 .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                     const context = this.getAccessoryInterface(accessory);
-                    if(!context.init) {
-                        callback(new Error("Not initialized."));
-                        return;
-                    }
                     callback(undefined, context.brightness);
                 });
         }
@@ -121,10 +117,6 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
                 })
                 .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                     const context = this.getAccessoryInterface(accessory);
-                    if(!context.init) {
-                        callback(new Error("Not initialized."));
-                        return;
-                    }
                     callback(undefined, context.colorTemperature);
                 });
         }

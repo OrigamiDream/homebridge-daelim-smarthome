@@ -67,10 +67,6 @@ export default abstract class ActiveAccessories<T extends ActiveAccessoryInterfa
             })
             .on(CharacteristicEventTypes.GET, async (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                if(!context.init) {
-                    callback(new Error("Not initialized."));
-                    return;
-                }
                 const state = context.active
                     ? this.api.hap.Characteristic.Active.ACTIVE
                     : this.api.hap.Characteristic.Active.INACTIVE;

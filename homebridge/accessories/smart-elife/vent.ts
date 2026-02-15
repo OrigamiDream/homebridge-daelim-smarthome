@@ -95,10 +95,6 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                if(!context.init) {
-                    callback(new Error("Not initialized."));
-                    return;
-                }
                 switch(context.mode) {
                     case Mode.AUTO_DRIVING:
                         callback(undefined, this.api.hap.Characteristic.TargetAirPurifierState.AUTO);
@@ -112,10 +108,6 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             .getCharacteristic(this.api.hap.Characteristic.CurrentAirPurifierState)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                if(!context.init) {
-                    callback(new Error("Not initialized."));
-                    return;
-                }
                 callback(undefined, context.active
                     ? this.api.hap.Characteristic.CurrentAirPurifierState.PURIFYING_AIR
                     : this.api.hap.Characteristic.CurrentAirPurifierState.INACTIVE);
@@ -165,10 +157,6 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                if(!context.init) {
-                    callback(new Error("Not initialized."));
-                    return;
-                }
                 callback(undefined, this.rotationSpeedToHomebridge(context.rotationSpeed));
             });
     }

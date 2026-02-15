@@ -61,10 +61,6 @@ export abstract class OnOffAccessories<T extends OnOffAccessoryInterface> extend
             })
             .on(CharacteristicEventTypes.GET, async (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                if(!context.init) {
-                    callback(new Error("Not initialized."));
-                    return;
-                }
                 callback(undefined, context.on);
             });
     }

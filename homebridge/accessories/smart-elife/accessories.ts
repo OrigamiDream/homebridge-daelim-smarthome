@@ -64,7 +64,6 @@ export default class Accessories<T extends AccessoryInterface> {
         }
         if(cachedAccessory) {
             cachedAccessory.context = context;
-            cachedAccessory.context.init = false;
             return cachedAccessory;
         } else {
             this.log.info("Adding new accessory: %s (%s :: %s)", context.displayName, context.deviceId, this.deviceType.toString());
@@ -74,7 +73,6 @@ export default class Accessories<T extends AccessoryInterface> {
 
             const accessory = new this.api.platformAccessory(context.displayName, uuid);
             accessory.context = context;
-            accessory.context.init = false;
 
             this.api.registerPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [accessory]);
 
