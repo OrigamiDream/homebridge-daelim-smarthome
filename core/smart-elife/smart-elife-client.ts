@@ -19,6 +19,9 @@ import {parseDeviceList} from "./parsers/device-parsers";
 import {HTMLCandidate, parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0} from "./parsers/version-parsers";
 import {EXTERIOR_ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
 import {setInterval} from "timers";
+import * as https from "node:https";
+import * as dns from "node:dns";
+import * as net from "node:net";
 
 export interface ListenerError {
     code: number
@@ -41,6 +44,11 @@ interface PushListenerInfo {
 const POLLING_INTERVAL_MILLISECONDS = 30 * 1000;
 
 export default class SmartELifeClient {
+
+    // Some networks (notably IPv6-only/NAT64) can resolve this host to both IPv4 and IPv6,
+    // while only one family is actually reachable. When we see low-level connect errors
+    // (EHOSTUNREACH/ENETUNREACH/etc), retry once with the opposite IP family.
+    private static readonly HTTPS_AGENT_DEFAULT = new https.Agent({ keepAlive: true });
 
     private readonly httpBody: {[key: string]: string};
     private readonly httpHeaders: Record<string, string> = {
@@ -212,24 +220,113 @@ export default class SmartELifeClient {
         }
     }
 
-    private async fetchWithJSessionId(url: string, options: any = {}): Promise<Response> {
-        this.applySessionCookie(options);
-        let response = await fetch(url, options);
-        this.updateSessionCookieFromResponse(response);
+    private static extractNetworkError(e: any): { code?: string, address?: string, port?: number, message?: string } {
+        // node-fetch v2 wraps system errors in FetchError, but copies code/address/port to the top-level.
+        // Also attempt to read from common nested locations to be defensive.
+        const code = e?.code ?? e?.cause?.code ?? e?.err?.code;
+        const address = e?.address ?? e?.cause?.address ?? e?.err?.address;
+        const port = e?.port ?? e?.cause?.port ?? e?.err?.port;
+        const message = e?.message ?? e?.cause?.message ?? e?.err?.message;
+        return { code, address, port, message };
+    }
 
-        // Debugging purpose.
-        let buf = `${options.method} ${url}\n`;
-        for(const headerKey in options.headers) {
-            const headerValue = options.headers[headerKey];
-            buf += `${headerKey}: ${headerValue}\n`;
+    private static isRetriableConnectError(code?: string): boolean {
+        // Keep this list tight; we only want to retry when the first attempt likely picked
+        // the wrong address family or DNS is temporarily unavailable.
+        return [
+            "EHOSTUNREACH",
+            "ENETUNREACH",
+            "EAI_AGAIN",
+            "ETIMEDOUT",
+            "ECONNRESET",
+        ].includes(code || "");
+    }
+
+    private async logResolvedAddressesOnce(hostname: string) {
+        try {
+            const addresses = await dns.promises.lookup(hostname, { all: true });
+            const formatted = addresses
+                .map(a => `${a.address} (v${a.family})`)
+                .join(", ");
+            if(formatted.length > 0) {
+                this.log.debug(`[DNS] ${hostname} -> ${formatted}`);
+            }
+        } catch(e: any) {
+            const { code, message } = SmartELifeClient.extractNetworkError(e);
+            this.log.debug(`[DNS] lookup failed for ${hostname}: ${code || ""} ${message || ""}`.trim());
         }
-        if(!!options.body) {
-            buf += "\n";
-            const body = JSON.parse(options.body);
-            buf += JSON.stringify(body, null, 2);
+    }
+
+    private async fetchWithJSessionId(url: string, options: any = {}): Promise<Response> {
+        const doFetch = async (overrideFamily?: 4 | 6): Promise<Response> => {
+            // Avoid mutating the caller's options object (especially across retries).
+            const opts: any = { ...options };
+            opts.headers = { ...(options.headers || {}) };
+
+            if(!opts.agent) {
+                opts.agent = SmartELifeClient.HTTPS_AGENT_DEFAULT;
+            }
+
+            if(!opts.family && overrideFamily) {
+                // Forwarded to https.request() by node-fetch; forces DNS resolution and connect() to that IP family.
+                opts.family = overrideFamily;
+            }
+
+            this.applySessionCookie(opts);
+            const response = await fetch(url, opts);
+            this.updateSessionCookieFromResponse(response);
+
+            // Debugging purpose.
+            let buf = `${opts.method} ${url}\n`;
+            const headers = opts.headers || {};
+            for(const headerKey in headers) {
+                buf += `${headerKey}: ${headers[headerKey]}\n`;
+            }
+            if(!!opts.body) {
+                try {
+                    const body = typeof opts.body === "string" ? JSON.parse(opts.body) : opts.body;
+                    buf += `\n${JSON.stringify(body, null, 2)}`;
+                } catch {
+                    // Non-JSON or unparsable body; avoid throwing in debug logging.
+                }
+            }
+            this.log.debug(buf);
+
+            return response;
+        };
+
+        try {
+            return await doFetch();
+        } catch(e: any) {
+            const { code, address, port, message } = SmartELifeClient.extractNetworkError(e);
+            if(!SmartELifeClient.isRetriableConnectError(code)) {
+                throw e;
+            }
+
+            // If the failure happened while connecting to an IPv4 address, retry forcing IPv6 (and vice-versa).
+            // This helps on IPv6-only/NAT64 networks where IPv4 is unroutable, or on broken IPv6 networks.
+            const u = new URL(url);
+            await this.logResolvedAddressesOnce(u.hostname);
+
+            const ipFamily = net.isIP(address || "");
+            const retryFamily: 4 | 6 =
+                ipFamily === 4 ? 6 :
+                4;
+
+            this.log.warn(
+                `Network error while requesting ${u.hostname}:${u.port || "443"} (${code}${address ? ` ${address}:${port || ""}` : ""}). Retrying with alternate IP family.`
+            );
+
+            try {
+                return await doFetch(retryFamily);
+            } catch(e2: any) {
+                const e2i = SmartELifeClient.extractNetworkError(e2);
+                this.log.error(
+                    `Request to ${u.hostname}:${u.port || "443"} failed: ${code || ""} ${message || ""} (retry: ${e2i.code || ""} ${e2i.message || ""})`.trim()
+                );
+                throw e2;
+            }
         }
-        this.log.debug(buf);
-        return response;
     }
 
     private async fetchJson(url: string, options: any = {}) {
@@ -273,7 +370,7 @@ export default class SmartELifeClient {
             const response = await this.fetchWithJSessionId(url, opts);
             text = await response.text();
 
-            needsRetry = !response.ok || response.status !== 200 || text === "requireLoginForAjax";
+            needsRetry = !response.ok || response.status !== 200 || text === "requireLoginForAjax" || text === "accountError2";
             if(needsRetry) {
                 this.log.debug(`[Error response] ${text}`);
             }
