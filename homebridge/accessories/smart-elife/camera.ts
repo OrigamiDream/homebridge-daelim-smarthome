@@ -63,6 +63,8 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
             api.hap.Service.MotionSensor,
             api.hap.Service.CameraOperatingMode,
             api.hap.Service.CameraRecordingManagement,
+            api.hap.Service.CameraRTPStreamManagement,
+            api.hap.Service.Microphone,
         ]);
         this.processorPath = ffmpegPath || "ffmpeg";
     }
