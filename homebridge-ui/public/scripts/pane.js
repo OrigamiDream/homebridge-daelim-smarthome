@@ -285,7 +285,7 @@ class ProviderPane extends Pane {
 class RegionPane extends Pane {
     constructor(element, config) {
         super(element, config);
-        this.url = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/complexes/regions.json";
+        this.url = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/master/complexes/daelim/regions.json";
 
         this.pane = document.createElement("div");
         this.pane.classList.add("hidden");
@@ -529,8 +529,7 @@ class AuthorizationPane extends Pane {
 
     _refreshNavigation() {
         this.getRightNavigation("authorization").disabled = (
-            this.usernameElement.value.length <= 5 ||
-            this.passwordElement.value.length <= 5
+            this.usernameElement.value.length < 1 || this.passwordElement.value.length < 1
         );
     }
 
