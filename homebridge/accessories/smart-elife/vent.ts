@@ -74,12 +74,20 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 let success;
                 let mode;
                 if(value === this.api.hap.Characteristic.TargetAirPurifierState.MANUAL) {
+                    if(context.mode === Mode.MANUAL) {
+                        callback(undefined);
+                        return;
+                    }
                     success = await this.setDeviceState({
                         ...device,
                         op: { mode: Mode.MANUAL.toString() },
                     });
                     mode = Mode.MANUAL;
                 } else {
+                    if(context.mode === Mode.AUTO_DRIVING) {
+                        callback(undefined);
+                        return;
+                    }
                     success = await this.setDeviceState({
                         ...device,
                         op: { mode: context.modeHw },
