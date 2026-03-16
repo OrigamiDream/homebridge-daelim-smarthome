@@ -123,6 +123,9 @@ export default class SmartELifeClient {
                 let deviceTypeString, message;
                 if(!!header) {
                     deviceTypeString = header["type"];
+                    if(header["command"] === "control_response")
+                        return;
+
                     if(json["result"]) {
                         status = json["result"]["status"];
                         message = json["result"]["message"];
