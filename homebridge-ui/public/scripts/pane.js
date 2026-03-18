@@ -653,11 +653,7 @@ class WallpadPasscodePane extends Pane {
     }
 
     _refreshNavigation() {
-        if(this.provider === "daelim") {
-            this.verifyButton.disabled = this.passcodeElement.value.length < 12;
-        } else {
-            this.verifyButton.disabled = this.passcodeElement.value.length < 8;
-        }
+        this.verifyButton.disabled = this.passcodeElement.value.length < 4;
     }
 
     prevPane() {
