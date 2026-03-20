@@ -122,16 +122,26 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
         }
     }
 
-    private miredToHardwareColorTemperature(mired: number, minMired = MIRED_MIN_VALUE, maxMired = MIRED_MAX_VALUE): number {
-        const clamped = Math.max(minMired, Math.min(maxMired, mired));
-        const ratio = (clamped - minMired) / (maxMired - minMired); // 0..1
-        return Math.round(ratio * 100); // 0..100, step 1
+    private miredToHardwareColorTemperature(
+      mired: number, 
+      minMired = MIRED_MIN_VALUE, 
+      maxMired = MIRED_MAX_VALUE
+    ): number {
+      const clamped = Math.max(minMired, Math.min(maxMired, mired));
+      const ratio = (maxMired - clamped) / (maxMired - minMired); 
+      
+      return Math.round(ratio * 100);
     }
 
-    private hardwareToMiredColorTemperature(hw: number, minMired = MIRED_MIN_VALUE, maxMired = MIRED_MAX_VALUE): number {
+    private hardwareToMiredColorTemperature(
+        hw: number, 
+        minMired = MIRED_MIN_VALUE, 
+        maxMired = MIRED_MAX_VALUE
+    ): number {
         const clamped = Math.max(0, Math.min(100, hw));
-        const mired = minMired + (clamped / 100) * (maxMired - minMired);
-        return Math.round(mired); // HomeKit step 1
+        const mired = maxMired - (clamped / 100) * (maxMired - minMired);
+    
+        return Math.round(mired);
     }
 
     private createLightbulbValue(context: LightbulbAccessoryInterface): string {
