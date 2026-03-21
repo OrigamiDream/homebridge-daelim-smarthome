@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="logo" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/master/branding/smarthome+homebridge.png?raw=true" height="140px">
+  <img alt="logo" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/main/branding/smarthome+homebridge.png?raw=true" height="140px">
 </p>
 
 # Homebridge DL E&C Smart Home

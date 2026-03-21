@@ -89,9 +89,9 @@ export class Utils {
     public static SMART_ELIFE_BASE_URL = "https://smartelife.apt.co.kr";
     public static SMART_ELIFE_APP_VERSION = "1.2.11";
 
-    public static DAELIM_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/master/complexes/daelim/complexes.json";
-    public static SMART_ELIFE_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/master/complexes/smart-elife/complexes.json";
-    public static HOMEKIT_SECURE_VIDEO_IDLE_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/master/assets/hksv_camera_idle.png";
+    public static DAELIM_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/main/complexes/daelim/complexes.json";
+    public static SMART_ELIFE_COMPLEX_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/refs/heads/main/complexes/smart-elife/complexes.json";
+    public static HOMEKIT_SECURE_VIDEO_IDLE_URL = "https://raw.githubusercontent.com/OrigamiDream/homebridge-daelim-smarthome/main/assets/hksv_camera_idle.png";
     public static MENU_INFO_URL = "https://smarthome.daelimcorp.co.kr/json/getApartMenuInfo.do";
 
     static homekitString(value: unknown, maxLen: number = 64): string {
