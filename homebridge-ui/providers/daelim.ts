@@ -339,17 +339,18 @@ export default class DaelimUiServer extends AbstractUiProvider {
                     this.handler.disconnect();
                     this.handler = undefined;
                 }
+
+                this.server.pushEvent('devices-fetched', {
+                    devices: this.devices,
+                });
+                this.devicesFetched = true;
+
                 await this.invalidate(null);
 
                 // remove all semaphores
                 this.semaphore.removeSemaphore();
                 clearTimeout(this.semaphoreTimeout);
                 this.semaphoreTimeout = undefined;
-
-                this.server.pushEvent('devices-fetched', {
-                    devices: this.devices,
-                });
-                this.devicesFetched = true;
             }
         });
         // Error Listeners
