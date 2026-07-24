@@ -34,9 +34,7 @@ export default class GasAccessories extends Accessories<GasAccessoryInterface> {
             .getCharacteristic(this.api.hap.Characteristic.LockCurrentState)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                callback(undefined, context.secured
-                    ? this.api.hap.Characteristic.LockCurrentState.SECURED
-                    : this.api.hap.Characteristic.LockCurrentState.UNSECURED);
+                callback(undefined, this.lockCurrentState(context));
             });
         this.getService(accessory, this.api.hap.Service.LockMechanism)
             .getCharacteristic(this.api.hap.Characteristic.LockTargetState)
@@ -52,7 +50,8 @@ export default class GasAccessories extends Accessories<GasAccessoryInterface> {
                     // Update the LockMechanism characteristic immediately.
                     setTimeout(() => {
                         this.getService(accessory, this.api.hap.Service.LockMechanism)
-                            .setCharacteristic(this.api.hap.Characteristic.LockTargetState, this.api.hap.Characteristic.LockTargetState.SECURED);
+                            .getCharacteristic(this.api.hap.Characteristic.LockTargetState)
+                            .updateValue(this.lockTargetState(this.getAccessoryInterface(accessory)));
                     }, 0);
                     callback(undefined);
                     return;
@@ -69,13 +68,33 @@ export default class GasAccessories extends Accessories<GasAccessoryInterface> {
                 }
                 context.secured = true;
                 callback(undefined);
+                this.updateLockState(accessory);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                callback(undefined, context.secured
-                    ? this.api.hap.Characteristic.LockTargetState.SECURED
-                    : this.api.hap.Characteristic.LockTargetState.UNSECURED);
+                callback(undefined, this.lockTargetState(context));
             });
+    }
+
+    private lockCurrentState(context: GasAccessoryInterface): CharacteristicValue {
+        return context.secured
+            ? this.api.hap.Characteristic.LockCurrentState.SECURED
+            : this.api.hap.Characteristic.LockCurrentState.UNSECURED;
+    }
+
+    private lockTargetState(context: GasAccessoryInterface): CharacteristicValue {
+        return context.secured
+            ? this.api.hap.Characteristic.LockTargetState.SECURED
+            : this.api.hap.Characteristic.LockTargetState.UNSECURED;
+    }
+
+    private updateLockState(accessory: PlatformAccessory) {
+        const context = this.getAccessoryInterface(accessory);
+        const lock = this.getService(accessory, this.api.hap.Service.LockMechanism);
+        lock.getCharacteristic(this.api.hap.Characteristic.LockCurrentState)
+            .updateValue(this.lockCurrentState(context));
+        lock.getCharacteristic(this.api.hap.Characteristic.LockTargetState)
+            .updateValue(this.lockTargetState(context));
     }
 
     register() {
@@ -91,11 +110,7 @@ export default class GasAccessories extends Accessories<GasAccessoryInterface> {
                 });
                 if(!accessory) continue;
 
-                const context = this.getAccessoryInterface(accessory);
-                const service = accessory.getService(this.api.hap.Service.LockMechanism);
-                service?.setCharacteristic(this.api.hap.Characteristic.LockTargetState, context.secured
-                    ? this.api.hap.Characteristic.LockTargetState.SECURED
-                    : this.api.hap.Characteristic.LockTargetState.UNSECURED);
+                this.updateLockState(accessory);
             }
         });
     }
