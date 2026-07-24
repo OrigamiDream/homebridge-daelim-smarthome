@@ -62,6 +62,20 @@ namespace AirQuality {
 
 const INDOOR_AIR_QUALITY_POLLING_INTERVAL_MILLISECONDS = 60 * 1000;
 
+// Apple-defined density characteristics (PM10Density, PM2_5Density, VOCDensity) only
+// accept 0–1000 µg/m³, but the wall pad grades TVOC on its own 0–1500 scale (the feed's
+// `max` field; readings up to ~1944 observed) with no unit metadata, so values above
+// 1000 arrive routinely. Clamp into the valid range instead of raising maxValue via
+// setProps; the air-quality grade shown in Home comes from `css`, not the raw density.
+const HOMEKIT_DENSITY_MAX = 1000;
+
+function clampDensity(density: number): number {
+    if(!Number.isFinite(density)) {
+        return 0;
+    }
+    return Math.max(0, Math.min(HOMEKIT_DENSITY_MAX, density));
+}
+
 export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQualityAccessoryInterface> {
 
     private skippedFirstPollingMessage: boolean = false;
@@ -151,19 +165,19 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
             .getCharacteristic(this.api.hap.Characteristic.PM10Density)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                callback(undefined, context.pm10.density);
+                callback(undefined, clampDensity(context.pm10.density));
             });
         this.getService(accessory, this.api.hap.Service.AirQualitySensor)
             .getCharacteristic(this.api.hap.Characteristic.PM2_5Density)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                callback(undefined, context.pm2_5.density);
+                callback(undefined, clampDensity(context.pm2_5.density));
             });
         this.getService(accessory, this.api.hap.Service.AirQualitySensor)
             .getCharacteristic(this.api.hap.Characteristic.VOCDensity)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                callback(undefined, context.vocs.density);
+                callback(undefined, clampDensity(context.vocs.density));
             });
     }
 
