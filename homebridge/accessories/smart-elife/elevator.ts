@@ -16,6 +16,7 @@ import {
     normalizeElevatorCallState,
     reduceElevatorServerEvent,
 } from "../../../core/smart-elife/elevator-protocol";
+import {EXTERIOR_ELEVATOR_DEVICE} from "../../../core/smart-elife/exterior-devices";
 import Timeout = NodeJS.Timeout;
 
 interface ElevatorAccessoryInterface extends AccessoryInterface {
@@ -27,13 +28,6 @@ interface ElevatorAccessoryInterface extends AccessoryInterface {
     motionDetected: boolean
 }
 
-export const EXTERIOR_ELEVATOR_DEVICE: Device = {
-    displayName: "외부 엘리베이터",
-    name: "엘리베이터",
-    deviceType: DeviceType.ELEVATOR,
-    deviceId: "CMF990100",
-    disabled: false,
-};
 const ELEVATOR_MOTION_DURATION_TIMEOUT_SECONDS = 5; // 5 seconds
 const ELEVATOR_CALL_FALLBACK_TIMEOUT_SECONDS = 120; // 2 minutes
 

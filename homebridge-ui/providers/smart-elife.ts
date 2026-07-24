@@ -7,7 +7,7 @@ import {ClientResponseCode} from "../../core/smart-elife/responses";
 import {Logging} from "homebridge";
 import Timeout = NodeJS.Timeout;
 import {WALLPAD_VERSION_3_0} from "../../core/smart-elife/parsers/version-parsers";
-import {EXTERIOR_ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
+import {EXTERIOR_ELEVATOR_DEVICE} from "../../core/smart-elife/exterior-devices";
 import {EXTERIOR_FRONT_DOOR_DEVICE} from "../../homebridge/accessories/smart-elife/door";
 import {EXTERIOR_VEHICLE_BARRIER_DEVICE} from "../../homebridge/accessories/smart-elife/vehicle";
 import {

@@ -1,0 +1,36 @@
+{
+  "name": "smart-home-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run build"
+  },
+  "dependencies": {
+    "@eneris/push-receiver": "4.2.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "axios": "1.18.0",
+    "homebridge": "2.0.1",
+    "lucide-react": "^0.468.0",
+    "next": "^15.4.0",
+    "node-fetch": "2.6.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "ws": "8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/node-fetch": "2.5.8",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "8.18.1",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.4.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.8.0"
+  }
+}

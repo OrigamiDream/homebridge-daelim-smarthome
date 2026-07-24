@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import {version} from "../package.json";
+import packageJson from "../package.json";
 import {
     ApplicationLogSubTypes,
     DeviceSubTypes,
@@ -160,7 +160,7 @@ export class Utils {
     }
 
     static currentSemanticVersion(): SemanticVersion {
-        return Utils.parseSemanticVersion(version);
+        return Utils.parseSemanticVersion(packageJson.version);
     }
 
     static arraycopy(src: Uint8Array, srcPos: number, dst: Uint8Array, dstPos: number, length: number) {

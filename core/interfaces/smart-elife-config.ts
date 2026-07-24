@@ -18,6 +18,7 @@ export interface Device {
     disabled: boolean
     deviceType: DeviceType
     deviceId: string
+    operation?: Record<string, unknown>
     camera?: CameraConfig
     duration?: DeviceDuration
 }

@@ -17,8 +17,8 @@ import WebSocketScheduler from "./ws-scheduler";
 import {parseWebSocketCredentials, WebSocketCredentials} from "./parsers/ws-creds-parsers";
 import {parseDeviceList} from "./parsers/device-parsers";
 import {HTMLCandidate, parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0} from "./parsers/version-parsers";
-import {EXTERIOR_ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
 import {createElevatorStatusRequest} from "./elevator-protocol";
+import {EXTERIOR_ELEVATOR_DEVICE} from "./exterior-devices";
 import {setInterval} from "timers";
 import * as https from "node:https";
 import * as dns from "node:dns";
@@ -47,6 +47,13 @@ interface PushListenerInfo {
 }
 
 const POLLING_INTERVAL_MILLISECONDS = 30 * 1000;
+const SENSITIVE_LOG_HEADERS = new Set([
+    "authorization",
+    "cookie",
+    "daelim_elife",
+    "dpk",
+    "_csrf",
+]);
 
 export default class SmartELifeClient {
 
@@ -293,12 +300,23 @@ export default class SmartELifeClient {
             let buf = `${opts.method} ${url}\n`;
             const headers = opts.headers || {};
             for(const headerKey in headers) {
-                buf += `${headerKey}: ${headers[headerKey]}\n`;
+                const value = SENSITIVE_LOG_HEADERS.has(headerKey.toLowerCase())
+                    ? "[REDACTED]"
+                    : headers[headerKey];
+                buf += `${headerKey}: ${value}\n`;
             }
             if(!!opts.body) {
                 try {
                     const body = typeof opts.body === "string" ? JSON.parse(opts.body) : opts.body;
-                    buf += `\n${JSON.stringify(body, null, 2)}`;
+                    const redactedBody = Object.fromEntries(
+                        Object.entries(body).map(([key, value]) => [
+                            key,
+                            /(password|token|authorization|userkey|roomkey|uuid|csrf|dpk)/i.test(key)
+                                ? "[REDACTED]"
+                                : value,
+                        ]),
+                    );
+                    buf += `\n${JSON.stringify(redactedBody, null, 2)}`;
                 } catch {
                     // Non-JSON or unparsable body; avoid throwing in debug logging.
                 }
@@ -467,14 +485,14 @@ export default class SmartELifeClient {
                     roomKey: response["roomkey"],
                     accessToken: "",
                 }
-                this.log.info(`Received user-key = ${this.wsCredentials.userKey}, room-key = ${this.wsCredentials.roomKey} prior to wallpad authorization.`);
+                this.log.info("Received temporary wallpad authorization keys.");
 
                 // Ask for preparing the Wallpad authorization.
                 const success = await this.requestWallpadAuthorization();
                 if(!success) {
                     return ClientResponseCode.WALLPAD_AUTHORIZATION_PREPARATION_FAILED;
                 }
-                return ClientResponseCode.SUCCESS;
+                return ClientResponseCode.UNCERTIFIED_WALLPAD;
             }
         }
         this.log.warn("Unexpected client response code had been returned: %s", code);
@@ -840,8 +858,11 @@ export default class SmartELifeClient {
         await this.sendJson(createElevatorStatusRequest(this.getWebSocketCredentials()));
     }
 
-    async fetchDevices(): Promise<Device[]> {
-        const deviceList: any[] = parseDeviceList(await this.fetchServerSideRenderedHTML());
+    async fetchDevices(forceFetch: boolean = false): Promise<Device[]> {
+        const deviceList = parseDeviceList(await this.fetchServerSideRenderedHTML(forceFetch));
+        if(!Array.isArray(deviceList)) {
+            throw new Error("Could not find the Smart eLife device list.");
+        }
         const fetchedDevices: Device[] = [];
         for(const deviceGroup of deviceList) {
             const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
@@ -862,6 +883,9 @@ export default class SmartELifeClient {
                     displayName, name, deviceType,
                     deviceId: device["uid"],
                     disabled: false,
+                    operation: device["operation"] && typeof device["operation"] === "object"
+                        ? {...device["operation"]}
+                        : undefined,
                 });
             }
         }

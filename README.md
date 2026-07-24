@@ -69,3 +69,60 @@ sudo npm install -g --unsafe-perm homebridge-daelim-smarthome
 <sub><b id="lightbulb">1</b> 세대에 따라 거실 전등 밝기를 3단계 혹은 8단계로 조절 가능합니다.</sub><br>
 <sub><b id="fans">2</b> 일부 세대의 경우 환풍기 풍량 조절이 가능합니다.</sub><br>
 <sub><b id="hksv">3</b> HomeKit Secure Video를 통해 표기되며, 홈킷 허브인 Apple TV 혹은 HomePod이 있어야 합니다.</sub>
+
+## Smart eLife dashboard
+
+Install the dashboard dependencies once:
+
+```powershell
+npm --prefix frontend install
+```
+
+Run the dashboard in development mode:
+
+```powershell
+npm run dashboard:dev
+```
+
+For production, build the complete project and start the dashboard:
+
+```powershell
+npm run build:all
+npm run dashboard:start
+```
+
+Open `http://localhost:3000`, sign in with the Smart eLife account, and enter the
+wallpad passcode when requested. Device refreshes and light controls reuse the
+existing Smart eLife client.
+
+### Vercel deployment
+
+Create a Vercel project for this repository and set its Root Directory to
+`frontend`. Keep the "Include source files outside of the Root Directory"
+setting enabled because the dashboard imports the existing Smart eLife client
+from the repository root.
+
+Add these Environment Variables in the Vercel project:
+
+```text
+SMART_ELIFE_EMAIL
+SMART_ELIFE_PASSWORD
+```
+
+`SMART_ELIFE_EMAIL` is the email address used to sign in to the Smart eLife
+app. The legacy `SMART_ELIFE_USERNAME` name is also accepted for compatibility.
+
+`SMART_ELIFE_UUID` is optional. If it is not set, the existing deterministic
+UUID calculation is used. Once the wallpad has authorized a UUID, do not change
+it.
+
+The Apple Shortcuts endpoint is:
+
+```text
+POST https://your-project.vercel.app/api/shortcut/elevator
+```
+
+The endpoint automatically signs in from the Environment Variables after a
+cold start and reuses the in-memory client while the Vercel function instance
+remains warm. If wallpad authorization is requested, open the dashboard once
+and enter the passcode.
