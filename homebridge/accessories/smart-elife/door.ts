@@ -15,6 +15,7 @@ interface DoorAccessoryInterface extends AccessoryInterface {
     motionTimer?: Timeout
     motionDetected: boolean
     isSmartDoorLock?: boolean
+    closed?: boolean
     batteryLevel?: number
 }
 
@@ -50,7 +51,7 @@ const LOW_BATTERY_THRESHOLD = 20;
 export default class DoorAccessories extends Accessories<DoorAccessoryInterface> {
 
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
-        super(log, api, config, DeviceType.DOOR, [api.hap.Service.MotionSensor, api.hap.Service.Battery]);
+        super(log, api, config, DeviceType.DOOR, [api.hap.Service.MotionSensor, api.hap.Service.ContactSensor, api.hap.Service.Battery]);
     }
 
     protected async identify(accessory: PlatformAccessory): Promise<void> {
@@ -90,7 +91,21 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
             return;
         }
 
-        // `LockMechanism` service is discarded.
+        // `LockMechanism` requires a writable `LockTargetState`,
+        // which cannot express the BLE-only (read-only from HomeKit's perspective) door lock.
+        // A `ContactSensor` is inherently read-only
+        // and still surfaces the open/close state under the Home app's security category.
+        const contact = this.getService(accessory, this.api.hap.Service.ContactSensor);
+        contact.setPrimaryService(true);
+        contact.getCharacteristic(this.api.hap.Characteristic.ContactSensorState)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                if(context.closed === undefined) {
+                    callback(HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+                    return;
+                }
+                callback(undefined, this.contactSensorState(context.closed));
+            });
 
         const battery = this.getService(accessory, this.api.hap.Service.Battery);
         battery.getCharacteristic(this.api.hap.Characteristic.BatteryLevel)
@@ -115,6 +130,12 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 callback(undefined, this.api.hap.Characteristic.ChargingState.NOT_CHARGEABLE);
             });
+    }
+
+    private contactSensorState(closed: boolean): CharacteristicValue {
+        return closed
+            ? this.api.hap.Characteristic.ContactSensorState.CONTACT_DETECTED
+            : this.api.hap.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
     }
 
     private lowBatteryState(batteryLevel: number): CharacteristicValue {
@@ -150,12 +171,27 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
             motionTimer: context?.motionTimer,
             motionDetected: context?.motionDetected ?? false,
             isSmartDoorLock: doorDevice.isSmartDoorLock,
+            closed: doorDevice.isSmartDoorLock ? context?.closed : undefined,
             batteryLevel: doorDevice.isSmartDoorLock ? context?.batteryLevel : undefined,
         });
     }
 
     private refreshSmartDoorLockState(accessory: PlatformAccessory, op: any) {
         const context = this.getAccessoryInterface(accessory);
+
+        const status = op?.["status"];
+        if(status === "open") {
+            context.closed = false;
+        } else if(status === "close") {
+            context.closed = true;
+        } else {
+            this.log.debug("Ignoring unknown smartdoor status: %s", String(status));
+        }
+        if(context.closed !== undefined) {
+            accessory.getService(this.api.hap.Service.ContactSensor)
+                ?.getCharacteristic(this.api.hap.Characteristic.ContactSensorState)
+                .updateValue(this.contactSensorState(context.closed));
+        }
 
         const parsedBatteryLevel = this.parseBatteryLevel(op?.["battery"]);
         if(parsedBatteryLevel === undefined) return;
@@ -215,6 +251,9 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
                 this.log.warn("Currently, only one `smartdoor` device is supported. The other devices are discarded: %s", JSON.stringify(devices));
             }
             const device = devices[0];
+            // The wallpad occasionally reports an empty op list, and smartdoor events from
+            // other households are filtered out by the config, leaving no devices here.
+            if(!device) return;
             for(const doorDevice of EXTERIOR_DOOR_DEVICES) {
                 if(!doorDevice.isSmartDoorLock) continue;
 

@@ -750,12 +750,12 @@ export default class SmartELifeClient {
             this.log("Push notification configured.");
 
             const items = await this.checkPushSettings();
+            // The legacy VISITOR and FAMILY_ENTER kinds are dropped here because the
+            // renamed setting list exposes no equivalent items.
             await this.setPushActive(items, [
-                PushItemKind.VISITOR,
-                PushItemKind.CAR,
-                PushItemKind.DOOR,
-                PushItemKind.FAMILY_ENTER,
-                PushItemKind.SMART_DOOR_STATUS,
+                PushItemKind.CAR, // vehicle in/out motion (data4 58)
+                PushItemKind.DOOR, // communal/front door access motion (data4 64)
+                PushItemKind.DOOR_LOCK, // front door open motion (data4 55)
             ]);
         });
 
