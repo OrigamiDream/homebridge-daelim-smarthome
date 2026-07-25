@@ -2,12 +2,14 @@ import fetch, {Response} from "node-fetch";
 import {LoggerBase, Utils} from "../utils";
 import {
     ControlQueryCategory,
+    DATA4_PUSH_TYPES,
     Device,
     DeviceType,
     PushItem,
     PushItemKind,
     PushType,
-    SmartELifeConfig
+    SmartELifeConfig,
+    TITLE_PUSH_TYPES
 } from "../interfaces/smart-elife-config";
 import {ClientResponseCode} from "./responses";
 import PushReceiver from "@eneris/push-receiver";
@@ -593,33 +595,68 @@ export default class SmartELifeClient {
         return Utils.aes256Base64(this.config.uuid, this.key, this.iv);
     }
 
+    private parsePushType(data: { [key: string]: unknown } | undefined, title?: string, body?: string): PushType {
+        const pushType = this.parseRawPushType(data, title);
+        // The access (출입) push category covers both the household front door and
+        // the communal door; only the notification body tells them apart.
+        if(pushType === PushType.FRONT_DOOR && !!body && body.includes("공동")) {
+            return PushType.COMMUNAL_DOOR;
+        }
+        return pushType;
+    }
+
+    private parseRawPushType(data: { [key: string]: unknown } | undefined, title?: string): PushType {
+        if(!data) {
+            return PushType.UNKNOWN;
+        }
+        // Legacy payload: `data` holds a JSON string whose data1/data2/data3
+        // fields are joined into the PushType key (e.g. "5-46").
+        if(data["data"]) {
+            let payload: any;
+            try {
+                payload = JSON.parse(data["data"] as string);
+            } catch {
+                return PushType.UNKNOWN;
+            }
+            if(!payload) {
+                return PushType.UNKNOWN;
+            }
+            const pushTypeString = ["data1", "data2", "data3"]
+                .map((key) => payload[key])
+                .filter((value) => !!value)
+                .join("-");
+            return pushTypeString as PushType || PushType.UNKNOWN;
+        }
+        // Current payload (since July 2026): a single `data4` code.
+        if(data["data4"]) {
+            const pushType = DATA4_PUSH_TYPES[String(data["data4"])];
+            if(pushType) {
+                return pushType;
+            }
+        }
+        // Unmapped code; fall back to the notification title which carries
+        // the push category name.
+        if(title && TITLE_PUSH_TYPES[title]) {
+            return TITLE_PUSH_TYPES[title];
+        }
+        return PushType.UNKNOWN;
+    }
+
     private async configurePushNotification() {
         if(this.push) {
             this.log("Configuring Push");
 
             this.push.onNotification((notification) => {
                 this.log.info(`[Push] onNotify (JSON): ${JSON.stringify(notification.message, null, 2)}`);
-                const data = notification.message.data;
-                if(!data || !data["data"]) {
-                    this.log.warn("Unexpected Push message (no data): %s", JSON.stringify(notification.message));
-                    return;
-                }
-                const payload = JSON.parse(data["data"] as string);
-                if(!payload) {
-                    this.log.warn("Unexpected Push message (not JSON): %s", JSON.stringify(notification.message));
-                    return;
-                }
-                const pushTypeString = ["data1", "data2", "data3"]
-                    .map((key) => payload[key])
-                    .filter((value) => !!value)
-                    .join("-");
-                const pushType = pushTypeString as PushType || PushType.UNKNOWN;
+                const message = notification.message;
+                const title = message.notification?.title;
+                const body = message.notification?.body;
+
+                const pushType = this.parsePushType(message.data, title, body);
                 if(pushType === PushType.UNKNOWN) {
-                    this.log.warn("Unexpected Push message (unknown payload): %s", JSON.stringify(notification.message));
+                    this.log.warn("Unexpected Push message (unknown payload): %s", JSON.stringify(message));
                     return;
                 }
-                const title = notification.message.notification?.title;
-                const body = notification.message.notification?.body;
 
                 for(const listener of this.pushListeners) {
                     if(listener.pushType !== pushType) continue;
@@ -713,12 +750,12 @@ export default class SmartELifeClient {
             this.log("Push notification configured.");
 
             const items = await this.checkPushSettings();
+            // The legacy VISITOR and FAMILY_ENTER kinds are dropped here because the
+            // renamed setting list exposes no equivalent items.
             await this.setPushActive(items, [
-                PushItemKind.VISITOR,
-                PushItemKind.CAR,
-                PushItemKind.DOOR,
-                PushItemKind.FAMILY_ENTER,
-                PushItemKind.SMART_DOOR_STATUS,
+                PushItemKind.CAR, // vehicle in/out motion (data4 58)
+                PushItemKind.DOOR, // communal/front door access motion (data4 64)
+                PushItemKind.DOOR_LOCK, // front door open motion (data4 55)
             ]);
         });
 

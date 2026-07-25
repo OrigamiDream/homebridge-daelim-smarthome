@@ -55,33 +55,27 @@ export interface PushItem {
     desc?: string
 }
 
+// The server renamed the push setting item keys around July 2026 (e.g. `car` -> `push_car`,
+// `smartdoorstatus` -> `push_doorlock`), alongside the push payload format change. The values
+// below are the keys /mypage/pushList.ajax currently returns. The legacy `visitor` and
+// `familyenter` kinds have no observed equivalent in the new list.
 export enum PushItemKind {
     UNKNOWN = "unknown",
-    GAS = "gas",
-    FAMILY_ENTER = "familyenter",
-    NEW_BOARD = "boardnew",
-    ENTRANCE_PASSWORD_CHANGE = "entpw",
-    NEW_NOTICE = "notice",
-    HEATING = "heating",
-    WALL_SOCKET = "wallsocket",
-    SMART_DOOR_STATUS = "smartdoorstatus",
-    SECURITY = "OUTING",
-    SECURITY_PASSWORD_CHANGE = "secpw",
-    VISITOR = "visitor",
-    MODE_RUNNING = "moderun",
-    AIR_CONDITIONER = "aircon",
-    EMS = "ems",
-    ELEVATOR = "elevator",
-    ALL_OFF_SWITCH = "allofswitch",
-    ONE_TIME_KEY = "onetimekey",
-    CAR = "car",
-    LIGHT = "light",
-    DOOR = "door",
-    CARE_SERVICE = "careservice",
-    PARCEL = "parcel",
-    VENT = "vent",
-    NEW_USER = "usernew",
-    UNREGISTER_USER = "userout",
+    NOTICE = "push_notice",
+    DOOR_LOCK = "push_doorlock",
+    MODE_RUNNING = "push_mode",
+    PASSWORD_CHANGE = "push_change_pw",
+    INDOOR_AIR = "push_indoorair",
+    EMS = "push_ems",
+    CAR = "push_car",
+    EV = "push_ev",
+    CONTROL = "push_control",
+    PARKING_LOT = "push_parking_lot",
+    DOOR = "push_door",
+    PARCEL = "push_parcel",
+    MEMBER = "push_member",
+    // FAMILY_ENTER = "familyenter",
+    // VISITOR = "visitor",
 }
 
 export enum PushType {
@@ -91,4 +85,25 @@ export enum PushType {
     VISITOR = "5-32",
     CAR = "5-46",
     FRONT_DOOR = "5-61",
+
+    // Not a wire-format value. The access (출입) push category covers both the
+    // household front door and the communal door; parsing resolves to this type
+    // when the notification body points to the communal door.
+    COMMUNAL_DOOR = "communal-door",
 }
+
+// Since July 2026 the server sends a single `data4` code instead of the legacy
+// data1/data2/data3 JSON payload. Only codes observed in the wild are mapped here;
+// unknown codes fall back to matching the notification title (`TITLE_PUSH_TYPES`).
+export const DATA4_PUSH_TYPES: { [code: string]: PushType } = {
+    "55": PushType.FRONT_DOOR, // 도어락: "수동에 의하여 문이 열렸습니다." (sent only when push_doorlock is enabled)
+    "58": PushType.CAR, // 입출차: "등록 ... 차량이 입차하였습니다."
+    "64": PushType.FRONT_DOOR, // 출입: "공동 현관 출입이 감지되었습니다." (refined by body into COMMUNAL_DOOR)
+};
+
+// Fallback mapping for unmapped `data4` codes. The titles are the same category
+// names that appear in /mypage/pushList.ajax (push_car: "입출차", push_door: "출입 알림").
+export const TITLE_PUSH_TYPES: { [title: string]: PushType } = {
+    "입출차": PushType.CAR,
+    "출입": PushType.FRONT_DOOR,
+};

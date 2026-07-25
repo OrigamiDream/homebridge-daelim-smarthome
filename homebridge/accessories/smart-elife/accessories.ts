@@ -15,7 +15,8 @@ export interface DeviceWithOp extends Device {
     op: any;
 }
 
-export type DeviceListener = (devices: DeviceWithOp[]) => void;
+export type NonEmptyDeviceList = [DeviceWithOp, ...DeviceWithOp[]];
+export type DeviceListener = (devices: NonEmptyDeviceList) => void;
 export type ServiceType = WithUUID<typeof Service>;
 
 const DEFERRED_TASKS_MILLISECONDS = 500;
@@ -97,7 +98,7 @@ export default class Accessories<T extends AccessoryInterface> {
 
         const removals = [];
         for(const service of accessory.services) {
-            if(this.isSupportedService(service)) {
+            if(this.isSupportedService(service, accessory)) {
                 continue;
             }
             this.log.debug("The service %s is no longer supported from accessory: %s (%s)", service.constructor.name, context.displayName, this.deviceType.toString());
@@ -114,7 +115,7 @@ export default class Accessories<T extends AccessoryInterface> {
         this.log.info("Identifying %s", accessory.displayName);
     }
 
-    private isSupportedService(service: Service): boolean {
+    protected isSupportedService(service: Service, _: PlatformAccessory): boolean {
         for(const t of this.serviceTypes) {
             if(t.UUID === service.UUID) {
                 return true;
@@ -123,7 +124,7 @@ export default class Accessories<T extends AccessoryInterface> {
         return false;
     }
 
-    private isSupportedServiceType(serviceType: ServiceType): boolean {
+    protected isSupportedServiceType(serviceType: ServiceType, _: PlatformAccessory): boolean {
         for(const t of this.serviceTypes) {
             if(t.UUID === serviceType.UUID) {
                 return true;
@@ -133,7 +134,7 @@ export default class Accessories<T extends AccessoryInterface> {
     }
 
     protected getService(accessory: PlatformAccessory, serviceType: ServiceType): Service {
-        if(!this.isSupportedServiceType(serviceType)) {
+        if(!this.isSupportedServiceType(serviceType, accessory)) {
             throw new Error(`Service \`${serviceType.name}\` is not registered as a supported service type in \`${this.deviceType.toString()}\` accessories.`);
         }
         const context = this.getAccessoryInterface(accessory);
@@ -194,10 +195,18 @@ export default class Accessories<T extends AccessoryInterface> {
             } else {
                 devices = this.parseDevices(data, deviceType);
             }
-            if(devices.length === 0)
-                this.log.warn("No devices op received for %s. Are the devices disconnected from WallPad?", deviceType.toString());
+            // The wallpad can return no devices, and broadcasts for other households can leave
+            // no locally configured devices after parsing. Neither case carries device state for
+            // this listener but retains the signal at debug level for troubleshooting.
+            if(devices.length === 0) {
+                if(data && Array.isArray(data["devices"])) {
+                    this.log.debug("Ignoring %s listener event: %d device(s) received and no configured device state was available.",
+                        deviceType.toString(), data["devices"].length);
+                }
+                return;
+            }
 
-            deviceListener(devices);
+            deviceListener(devices as NonEmptyDeviceList);
         }, deviceType);
     }
 
