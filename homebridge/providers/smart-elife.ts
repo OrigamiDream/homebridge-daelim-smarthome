@@ -20,6 +20,11 @@ import DoorAccessories from "../accessories/smart-elife/door";
 import VehicleAccessories from "../accessories/smart-elife/vehicle";
 import CameraAccessories from "../accessories/smart-elife/camera";
 
+// Keys without which the plugin cannot sign in at all.
+// Every other key is either optional (`roomKey`, `userKey`) or has a fallback,
+// and must not invalidate the config.
+const REQUIRED_CONFIG_KEYS = ["username", "password", "uuid"];
+
 export default class SmartELifeProvider extends AbstractProvider {
 
     private readonly config?: SmartELifeConfig;
@@ -45,11 +50,10 @@ export default class SmartELifeProvider extends AbstractProvider {
     }
 
     loadConfig(config: PlatformConfig): SmartELifeConfig | undefined {
-        for(const key in config) {
-            const value = config[key];
-            if(value === undefined || !value) {
-                return undefined;
-            }
+        const missingKeys = REQUIRED_CONFIG_KEYS.filter(key => !config[key]);
+        if(missingKeys.length > 0) {
+            this.log.warn(`The plugin configuration is missing required values: ${missingKeys.join(", ")}`);
+            return undefined;
         }
         return {
             username: config["username"],

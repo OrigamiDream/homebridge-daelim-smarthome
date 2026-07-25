@@ -17,6 +17,11 @@ import {VehicleAccessories} from "../accessories/daelim/vehicle";
 import {CameraAccessories} from "../accessories/daelim/camera";
 import PushReceiverStateStore from "../../core/push-receiver-state-store";
 
+// Keys without which the plugin cannot sign in at all.
+// Every other key either has a fallback (`devices`) or is unrelated,
+// and must not invalidate the config.
+const REQUIRED_CONFIG_KEYS = ["region", "complex", "username", "password", "uuid"];
+
 export default class DaelimProvider extends AbstractProvider {
 
     private client?: DaelimClient;
@@ -42,11 +47,10 @@ export default class DaelimProvider extends AbstractProvider {
     }
 
     configureCredentials(config: PlatformConfig): DaelimConfig | undefined {
-        for(const key in config) {
-            const value = config[key];
-            if(value === undefined || !value) {
-                return undefined;
-            }
+        const missingKeys = REQUIRED_CONFIG_KEYS.filter(key => !config[key]);
+        if(missingKeys.length > 0) {
+            this.log.warn(`The plugin configuration is missing required values: ${missingKeys.join(", ")}`);
+            return undefined;
         }
         return {
             region: config["region"],
