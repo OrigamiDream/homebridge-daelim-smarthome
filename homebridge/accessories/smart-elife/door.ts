@@ -251,9 +251,6 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
                 this.log.warn("Currently, only one `smartdoor` device is supported. The other devices are discarded: %s", JSON.stringify(devices));
             }
             const device = devices[0];
-            // The wallpad occasionally reports an empty op list, and smartdoor events from
-            // other households are filtered out by the config, leaving no devices here.
-            if(!device) return;
             for(const doorDevice of EXTERIOR_DOOR_DEVICES) {
                 if(!doorDevice.isSmartDoorLock) continue;
 

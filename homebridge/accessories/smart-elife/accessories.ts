@@ -15,7 +15,8 @@ export interface DeviceWithOp extends Device {
     op: any;
 }
 
-export type DeviceListener = (devices: DeviceWithOp[]) => void;
+export type NonEmptyDeviceList = [DeviceWithOp, ...DeviceWithOp[]];
+export type DeviceListener = (devices: NonEmptyDeviceList) => void;
 export type ServiceType = WithUUID<typeof Service>;
 
 const DEFERRED_TASKS_MILLISECONDS = 500;
@@ -194,10 +195,18 @@ export default class Accessories<T extends AccessoryInterface> {
             } else {
                 devices = this.parseDevices(data, deviceType);
             }
-            if(devices.length === 0)
-                this.log.warn("No devices op received for %s. Are the devices disconnected from WallPad?", deviceType.toString());
+            // The wallpad can return no devices, and broadcasts for other households can leave
+            // no locally configured devices after parsing. Neither case carries device state for
+            // this listener but retains the signal at debug level for troubleshooting.
+            if(devices.length === 0) {
+                if(data && Array.isArray(data["devices"])) {
+                    this.log.debug("Ignoring %s listener event: %d device(s) received and no configured device state was available.",
+                        deviceType.toString(), data["devices"].length);
+                }
+                return;
+            }
 
-            deviceListener(devices);
+            deviceListener(devices as NonEmptyDeviceList);
         }, deviceType);
     }
 
