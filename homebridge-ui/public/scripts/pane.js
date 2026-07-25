@@ -716,9 +716,26 @@ class WallpadPasscodePane extends Pane {
     }
 }
 
+// Backstop for the device refresh.
+// The smart-elife request settles on its own because its handler awaits the whole sign-in,
+// but daelim only acknowledges the request and keeps streaming devices in afterwards,
+// so a stalled wall-pad would otherwise leave the advanced button locked forever.
+const DEVICE_REFRESH_TIMEOUT_MILLISECONDS = 30 * 1000;
+const DEVICE_REFRESH_FAILED_MESSAGE = "기기 목록을 갱신하지 못했습니다. 저장된 목록으로 설정을 편집합니다.";
+const WALLPAD_REAUTHORIZATION_MESSAGE = "월패드 재인증이 필요합니다. 기기 목록을 갱신하려면 '재설정'으로 다시 로그인해주세요.";
+
 class CompletePane extends Pane {
     constructor(element, config) {
         super(element, config);
+
+        // The refresh is not a single promise:
+        // the request and its result arrive through different channels,
+        // and some failure paths emit nothing at all.
+        // The advanced button opens once the refresh has settled either way.
+        this._settled = false;
+        this._settleTimeout = undefined;
+        this._refreshed = false;
+        this._advancedFormOpened = false;
 
         this.pane = document.createElement("div");
         this.pane.classList.add("hidden");
@@ -750,6 +767,21 @@ class CompletePane extends Pane {
         return new ResetConfirmablePane(this.element, this.config);
     }
 
+    _settle(warning) {
+        if(this._settled) {
+            return; // only the first terminal state wins
+        }
+        this._settled = true;
+        if(this._settleTimeout) {
+            clearTimeout(this._settleTimeout);
+            this._settleTimeout = undefined;
+        }
+        this.advancedButton.removeAttribute("disabled");
+        if(warning) {
+            window.homebridge.toast.warning(warning);
+        }
+    }
+
     devicesEquals(oldDevice, newDevice) {
         if(this.config.provider === "daelim") {
             return oldDevice.name === newDevice.name
@@ -766,16 +798,44 @@ class CompletePane extends Pane {
         this.ensureAttached();
         refreshTrademark(this.config);
         setTimeout(async () => {
-            await window.homebridge.request(`/${this.config.provider}/fetch-devices`, {
-                region: this.config.region,
-                complex: this.config.complex,
-                username: this.config.username,
-                password: this.config.password,
-            });
+            try {
+                await window.homebridge.request(`/${this.config.provider}/fetch-devices`, {
+                    region: this.config.region,
+                    complex: this.config.complex,
+                    username: this.config.username,
+                    password: this.config.password,
+                });
+                if(this.config.provider === "smart-elife" && !this._refreshed) {
+                    // The handler awaits the whole sign-in,
+                    // so returning without having reported any device means the query gave up quietly.
+                    this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
+                }
+            } catch(error) {
+                console.error("Could not refresh the device list:", error);
+                this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
+            }
         }, 0);
+        this._settleTimeout = setTimeout(() => {
+            this._settleTimeout = undefined;
+            this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
+        }, DEVICE_REFRESH_TIMEOUT_MILLISECONDS);
+        this.addHomebridgeListener("authorization-failed", () => {
+            this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
+        });
+        this.addHomebridgeListener("require-wallpad-passcode", () => {
+            this._settle(WALLPAD_REAUTHORIZATION_MESSAGE);
+        });
         this.addHomebridgeListener("devices-fetched", async (event) => {
             const devices = event["data"].devices;
             console.log(`Num of devices: ${devices.length}`);
+
+            this._refreshed = true; // mark before yielding, the request may settle next
+            if(this._advancedFormOpened) {
+                // The user is already editing the device list,
+                // and the button can only have been opened by an earlier `_settle()`.
+                // Replacing the list now would silently discard those edits.
+                return;
+            }
 
             const availableDevices = [];
             for(const device of devices) {
@@ -791,7 +851,7 @@ class CompletePane extends Pane {
             await this.updatePluginConfig();
             await this.savePluginConfig();
 
-            this.advancedButton.removeAttribute("disabled");
+            this._settle();
         });
         this.addListener(this.resetButton, "click", async () => {
             await this.advance({}, this.nextPane());
@@ -803,6 +863,8 @@ class CompletePane extends Pane {
         });
 
         this.addListener(this.advancedButton, "click", async () => {
+            this._advancedFormOpened = true;
+
             document.getElementById("setupForm").classList.add("hidden");
             document.getElementById("footer").classList.add("hidden");
             document.getElementById("advancedForm").classList.remove("hidden");
@@ -816,6 +878,14 @@ class CompletePane extends Pane {
                 this.updatePluginConfig();
             });
         });
+    }
+
+    dispose() {
+        if(this._settleTimeout) {
+            clearTimeout(this._settleTimeout);
+            this._settleTimeout = undefined;
+        }
+        super.dispose();
     }
 }
 
