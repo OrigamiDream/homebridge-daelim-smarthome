@@ -137,6 +137,10 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         this.devicesFetched = true;
 
         // On success
+        // `devices-fetched` is pushed before `complete`,
+        // so that a pane waiting only for the device list settles before the wizard moves on.
+        // Without it, a sign-in triggered by `/fetch-devices` would report nothing the caller listens for.
+        this.server.pushEvent("devices-fetched", { devices });
         this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
     }
 
