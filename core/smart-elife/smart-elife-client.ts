@@ -597,10 +597,19 @@ export default class SmartELifeClient {
 
     private parsePushType(data: { [key: string]: unknown } | undefined, title?: string, body?: string): PushType {
         const pushType = this.parseRawPushType(data, title);
-        // The access (출입) push category covers both the household front door and
-        // the communal door; only the notification body tells them apart.
-        if(pushType === PushType.FRONT_DOOR && !!body && body.includes("공동")) {
-            return PushType.COMMUNAL_DOOR;
+        // The access (출입) push category covers the household front door, the communal
+        // door and the interphone camera alike; only the notification body tells them
+        // apart. Without this an unmapped `data4` falls back to the title and every one
+        // of them would resolve to FRONT_DOOR.
+        if(pushType === PushType.FRONT_DOOR && !!body) {
+            // A visitor snapshot is not tied to either door - the camera accessory reads
+            // `door_type` off the visitor board to decide which one it belongs to.
+            if(body.includes("방문자")) {
+                return PushType.VISITOR;
+            }
+            if(body.includes("공동")) {
+                return PushType.COMMUNAL_DOOR;
+            }
         }
         return pushType;
     }
