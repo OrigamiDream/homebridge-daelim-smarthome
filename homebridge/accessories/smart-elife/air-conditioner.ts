@@ -903,11 +903,16 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
 
         this.addDeviceListener((devices) => {
             for(const device of devices) {
-                // Existing accessory: route the push through the command/temperature
-                // guards, mutating context in place (see applyWallPadState).
+                // Existing accessory: still run it through addOrGetAccessory,
+                // so the "disabled in config -> unregister" path there keeps owning removal.
+                // Feed it the current context (not the push),
+                // so a surviving accessory is re-assigned to itself unchanged,
+                // then let applyWallPadState apply the push in place through the command/temperature guards.
                 const existing = this.findAccessory(device.deviceId);
                 if(existing) {
-                    this.applyWallPadState(existing, device.op);
+                    const kept = this.addOrGetAccessory(this.getAccessoryInterface(existing));
+                    if(!kept) continue; // disabled -> unregistered
+                    this.applyWallPadState(kept, device.op);
                     continue;
                 }
 
