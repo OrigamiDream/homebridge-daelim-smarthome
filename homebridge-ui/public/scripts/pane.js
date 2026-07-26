@@ -716,11 +716,6 @@ class WallpadPasscodePane extends Pane {
     }
 }
 
-// Backstop for the device refresh.
-// The smart-elife request settles on its own because its handler awaits the whole sign-in,
-// but daelim only acknowledges the request and keeps streaming devices in afterwards,
-// so a stalled wall-pad would otherwise leave the advanced button locked forever.
-const DEVICE_REFRESH_TIMEOUT_MILLISECONDS = 30 * 1000;
 const DEVICE_REFRESH_FAILED_MESSAGE = "기기 목록을 갱신하지 못했습니다. 저장된 목록으로 설정을 편집합니다.";
 const WALLPAD_REAUTHORIZATION_MESSAGE = "월패드 재인증이 필요합니다. 기기 목록을 갱신하려면 '재설정'으로 다시 로그인해주세요.";
 
@@ -728,12 +723,9 @@ class CompletePane extends Pane {
     constructor(element, config) {
         super(element, config);
 
-        // The refresh is not a single promise:
-        // the request and its result arrive through different channels,
-        // and some failure paths emit nothing at all.
-        // The advanced button opens once the refresh has settled either way.
+        // Device data still arrives through an event for compatibility, while each
+        // provider request now has its own terminal success or failure.
         this._settled = false;
-        this._settleTimeout = undefined;
         this._refreshed = false;
         this._advancedFormOpened = false;
 
@@ -772,10 +764,6 @@ class CompletePane extends Pane {
             return; // only the first terminal state wins
         }
         this._settled = true;
-        if(this._settleTimeout) {
-            clearTimeout(this._settleTimeout);
-            this._settleTimeout = undefined;
-        }
         this.advancedButton.removeAttribute("disabled");
         if(warning) {
             window.homebridge.toast.warning(warning);
@@ -815,10 +803,6 @@ class CompletePane extends Pane {
                 this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
             }
         }, 0);
-        this._settleTimeout = setTimeout(() => {
-            this._settleTimeout = undefined;
-            this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
-        }, DEVICE_REFRESH_TIMEOUT_MILLISECONDS);
         this.addHomebridgeListener("authorization-failed", () => {
             this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
         });
@@ -880,13 +864,6 @@ class CompletePane extends Pane {
         });
     }
 
-    dispose() {
-        if(this._settleTimeout) {
-            clearTimeout(this._settleTimeout);
-            this._settleTimeout = undefined;
-        }
-        super.dispose();
-    }
 }
 
 class ResetConfirmablePane extends Pane {
