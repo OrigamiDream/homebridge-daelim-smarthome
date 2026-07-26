@@ -105,6 +105,14 @@ export default class Accessories<T extends AccessoryInterface> {
 
         const removals = [];
         for(const service of accessory.services) {
+            // `AccessoryInformation` is mandatory: HAP dereferences it unconditionally when
+            // it deserializes the accessory cache, so an accessory pruned down to zero of
+            // them takes the whole bridge down on the *next* start, long after the prune.
+            // The base `serviceTypes` already includes it, but a subclass override of
+            // `isSupportedService()` can miss it, so the guard lives here rather than there.
+            if(service.UUID === this.api.hap.Service.AccessoryInformation.UUID) {
+                continue;
+            }
             if(this.isSupportedService(service, accessory)) {
                 continue;
             }
