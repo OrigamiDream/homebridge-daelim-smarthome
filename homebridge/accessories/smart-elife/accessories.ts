@@ -26,6 +26,10 @@ export default class Accessories<T extends AccessoryInterface> {
     protected deferredTasks: Record<string, Promise<boolean>> = {};
     protected readonly accessories: PlatformAccessory[] = [];
     protected readonly capabilities: WallPadCapabilities;
+    // Device IDs already reported as disabled.
+    // `addOrGetAccessory()` runs on every device poll, not just at registration,
+    // so the notice has to be remembered or it repeats for the lifetime of the process.
+    private readonly reportedDisabledDevices = new Set<string>();
 
     constructor(protected readonly log: Logging,
                 protected readonly api: API,
@@ -55,7 +59,10 @@ export default class Accessories<T extends AccessoryInterface> {
         const device = this.findDevice(context.deviceId);
         const cachedAccessory = this.findAccessory(context.deviceId);
         if(device && device.disabled) {
-            this.log.info("The device (%s) is disabled.", device.displayName);
+            if(!this.reportedDisabledDevices.has(context.deviceId)) {
+                this.reportedDisabledDevices.add(context.deviceId);
+                this.log.info("The device (%s) is disabled.", device.displayName);
+            }
 
             // Unregister accessory if exists.
             if(cachedAccessory)
