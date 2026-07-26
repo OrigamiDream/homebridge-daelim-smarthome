@@ -302,9 +302,12 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
         const reportedMode = (op["mode"] as Mode) || context.mode;
 
         // Command guard: drop stale pushes that still carry the pre-command power/mode.
+        // Mode is compared even when off: a mode picked while powered off is a local-only
+        // change (no command is sent), so a stale off-push carrying the previous mode must
+        // not confirm and overwrite it — otherwise the next power-on would use the old mode.
         if(gesture.pendingSince !== undefined) {
             const confirmed = reportedPower === gesture.pendingPower
-                && (!reportedPower || reportedMode === gesture.pendingMode);
+                && reportedMode === gesture.pendingMode;
             if(confirmed) {
                 gesture.pendingSince = undefined; // wallpad caught up — live again
             } else if(Date.now() - gesture.pendingSince < COMMAND_GUARD_MILLISECONDS) {
