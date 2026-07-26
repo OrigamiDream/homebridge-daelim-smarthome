@@ -1,5 +1,6 @@
 import {SemanticVersion} from "../utils";
 import {CameraConfig, DeviceDuration} from "./config";
+import {OnePassConfig} from "./smart-elife-onepass-config";
 
 export interface SmartELifeConfig {
     username: string
@@ -10,6 +11,7 @@ export interface SmartELifeConfig {
     version: SemanticVersion
     wallpadVersion: string
     devices: Device[]
+    onePass?: OnePassConfig
 }
 
 export interface Device {

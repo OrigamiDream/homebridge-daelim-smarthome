@@ -64,6 +64,7 @@ export default class SmartELifeProvider extends AbstractProvider {
             version: Utils.currentSemanticVersion(),
             wallpadVersion: WALLPAD_VERSION_3_0,
             devices: config["devices"] || [],
+            onePass: config["onePass"], // nullable
         };
     }
 

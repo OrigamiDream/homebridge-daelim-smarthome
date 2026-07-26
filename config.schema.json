@@ -41,6 +41,60 @@
         "required": true,
         "pattern": "^[a-fA-F0-9]{32}$"
       },
+      "onePass": {
+        "title": "세대현관 실시간 영상 (One Pass)",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "title": "실시간 영상 사용",
+            "type": "boolean",
+            "default": false,
+            "description": "켜면 '외부 세대현관 초인종' 카메라를 볼 때 e편한세상 One Pass 인터폰 회선으로 실시간 영상을 불러옵니다. 끄면 기존처럼 마지막 방문자 스냅샷만 보여줍니다. 스마트 eLife 전용이며, 실시간 영상을 보는 동안에는 One Pass 앱에서 세대현관을 모니터링할 수 없습니다."
+          },
+          "userId": {
+            "title": "One Pass 아이디",
+            "type": "string",
+            "description": "미입력 시 스마트홈 로그인 아이디를 그대로 사용합니다."
+          },
+          "building": {
+            "title": "동",
+            "type": "string",
+            "placeholder": "0103",
+            "description": "미입력 시 로그인 응답의 동 정보를 사용합니다. 네 자리로 입력하세요."
+          },
+          "unit": {
+            "title": "호",
+            "type": "string",
+            "placeholder": "0803",
+            "description": "미입력 시 로그인 응답의 호 정보를 사용합니다. 네 자리로 입력하세요."
+          },
+          "complexCode": {
+            "title": "One Pass 단지 코드",
+            "type": "string",
+            "placeholder": "201004",
+            "description": "미입력 시 스마트홈 단지 정보로 자동 조회합니다. 스마트홈 앱의 단지 코드와는 번호 체계가 다르니, 자동 조회가 실패할 때만 One Pass 쪽 코드를 입력하세요."
+          },
+          "host": {
+            "title": "One Pass 서버 주소",
+            "type": "string",
+            "description": "미입력 시 단지 코드로 자동 조회합니다. 자동 조회가 실패할 때만 입력하세요."
+          },
+          "port": {
+            "title": "One Pass 서버 포트",
+            "type": "integer",
+            "placeholder": 25204,
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "lingerSeconds": {
+            "title": "통화 유지 시간",
+            "type": "integer",
+            "placeholder": 5,
+            "minimum": 0,
+            "description": "마지막 시청자가 나간 뒤 인터폰 통화를 끊기까지 기다리는 시간 (초 단위). 여러 기기로 번갈아 볼 때 재연결을 줄여줍니다."
+          }
+        }
+      },
       "devices": {
         "title": "기기",
         "type": "array",
@@ -176,6 +230,34 @@
     }
   },
   "layout": [{
+    "key": "onePass",
+    "type": "fieldset",
+    "title": "세대현관 실시간 영상 (One Pass)",
+    "description": "스마트 eLife 전용. e편한세상 One Pass 인터폰 회선으로 '외부 세대현관 초인종' 카메라의 실시간 영상을 불러옵니다.",
+    "expandable": true,
+    "expanded": false,
+    "items": [
+      "onePass.enabled",
+      {
+        "type": "fieldset",
+        "title": "고급 설정",
+        "expandable": true,
+        "expanded": false,
+        "items": [
+          "onePass.userId",
+          "onePass.building",
+          "onePass.unit",
+          "onePass.complexCode",
+          "onePass.host",
+          "onePass.port",
+          "onePass.lingerSeconds"
+        ],
+        "condition": {
+          "functionBody": "return model.onePass && model.onePass.enabled"
+        }
+      }
+    ]
+  }, {
     "key": "devices",
     "type": "tabarray",
     "title": "{{ value.displayName }}",

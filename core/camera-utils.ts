@@ -100,6 +100,26 @@ interface ActiveSession {
     transitionReady: boolean;
     progress: StreamingProgress;
     socket?: Socket;
+    liveLease?: LiveViewLease;
+    sdpPath?: string;
+}
+
+// Supplied by providers that can offer a real-time feed for the camera. When it is absent,
+// disabled, or fails to produce a lease, the delegate falls back to the snapshot feed.
+export interface LiveViewSource {
+    readonly enabled: boolean;
+    acquire(): Promise<LiveViewLease>;
+    // Fires when a running call ends. Streams reading from it are dead at that point and
+    // must be stopped, or ffmpeg sits on a silent socket and the picture freezes.
+    onEnded(listener: () => void): void;
+}
+
+export interface LiveViewLease {
+    media: {
+        payloadType: string;
+        relayPort: number;
+    };
+    release(): void;
 }
 
 interface StreamingProgress {
@@ -130,11 +150,24 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 private readonly log: Logging,
                 private readonly context: CameraAccessoryInterfaceBase,
                 private readonly cameraConfig: CameraConfig,
-                private readonly processor: string) {
+                private readonly processor: string,
+                private readonly liveView?: LiveViewSource) {
         this.cameraName = this.context.cameraDisplayName;
+        // When the call behind the live feed goes away, end the HomeKit sessions built on
+        // it. Left alone they would keep an ffmpeg alive on a relay that never sends
+        // again, which is what a frozen picture looks like from the Home app.
+        this.liveView?.onEnded(() => {
+            for(const [sessionId, session] of Array.from(this.ongoingSessions)) {
+                if(!session.liveLease) continue;
+                this.log.info(`[${this.cameraName}] Live view ended, stopping the video stream.`);
+                this.controller.forceStopStreamingSession(sessionId);
+                this.stopStream(sessionId);
+            }
+        });
         this.api.on(APIEvent.SHUTDOWN, () => {
-            for(const session in this.ongoingSessions) {
-                this.stopStream(session);
+            // `for...in` over a Map yields nothing; iterate the keys.
+            for(const sessionId of Array.from(this.ongoingSessions.keys())) {
+                this.stopStream(sessionId);
             }
             this.context.cameraInfo = undefined;
             if(this.context.motionTimer) {
@@ -433,9 +466,32 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
         }
     }
 
-    private startStream(request: StartStreamRequest, callback: StreamRequestCallback): void {
+    // Opens the real-time feed when one is configured. Every failure - the door line being
+    // busy, One Pass not reachable, bad credentials - degrades to the snapshot feed rather
+    // than failing the HomeKit session.
+    private async acquireLiveView(): Promise<LiveViewLease | undefined> {
+        if(!this.liveView?.enabled) {
+            return undefined;
+        }
+        try {
+            const lease = await this.liveView.acquire();
+            this.log.info(`[${this.cameraName}] Live view acquired.`);
+            return lease;
+        } catch(err) {
+            this.log.warn(`[${this.cameraName}] Live view unavailable, falling back to snapshots: ${(err as Error)?.message || err}`);
+            return undefined;
+        }
+    }
+
+    private async startStream(request: StartStreamRequest, callback: StreamRequestCallback): Promise<void> {
         const sessionInfo = this.pendingSessions.get(request.sessionID);
         if(sessionInfo) {
+            const liveLease = await this.acquireLiveView();
+            if(liveLease && !this.pendingSessions.has(request.sessionID)) {
+                // HomeKit gave up while the call was being set up.
+                liveLease.release();
+                return;
+            }
             const codec = this.cameraConfig.codec || "libx264";
             const mtu = this.cameraConfig.packetSize || 1316; // request.video.mtu is not used
             let encoderOptions = this.cameraConfig.encoderOptions;
@@ -460,7 +516,22 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
             const args: string[] = [];
 
             // Video
-            args.push("-i pipe:");
+            if(liveLease) {
+                // The SDP describes the loopback port the One Pass relay feeds, and is
+                // handed over on stdin so no temporary file is needed.
+                args.push("-protocol_whitelist pipe,udp,rtp");
+                // The relay hands packets over in order, so the reorder queue only adds
+                // latency - and its overflow warnings read as packet loss that isn't real.
+                args.push("-reorder_queue_size 0");
+                // 64 KiB (the default) overflows on 720p bursts even over loopback.
+                args.push("-buffer_size 2097152");
+                args.push("-fflags +genpts+nobuffer");
+                args.push("-flags low_delay");
+                args.push("-f sdp");
+                args.push("-i pipe:");
+            } else {
+                args.push("-i pipe:");
+            }
             args.push(this.cameraConfig.mapVideo ? `-map ${this.cameraConfig.mapVideo}` : "-an -sn -dn");
             args.push(`-codec:v ${codec}`);
             args.push("-pix_fmt yuv420p");
@@ -468,7 +539,9 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
             if(fps > 0) {
                 args.push(`-r ${fps}`);
             }
-            args.push("-f rawvideo");
+            if(!liveLease) {
+                args.push("-f rawvideo");
+            }
             if(encoderOptions) {
                 args.push(encoderOptions);
             }
@@ -528,7 +601,8 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 },
                 enqueuedSnapshots: [],
                 transition: false,
-                transitionReady: false
+                transitionReady: false,
+                liveLease: liveLease
             };
             activeSession.socket = createSocket(sessionInfo.ipv6 ? "udp6" : "udp4");
             activeSession.socket.on("error", (err: Error) => {
@@ -548,6 +622,17 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
             activeSession.socket.bind(sessionInfo.videoReturnPort);
 
             activeSession.mainProcess = new FFmpegProcess(this.cameraName, request.sessionID, this.processor, ffmpegArgs, this.log, this, callback);
+            if(liveLease) {
+                const sdp: string[] = [];
+                sdp.push("v=0");
+                sdp.push("o=- 0 0 IN IP4 127.0.0.1");
+                sdp.push("s=One Pass");
+                sdp.push("c=IN IP4 127.0.0.1");
+                sdp.push("t=0 0");
+                sdp.push(`m=video ${liveLease.media.relayPort} RTP/AVP ${liveLease.media.payloadType}`);
+                sdp.push(`a=rtpmap:${liveLease.media.payloadType} H264/90000`);
+                activeSession.mainProcess.stdin.end(sdp.join("\r\n") + "\r\n");
+            }
             if(this.cameraConfig.returnAudioTarget) {
                 const returnArgs: string[] = [];
                 returnArgs.push("-hide_banner");
@@ -574,6 +659,13 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 sdpReturnAudio.push(`a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${sessionInfo.audioSRTP.toString("base64")}`);
                 activeSession.returnProcess = new FFmpegProcess(`${this.cameraName}] [Two-way`, request.sessionID, this.processor, ffmpegReturnArgs, this.log, this);
                 activeSession.returnProcess.stdin.end(sdpReturnAudio.join("\r\n") + "\r\n");
+            }
+            // The snapshot slideshow only applies to the fallback path - a live feed
+            // arrives over RTP and ffmpeg's stdin is already closed by the SDP above.
+            if(liveLease) {
+                this.ongoingSessions.set(request.sessionID, activeSession);
+                this.pendingSessions.delete(request.sessionID);
+                return;
             }
             activeSession.progressInterval = setInterval(() => {
                 this.log.debug("Stream feeding progress: frame buffer written %d, dropped: %d", activeSession.progress.written, activeSession.progress.dropped);
@@ -638,6 +730,11 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 clearInterval(session.progressInterval);
             }
             try {
+                session.liveLease?.release();
+            } catch(err) {
+                this.log.error(`[${this.cameraName}] Error occurred releasing the live view: ${err}`);
+            }
+            try {
                 session.socket?.close();
             } catch(err) {
                 this.log.error(`[${this.cameraName}] Error occurred closing socket: ${err}`);
@@ -660,7 +757,10 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback): void {
         switch (request.type) {
             case StreamRequestTypes.START:
-                this.startStream(request, callback);
+                this.startStream(request, callback).catch((err) => {
+                    this.log.error(`[${this.cameraName}] Could not start the video stream: ${err}`);
+                    callback(err instanceof Error ? err : new Error(String(err)));
+                });
                 break;
             case StreamRequestTypes.STOP:
                 this.stopStream(request.sessionID);

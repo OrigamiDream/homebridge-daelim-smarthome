@@ -498,6 +498,18 @@ export default class SmartELifeClient {
         }
     }
 
+    // Populated by `sign-in`; the unit it carries is what One Pass needs to look up the
+    // household's SIP line.
+    public getUserInfo(): SmartELifeUserInfo | undefined {
+        return this.userInfo;
+    }
+
+    // Populated during `serve()`, so it stays undefined until the first poll completes.
+    // One Pass keys its complexes by `complexKey`, which it reports as `projectCode2`.
+    public getComplex(): SmartELifeComplex | undefined {
+        return this.complex;
+    }
+
     public getWebSocketCredentials(): WebSocketCredentials {
         // This variables will be initialized after `sign-in` succeeded.
         if(!this.wsCredentials)
