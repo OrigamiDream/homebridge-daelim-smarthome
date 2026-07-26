@@ -298,13 +298,13 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
         const context = this.getAccessoryInterface(accessory);
         this.normalizeContext(context); // in case a push lands before configureAccessory
         const gesture = this.gestureOf(context);
-        const incPower = op["status"] === "on";
-        const incMode = (op["mode"] as Mode) || context.mode;
+        const reportedPower = op["status"] === "on";
+        const reportedMode = (op["mode"] as Mode) || context.mode;
 
         // Command guard: drop stale pushes that still carry the pre-command power/mode.
         if(gesture.pendingSince !== undefined) {
-            const confirmed = incPower === gesture.pendingPower
-                && (!incPower || incMode === gesture.pendingMode);
+            const confirmed = reportedPower === gesture.pendingPower
+                && (!reportedPower || reportedMode === gesture.pendingMode);
             if(confirmed) {
                 gesture.pendingSince = undefined; // wallpad caught up — live again
             } else if(Date.now() - gesture.pendingSince < COMMAND_GUARD_MILLISECONDS) {
@@ -319,22 +319,22 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
         // Held for the whole window (never released on the first match)
         // because the wallpad echoes our value once, then snaps back to its stored per-mode value.
         let holdTemp = false;
-        const incTemp = Number(op["desired_temp"] ?? op["set_temp"]);
-        if(gesture.tempGuardUntil !== undefined && incPower && this.isClimateMode(incMode)) {
+        const reportedTemp = Number(op["desired_temp"] ?? op["set_temp"]);
+        if(gesture.tempGuardUntil !== undefined && reportedPower && this.isClimateMode(reportedMode)) {
             if(Date.now() >= gesture.tempGuardUntil) {
                 gesture.tempGuardUntil = undefined; // cap reached — adopt whatever comes
             } else {
                 holdTemp = true;
-                if(!Number.isNaN(incTemp) && incTemp !== gesture.tempGuardTarget
+                if(!Number.isNaN(reportedTemp) && reportedTemp !== gesture.tempGuardTarget
                     && Date.now() - (gesture.lastReassertAt ?? 0) > REASSERT_THROTTLE_MILLISECONDS) {
                     gesture.lastReassertAt = Date.now();
-                    this.reassertThresholdTemperature(context, incMode, gesture.tempGuardTarget as number);
+                    this.reassertThresholdTemperature(context, reportedMode, gesture.tempGuardTarget as number);
                 }
             }
         }
 
-        context.active = incPower;
-        context.mode = incMode;
+        context.active = reportedPower;
+        context.mode = reportedMode;
         if(op["current_temp"]) {
             context.currentTemperature = Number(op["current_temp"]);
         }
@@ -347,7 +347,7 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
             }
         }
         const windSpeed = op["wind_speed"] as RotationSpeed | undefined;
-        context.rotationSpeed = incPower ? (windSpeed || RotationSpeed.OFF) : RotationSpeed.OFF;
+        context.rotationSpeed = reportedPower ? (windSpeed || RotationSpeed.OFF) : RotationSpeed.OFF;
         if(windSpeed === RotationSpeed.LOW || windSpeed === RotationSpeed.MIDDLE || windSpeed === RotationSpeed.HIGH) {
             context.lastManualRotationSpeed = windSpeed;
         }
