@@ -16,8 +16,9 @@ interface AirConditionerInterface extends AccessoryInterface {
     rotationSpeed: RotationSpeed
 
     /**
-     * Last manual wind speed (LOW/MIDDLE/HIGH only). Preserved across auto/off so the
-     * slider can restore the previous manual speed when leaving wallpad-managed states.
+     * Last manual wind speed (LOW/MIDDLE/HIGH only).
+     * Preserved across auto/off so the slider can restore the previous manual speed
+     * when leaving wallpad-managed states.
      */
     lastManualRotationSpeed: RotationSpeed
 
@@ -50,12 +51,12 @@ const MIN_TEMPERATURE = 18;
 const MAX_TEMPERATURE = 30;
 
 /**
- * Per-device, never-persisted bookkeeping. Holds three unrelated concerns keyed off the
- * same device:
+ * Per-device, never-persisted bookkeeping.
+ * Holds three unrelated concerns keyed off the same device:
  *  - the temperature handle gesture (mirror + pending write, resolved in scheduleSync),
- *  - the command guard that suppresses stale pre-command state pushes, and
- *  - the temperature re-assert guard that forces our setpoint past the wallpad's own
- *    stored per-mode value.
+ *  - the command guard that suppresses stale pre-command state pushes,
+ *  - and the temperature re-assert guard that forces our setpoint
+ *    past the wallpad's own stored per-mode value.
  * See applyWallPadState and scheduleSync for how these interact with incoming pushes.
  */
 interface TemperatureGesture {
@@ -75,25 +76,24 @@ interface TemperatureGesture {
     lastReassertAt?: number
 }
 
-// Long enough that both writes of one Home app gesture (the moved handle plus the
-// app's rewrite of the untouched one) land in the same window, short enough that
-// the follower handle visibly snaps over right after the drag.
+// Long enough that both writes of one Home app gesture
+// (the moved handle plus the app's rewrite of the untouched one) land in the same window,
+// short enough that the follower handle visibly snaps over right after the drag.
 const GESTURE_WINDOW_MILLISECONDS = 120;
 
-// The Home app tends to ignore a correction that contradicts its own write for a few
-// seconds, and once our value is back at the park further syncs emit no event (no
-// change) — so the parked handle gets a late forced notification after this delay.
+// The Home app tends to ignore a correction that contradicts its own write for a few seconds,
+// and once our value is back at the park further syncs emit no event (no change) —
+// so the parked handle gets a late forced notification after this delay.
 const LATE_PARK_PUSH_MILLISECONDS = 2500;
 
-// After a command, ignore pushes that still carry the pre-command power/mode for up to
-// this long (or until the wallpad confirms our power+mode, whichever comes first). The
-// wallpad reflects a control op only after a few seconds and would otherwise fight the
-// optimistic UI.
+// After a command, ignore pushes that still carry the pre-command power/mode
+// for up to this long (or until the wallpad confirms our power+mode, whichever comes first).
+// The wallpad reflects a control op only after a few seconds and would otherwise fight the optimistic UI.
 const COMMAND_GUARD_MILLISECONDS = 7000;
 
-// The wallpad drops a set_temp bundled with a mode change and keeps its own stored
-// per-mode setpoint. Hold the displayed temperature at our target and re-send a
-// standalone set_temp until the wallpad reports it, capped at this window.
+// The wallpad drops a set_temp bundled with a mode change and keeps its own stored per-mode setpoint.
+// Hold the displayed temperature at our target and re-send a standalone set_temp until the wallpad
+// reports it, capped at this window.
 const TEMP_GUARD_MILLISECONDS = 10000;
 
 // Minimum spacing between standalone set_temp re-assert commands within the guard window.
@@ -144,17 +144,17 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
     }
 
     /**
-     * The wallpad accepts integer temperatures within 18..30 only — every value coming
-     * from a threshold handle floors into that range.
+     * The wallpad accepts integer temperatures within 18..30 only —
+     * every value coming from a threshold handle floors into that range.
      */
     private toWallPadTemperature(value: number): number {
         return Math.min(MAX_TEMPERATURE, Math.max(MIN_TEMPERATURE, Math.floor(value)));
     }
 
     /**
-     * Wind slider percentage. While the wind is wallpad-managed the slider parks at
-     * full so it reads as "auto is in charge"; the manual speed stays preserved in
-     * `lastManualRotationSpeed` underneath.
+     * Wind slider percentage.
+     * While the wind is wallpad-managed the slider parks at full so it reads as "auto is in charge";
+     * the manual speed stays preserved in `lastManualRotationSpeed` underneath.
      */
     private getDisplayRotationSpeed(context: AirConditionerInterface): number {
         if(!this.isBlowing(context)) {
@@ -167,20 +167,21 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
     }
 
     /**
-     * The cooling threshold is the one and only temperature control: the COOL dial and
-     * the top handle of the AUTO pair both show the target itself, keeping the two
-     * views in the same tone.
+     * The cooling threshold is the one and only temperature control:
+     * the COOL dial and the top handle of the AUTO pair both show the target itself,
+     * keeping the two views in the same tone.
      */
     private getDisplayCoolingThreshold(context: AirConditionerInterface): number {
         return this.getThresholdTemperature(context);
     }
 
     /**
-     * The heating threshold exists only so the Home app renders a temperature control
-     * in AUTO (it wants a heat/cool pair). It parks one degree BELOW the minimum
-     * target, so the cooling handle can travel the whole range in both directions —
-     * including down to the minimum itself; writes to it are dropped entirely
-     * (see the SET handler).
+     * The heating threshold exists only so the Home app renders a temperature control in AUTO
+     * (it wants a heat/cool pair).
+     * It parks one degree BELOW the minimum target,
+     * so the cooling handle can travel the whole range in both directions —
+     * including down to the minimum itself;
+     * writes to it are dropped entirely (see the SET handler).
      */
     private getDisplayHeatingThreshold(): number {
         return MIN_TEMPERATURE - 1;
@@ -233,28 +234,44 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
      * gets its UI reverted by the trailing sync in one pass.
      */
     private scheduleSync(accessory: PlatformAccessory) {
+        const gesture = this.gestureOf(this.getAccessoryInterface(accessory));
+        if(gesture.timer) {
+            clearTimeout(gesture.timer);
+        }
+        gesture.timer = setTimeout(() => this.flushGesture(accessory), GESTURE_WINDOW_MILLISECONDS);
+    }
+
+    /**
+     * Commit the debounced gesture now:
+     * apply the pending cooling write, sync the UI, and arm the guards.
+     * Extracted so an incoming push can force it before applying wallpad state —
+     * otherwise a push landing inside the debounce window would reflect ahead of the user's gesture,
+     * and the trailing task would then fight it.
+     * Committing first arms the command/temperature guards,
+     * which then suppress the (stale, pre-command) push that follows,
+     * keeping the user's intent authoritative.
+     */
+    private flushGesture(accessory: PlatformAccessory) {
         const context = this.getAccessoryInterface(accessory);
         const gesture = this.gestureOf(context);
         if(gesture.timer) {
             clearTimeout(gesture.timer);
-        }
-        gesture.timer = setTimeout(() => {
             gesture.timer = undefined;
-            const pending = gesture.pendingCool;
-            gesture.pendingCool = undefined;
-            if(pending !== undefined) {
-                this.applyThresholdTemperature(accessory, this.toWallPadTemperature(pending));
-            }
-            this.syncAccessoryState(accessory);
-            this.armCommandGuards(context);
-        }, GESTURE_WINDOW_MILLISECONDS);
+        }
+        const pending = gesture.pendingCool;
+        gesture.pendingCool = undefined;
+        if(pending !== undefined) {
+            this.applyThresholdTemperature(accessory, this.toWallPadTemperature(pending));
+        }
+        this.syncAccessoryState(accessory);
+        this.armCommandGuards(context);
     }
 
     /**
      * Arm the command + temperature guards from the just-committed optimistic context,
-     * so incoming pushes (see applyWallPadState) can tell our own command's settling
-     * from stale pre-command state. Called only from the user-action path (scheduleSync),
-     * never when applying wallpad state, so incoming state never re-arms the guards.
+     * so incoming pushes (see applyWallPadState) can tell our own command's settling from stale pre-command state.
+     * Called only from the user-action path (scheduleSync), never when applying wallpad state,
+     * so incoming state never re-arms the guards.
      */
     private armCommandGuards(context: AirConditionerInterface) {
         const gesture = this.gestureOf(context);
@@ -273,9 +290,9 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
     }
 
     /**
-     * WallPad state -> context, gated by the command + temperature guards. Mutates the
-     * existing context in place (unlike first-sight creation), so fields the op does not
-     * report — lastManualRotationSpeed, lastClimateMode — persist naturally.
+     * WallPad state -> context, gated by the command + temperature guards.
+     * Mutates the existing context in place (unlike first-sight creation),
+     * so fields the op does not report — lastManualRotationSpeed, lastClimateMode — persist naturally.
      */
     private applyWallPadState(accessory: PlatformAccessory, op: any) {
         const context = this.getAccessoryInterface(accessory);
@@ -297,10 +314,10 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
             }
         }
 
-        // Temperature re-assert guard: hold our target on screen and re-send it while the
-        // wallpad reports its own stored setpoint. Held for the whole window (never
-        // released on the first match) because the wallpad echoes our value once, then
-        // snaps back to its stored per-mode value.
+        // Temperature re-assert guard: hold our target on screen and re-send it
+        // while the wallpad reports its own stored setpoint.
+        // Held for the whole window (never released on the first match)
+        // because the wallpad echoes our value once, then snaps back to its stored per-mode value.
         let holdTemp = false;
         const incTemp = Number(op["desired_temp"] ?? op["set_temp"]);
         if(gesture.tempGuardUntil !== undefined && incPower && this.isClimateMode(incMode)) {
@@ -343,9 +360,9 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
     }
 
     /**
-     * Fire a standalone set_temp so the wallpad adopts our value even after it dropped
-     * the set_temp bundled with a mode change. Sent immediately (not deferred): the guard
-     * needs the correction to reach the wallpad within its window.
+     * Fire a standalone set_temp so the wallpad adopts our value
+     * even after it dropped the set_temp bundled with a mode change.
+     * Sent immediately (not deferred): the guard needs the correction to reach the wallpad within its window.
      */
     private reassertThresholdTemperature(context: AirConditionerInterface, mode: Mode, target: number) {
         const device = this.findDevice(context.deviceId);
@@ -511,8 +528,9 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
         }
         const wind = this.homebridgeToRotationSpeed(numeric);
         if(!context.active) {
-            // The Home app often writes the slider just before Active=1 — remember the
-            // speed so the power-on that follows uses it, and revert the slider for now.
+            // The Home app often writes the slider just before Active=1 —
+            // remember the speed so the power-on that follows uses it,
+            // and revert the slider for now.
             context.lastManualRotationSpeed = wind;
             this.scheduleSync(accessory);
             callback(undefined);
@@ -558,10 +576,11 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
     }
 
     /**
-     * Migrate a context restored from an older cache: `lastManualRotationSpeed` and
-     * `lastClimateMode` did not exist before this rework, so a cached accessory carries
-     * them as undefined. Seed sane defaults before any handler can read them — otherwise
-     * powering on would command `mode: "undefined"` or throw on `undefined.toString()`.
+     * Migrate a context restored from an older cache:
+     * `lastManualRotationSpeed` and `lastClimateMode` did not exist before this rework,
+     * so a cached accessory carries them as undefined.
+     * Seed sane defaults before any handler can read them —
+     * otherwise powering on would command `mode: "undefined"` or throw on `undefined.toString()`.
      */
     private normalizeContext(context: AirConditionerInterface) {
         if(context.lastManualRotationSpeed === undefined) {
@@ -662,10 +681,10 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
 
         heaterCooler.getCharacteristic(this.api.hap.Characteristic.CoolingThresholdTemperature)
             .setProps({
-                // Matches the parked heating handle (min - 1): the Home app renders the
-                // AUTO pair on one shared track bounded by this range, and a floor of 18
-                // would clamp the parked handle up to 18 on every gesture. Targets still
-                // clamp into 18..30 on write.
+                // Matches the parked heating handle (min - 1):
+                // the Home app renders the AUTO pair on one shared track bounded by this range,
+                // and a floor of 18 would clamp the parked handle up to 18 on every gesture.
+                // Targets still clamp into 18..30 on write.
                 minValue: MIN_TEMPERATURE - 1,
                 maxValue: MAX_TEMPERATURE,
                 minStep: 1,
@@ -912,6 +931,11 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
                 if(existing) {
                     const kept = this.addOrGetAccessory(this.getAccessoryInterface(existing));
                     if(!kept) continue; // disabled -> unregistered
+                    // A gesture still mid-debounce must be committed before the push is applied,
+                    // so the user's intent lands (and arms the guards) first.
+                    if(this.gestureOf(this.getAccessoryInterface(kept)).timer) {
+                        this.flushGesture(kept);
+                    }
                     this.applyWallPadState(kept, device.op);
                     continue;
                 }
