@@ -34,6 +34,10 @@ export class Accessories<T extends AccessoryInterface> {
 
     protected readonly accessories: PlatformAccessory[] = [];
     protected readonly enqueuedAccessoriesCache: EnqueuedAccessoryMap = {};
+    // Device IDs already reported as disabled.
+    // `addAccessory()` can run repeatedly as device state is polled, so the notice
+    // has to be remembered or it repeats for the lifetime of the process.
+    private readonly reportedDisabledDevices = new Set<string>();
 
     private lastInitRequestTimestamp: number = -1;
     protected removeLegacyService = false;
@@ -199,7 +203,10 @@ export class Accessories<T extends AccessoryInterface> {
                 if(deviceInfo && deviceInfo.disabled) {
                     // unregister the accessory since the accessory is cached in homebridge
                     this.api.unregisterPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [ cachedAccessory ]);
-                    this.log.debug('The device (%s, uid:%s) is disabled in config, therefore unregistered immediately', deviceInfo.name, deviceInfo.deviceId);
+                    if(!this.reportedDisabledDevices.has(context.deviceID)) {
+                        this.reportedDisabledDevices.add(context.deviceID);
+                        this.log.info('The device (%s, uid:%s) is disabled in config, therefore unregistered immediately', deviceInfo.name, deviceInfo.deviceId);
+                    }
                     return undefined;
                 }
                 const version = cachedAccessory.context.version;
@@ -231,7 +238,10 @@ export class Accessories<T extends AccessoryInterface> {
             }
         }
         if(deviceInfo && deviceInfo.disabled) {
-            this.log.debug('The device (%s, uid:%s) is disabled in config', deviceInfo.name, deviceInfo.deviceId);
+            if(!this.reportedDisabledDevices.has(context.deviceID)) {
+                this.reportedDisabledDevices.add(context.deviceID);
+                this.log.info('The device (%s, uid:%s) is disabled in config', deviceInfo.name, deviceInfo.deviceId);
+            }
             return undefined;
         }
         const seed = NEW_UUID_COMBINATION(context);
