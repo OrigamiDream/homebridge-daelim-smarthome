@@ -42,7 +42,7 @@
         "pattern": "^[a-fA-F0-9]{32}$"
       },
       "onePass": {
-        "title": "세대현관 실시간 영상 (One Pass)",
+        "title": "e편한세상 One Pass 설정",
         "type": "object",
         "properties": {
           "enabled": {
