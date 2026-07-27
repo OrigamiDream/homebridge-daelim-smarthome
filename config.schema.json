@@ -230,34 +230,6 @@
     }
   },
   "layout": [{
-    "key": "onePass",
-    "type": "fieldset",
-    "title": "세대현관 실시간 영상 (One Pass)",
-    "description": "스마트 eLife 전용. e편한세상 One Pass 인터폰 회선으로 '외부 세대현관 초인종' 카메라의 실시간 영상을 불러옵니다.",
-    "expandable": true,
-    "expanded": false,
-    "items": [
-      "onePass.enabled",
-      {
-        "type": "fieldset",
-        "title": "고급 설정",
-        "expandable": true,
-        "expanded": false,
-        "items": [
-          "onePass.userId",
-          "onePass.building",
-          "onePass.unit",
-          "onePass.complexCode",
-          "onePass.host",
-          "onePass.port",
-          "onePass.lingerSeconds"
-        ],
-        "condition": {
-          "functionBody": "return model.onePass && model.onePass.enabled"
-        }
-      }
-    ]
-  }, {
     "key": "devices",
     "type": "tabarray",
     "title": "{{ value.displayName }}",
@@ -315,6 +287,38 @@
         ],
         "condition": {
           "functionBody": "return model.devices && model.devices[arrayIndices] && ['camera'].includes(model.devices[arrayIndices].deviceType)"
+        }
+      },
+      {
+        "key": "devices[]",
+        "type": "fieldset",
+        "title": "e편한세상 One Pass 설정",
+        "description": "스마트 eLife 전용. e편한세상 One Pass 인터폰 회선으로 이 초인종 카메라의 실시간 영상을 불러옵니다.",
+        "expandable": true,
+        "expanded": false,
+        "items": [
+          "onePass.enabled",
+          {
+            "type": "fieldset",
+            "title": "고급 설정",
+            "expandable": true,
+            "expanded": false,
+            "items": [
+              "onePass.userId",
+              "onePass.building",
+              "onePass.unit",
+              "onePass.complexCode",
+              "onePass.host",
+              "onePass.port",
+              "onePass.lingerSeconds"
+            ],
+            "condition": {
+              "functionBody": "return model.onePass && model.onePass.enabled"
+            }
+          }
+        ],
+        "condition": {
+          "functionBody": "return model.devices && model.devices[arrayIndices] && model.devices[arrayIndices].deviceType === 'camera' && model.devices[arrayIndices].deviceId === 'CMFCAM001'"
         }
       },
       {
