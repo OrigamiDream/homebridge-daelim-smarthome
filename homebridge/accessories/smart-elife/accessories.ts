@@ -97,7 +97,7 @@ export default class Accessories<T extends AccessoryInterface> {
         });
 
         const context = this.getAccessoryInterface(accessory);
-        this.ensureServiceAvailability(this.api.hap.Service.AccessoryInformation, accessory)
+        accessory.getService(this.api.hap.Service.AccessoryInformation)!
             .setCharacteristic(this.api.hap.Characteristic.Manufacturer, Utils.homekitString(Utils.MANUFACTURER_NAME))
             .setCharacteristic(this.api.hap.Characteristic.Model, Utils.homekitString(context.displayName))
             .setCharacteristic(this.api.hap.Characteristic.SerialNumber, Utils.homekitString(context.deviceId))
@@ -123,15 +123,6 @@ export default class Accessories<T extends AccessoryInterface> {
 
     protected async identify(accessory: PlatformAccessory) {
         this.log.info("Identifying %s", accessory.displayName);
-    }
-
-    // Returns the service, adding it when the accessory does not carry one yet.
-    // A cached accessory can come back without a service the code below is about to write to,
-    // and HAP only guarantees the mandatory ones on a freshly constructed accessory.
-    protected ensureServiceAvailability(serviceType: ServiceType, accessory: PlatformAccessory): Service {
-        const context = this.getAccessoryInterface(accessory);
-        return accessory.getService(serviceType)
-            || accessory.addService(serviceType, context.displayName, serviceType.UUID);
     }
 
     // Services HAP requires on every accessory, whatever a subclass considers supported.

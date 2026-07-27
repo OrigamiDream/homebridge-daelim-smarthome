@@ -64,8 +64,9 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
         if(context.isSmartDoorLock) {
             return super.isSupportedServiceType(serviceType, accessory);
         }
-        // Communal door only supports MotionSensor service type.
-        return serviceType.UUID === this.api.hap.Service.MotionSensor.UUID;
+        // Communal door only supports MotionSensor, plus the mandatory information service.
+        return serviceType.UUID === this.api.hap.Service.MotionSensor.UUID
+            || serviceType.UUID === this.api.hap.Service.AccessoryInformation.UUID;
     }
 
     protected isSupportedService(service: Service, accessory: PlatformAccessory): boolean {
@@ -73,8 +74,9 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
         if(context.isSmartDoorLock) {
             return super.isSupportedService(service, accessory);
         }
-        // Communal door only supports MotionSensor service.
-        return service.UUID === this.api.hap.Service.MotionSensor.UUID;
+        // Communal door only supports MotionSensor, plus the mandatory information service.
+        return service.UUID === this.api.hap.Service.MotionSensor.UUID
+            || service.UUID === this.api.hap.Service.AccessoryInformation.UUID;
     }
 
     configureAccessory(accessory: PlatformAccessory) {
