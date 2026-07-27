@@ -601,7 +601,7 @@ export default class SmartELifeClient {
     private parsePushType(data: { [key: string]: unknown } | undefined, title?: string, body?: string): PushType {
         const pushType = this.parseRawPushType(data, title);
         // The access (출입) push category covers the household front door,
-        // the communal door and the interphone camera alike;
+        // the communal door and the doorbell camera alike;
         // only the notification body tells them apart.
         // Without this an unmapped `data4` falls back to the title,
         // and every one of them would resolve to FRONT_DOOR.
