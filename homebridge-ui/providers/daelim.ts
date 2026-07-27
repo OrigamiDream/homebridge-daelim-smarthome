@@ -196,7 +196,7 @@ export default class DaelimUiServer extends AbstractUiProvider {
             'cooling': '에어컨',
             'wallsocket': '콘센트',
             'fan': '환풍기',
-            'camera': '인터폰'
+            'camera': '초인종'
         }
         const suffix = suffixMap[deviceType];
         if(suffix === undefined) {
