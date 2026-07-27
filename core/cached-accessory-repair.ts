@@ -6,8 +6,9 @@ import {Utils} from "./utils";
 const ACCESSORY_INFORMATION_UUID = "0000003E-0000-1000-8000-0026BB765291";
 
 // The characteristics HAP itself adds to a freshly constructed AccessoryInformation.
-// Only the identity ones need a value; the plugin overwrites them on the next
-// `configureAccessory()` anyway. `Identify` is the mandatory write-only one.
+// Only the identity ones need a value,
+// since the plugin overwrites them on the next `configureAccessory()` anyway.
+// `Identify` is the mandatory write-only one.
 const ACCESSORY_INFORMATION_SERVICE = {
     displayName: "Accessory Information",
     UUID: ACCESSORY_INFORMATION_UUID,
@@ -99,8 +100,9 @@ function repairFile(filePath: string): string[] {
         return [];
     }
 
-    // Keep one copy of the unrepaired file around, and swap the repaired one in
-    // atomically so an interrupted write cannot leave a truncated cache behind.
+    // Keep one copy of the unrepaired file around,
+    // and swap the repaired one in atomically
+    // so an interrupted write cannot leave a truncated cache behind.
     const backupPath = `${filePath}.broken`;
     if(!fs.existsSync(backupPath)) {
         fs.copyFileSync(filePath, backupPath);
@@ -111,16 +113,18 @@ function repairFile(filePath: string): string[] {
     return repaired;
 }
 
-// An accessory cached without its `AccessoryInformation` service takes the whole bridge
-// down at startup: HAP dereferences that service unconditionally while deserializing the
-// cache, so the failure lands before any plugin code that could react to it, and it
-// repeats on every restart until the file is corrected. Rolling the plugin back does not
-// help either, because the damage is on disk rather than in the code.
+// An accessory cached without its `AccessoryInformation` service takes the whole bridge down
+// at startup: HAP dereferences that service unconditionally while deserializing the cache,
+// so the failure lands before any plugin code that could react to it,
+// and it repeats on every restart until the file is corrected.
+// Rolling the plugin back does not help either,
+// because the damage is on disk rather than in the code.
 //
-// This runs from the plugin's entry point, which Homebridge executes *before* it reads
-// the cache, and it is the only point where the file can still be corrected from inside
-// the plugin. Repairing rather than dropping the entry keeps the accessory's HomeKit
-// identity, so its room and automations survive.
+// This runs from the plugin's entry point,
+// which Homebridge executes *before* it reads the cache,
+// and it is the only point where the file can still be corrected from inside the plugin.
+// Repairing rather than dropping the entry keeps the accessory's HomeKit identity,
+// so its room and automations survive.
 export function repairCachedAccessories(api: API, log: Logger): void {
     try {
         const directory = path.join(api.user.storagePath(), "accessories");

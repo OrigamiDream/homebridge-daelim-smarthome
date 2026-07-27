@@ -125,9 +125,9 @@ export default class Accessories<T extends AccessoryInterface> {
         this.log.info("Identifying %s", accessory.displayName);
     }
 
-    // Returns the service, adding it when the accessory does not carry one yet. A cached
-    // accessory can come back without a service the code below is about to write to, and
-    // HAP itself only guarantees the mandatory ones on a freshly constructed accessory.
+    // Returns the service, adding it when the accessory does not carry one yet.
+    // A cached accessory can come back without a service the code below is about to write to,
+    // and HAP only guarantees the mandatory ones on a freshly constructed accessory.
     protected ensureServiceAvailability(serviceType: ServiceType, accessory: PlatformAccessory): Service {
         const context = this.getAccessoryInterface(accessory);
         return accessory.getService(serviceType)
@@ -135,9 +135,10 @@ export default class Accessories<T extends AccessoryInterface> {
     }
 
     // Services HAP requires on every accessory, whatever a subclass considers supported.
-    // `AccessoryInformation` in particular is dereferenced unconditionally while the
-    // accessory cache is deserialized, so an accessory that lost it takes the whole bridge
-    // down on the *next* start - long after whatever removed it ran.
+    // `AccessoryInformation` in particular is dereferenced unconditionally
+    // while the accessory cache is deserialized,
+    // so an accessory that lost it takes the whole bridge down on the *next* start -
+    // long after whatever removed it ran.
     protected isMandatoryService(service: Service): boolean {
         return service.UUID === this.api.hap.Service.AccessoryInformation.UUID;
     }

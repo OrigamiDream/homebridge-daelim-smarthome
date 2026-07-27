@@ -6,9 +6,10 @@ import SmartELifeProvider from "./providers/smart-elife";
 import {repairCachedAccessories} from "../core/cached-accessory-repair";
 
 export = (api: API) => {
-    // Homebridge runs this before it reads the accessory cache, which is the only window
-    // in which a cache that would otherwise crash the bridge can still be corrected from
-    // inside the plugin. No plugin logger exists this early.
+    // Homebridge runs this before it reads the accessory cache,
+    // which is the only window in which a cache that would otherwise crash the bridge
+    // can still be corrected from inside the plugin.
+    // No plugin logger exists this early.
     repairCachedAccessories(api, (message) => console.log(`[${Utils.PLATFORM_NAME}] ${message}`));
     api.registerPlatform(Utils.PLATFORM_NAME, DaelimSmartHomePlatform);
 }
