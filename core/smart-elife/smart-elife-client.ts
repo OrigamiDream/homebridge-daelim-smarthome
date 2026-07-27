@@ -498,8 +498,8 @@ export default class SmartELifeClient {
         }
     }
 
-    // Populated by `sign-in`; the unit it carries is what One Pass needs to look up the
-    // household's SIP line.
+    // Populated by `sign-in`;
+    // the unit it carries is what One Pass needs to look up the household's SIP line.
     public getUserInfo(): SmartELifeUserInfo | undefined {
         return this.userInfo;
     }

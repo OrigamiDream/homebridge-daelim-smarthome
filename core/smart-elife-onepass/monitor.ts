@@ -26,8 +26,9 @@ const AUDIO_INTERVAL_MS = 20;
 const VIDEO_INTERVAL_MS = 40;
 const STALL_TIMEOUT_MS = 5 * 1000;
 const RECONNECT_BACKOFF_MS = 15 * 1000;
-// The door camera line is single-session. These are the codes the PBX answers with when
-// the phone app (or another household member) already holds it.
+// The door camera line is single-session.
+// These are the codes the PBX answers with
+// when the phone app (or another household member) already holds it.
 const BUSY_STATUS_CODES = [
     408, // Request Timeout - the wallpad never picked up
     480, // Temporarily Unavailable
@@ -40,15 +41,15 @@ export class OnePassBusyError extends Error {
 }
 
 export interface MonitorMedia {
-    // Payload type ffmpeg should expect on the relayed H.264 stream. The loopback port is
-    // handed out per viewer by the live view, not fixed here.
+    // Payload type ffmpeg should expect on the relayed H.264 stream.
+    // The loopback port is handed out per viewer by the live view, not fixed here.
     payloadType: string
 }
 
-// The address we advertise is cosmetic - it is almost always private and the PBX reaches
-// us by latching onto our RTP source instead. The One Pass app itself advertises a CLAT
-// address that is unroutable from the PBX. Still, name a real interface so the Contact
-// and SDP origin are well-formed.
+// The address we advertise is cosmetic -
+// it is almost always private, and the PBX reaches us by latching onto our RTP source instead.
+// The One Pass app itself advertises a CLAT address that is unroutable from the PBX.
+// Still, name a real interface so the Contact and SDP origin are well-formed.
 function localAddress(): string {
     for(const addresses of Object.values(os.networkInterfaces())) {
         for(const address of addresses || []) {
@@ -60,9 +61,10 @@ function localAddress(): string {
     return "127.0.0.1";
 }
 
-// A single INVITE dialog against the wallpad extension. The whole trick is in the From
-// display name: "monitoring_sip" routes the call into the PBX's door-camera context, so
-// the wallpad never rings and the door camera answers one-way.
+// A single INVITE dialog against the wallpad extension.
+// The whole trick is in the From display name:
+// "monitoring_sip" routes the call into the PBX's door-camera context,
+// so the wallpad never rings and the door camera answers one-way.
 class MonitorCall {
 
     private readonly localAddress: string;
@@ -104,8 +106,8 @@ class MonitorCall {
             const socket = tls.connect({
                 host: this.credentials.sipDomain,
                 port: this.credentials.sipPort,
-                // The PBX presents a self-signed certificate and is usually addressed by
-                // IP; the app pins it rather than validating a chain.
+                // The PBX presents a self-signed certificate and is usually addressed by IP;
+                // the app pins it rather than validating a chain.
                 rejectUnauthorized: false,
             }, () => resolve());
             socket.on("error", (error) => {
@@ -260,8 +262,8 @@ class MonitorCall {
     }
 
     private sendAck(): void {
-        // A 2xx ACK is its own transaction: fresh branch, addressed to the dialog's
-        // remote target rather than the original request URI.
+        // A 2xx ACK is its own transaction:
+        // fresh branch, addressed to the dialog's remote target rather than the original request URI.
         this.send(buildRequest(`ACK ${this.remoteTarget} SIP/2.0`, [
             `Via: SIP/2.0/TLS ${this.localAddress};rport;branch=${randomBranch()}`,
             this.fromHeader,
@@ -296,8 +298,9 @@ class MonitorCall {
     }
 }
 
-// Owns the media plumbing for one live call and keeps it alive underneath a stable
-// loopback endpoint, so HomeKit sessions survive a reconnect of the SIP dialog.
+// Owns the media plumbing for one live call,
+// and keeps it alive underneath a stable loopback endpoint,
+// so HomeKit sessions survive a reconnect of the SIP dialog.
 export class OnePassMonitorSession {
 
     private call?: MonitorCall;
@@ -325,8 +328,9 @@ export class OnePassMonitorSession {
             if(isStun(packet) || isRtcp(packet)) return;
             this.relay?.forward(packet);
         });
-        // Audio is negotiated but never consumed; draining the socket keeps the kernel
-        // buffer from filling and the port alive for the latch.
+        // Audio is negotiated but never consumed;
+        // draining the socket keeps the kernel buffer from filling
+        // and the port alive for the latch.
         this.audio.on("message", () => undefined);
 
         const payloadType = await this.dial();
@@ -390,8 +394,9 @@ export class OnePassMonitorSession {
         this.videoTimer = undefined;
     }
 
-    // The PBX has been observed to drop long sessions. Rather than pre-empt it on a
-    // fixed timer, watch the media itself and rebuild the dialog only once it dries up.
+    // The PBX has been observed to drop long sessions.
+    // Rather than pre-empt it on a fixed timer,
+    // watch the media itself and rebuild the dialog only once it dries up.
     private watchForStalls(): void {
         this.stalledTimer = setInterval(async () => {
             if(this.stopped || this.reconnecting || !this.relay) return;

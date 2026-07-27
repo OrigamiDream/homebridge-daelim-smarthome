@@ -1,6 +1,6 @@
 export interface OnePassConfig {
-    // Live view is opt-in: it opens a real interphone call, which is exclusive with the
-    // One Pass phone app.
+    // Live view is opt-in:
+    // it opens a real interphone call, which is exclusive with the One Pass phone app.
     enabled: boolean
     // Defaults to the Smart eLife username - both services use the same account id.
     userId?: string
@@ -8,9 +8,11 @@ export interface OnePassConfig {
     building?: string
     unit?: string
     hoIndex?: number
-    // A One Pass `projectCode`. Normally left unset: the complex is found by matching One
-    // Pass's `projectCode2` against the Smart eLife session's `complexKey`. This is *not*
-    // the Smart eLife complex code (`djCd`) - the two numbering schemes never coincide.
+    // A One Pass `projectCode`. Normally left unset:
+    // the complex is found by matching One Pass's `projectCode2`
+    // against the Smart eLife session's `complexKey`.
+    // This is *not* the Smart eLife complex code (`djCd`) -
+    // the two numbering schemes never coincide.
     complexCode?: string
     // Override the `*.uasis.com` host discovered from the complex list.
     host?: string

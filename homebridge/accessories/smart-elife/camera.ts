@@ -186,9 +186,10 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
         return Buffer.from(b64, "base64");
     }
 
-    // The One Pass call needs the household's complex and unit. Those are read on demand
-    // rather than captured here: the complex is only known once `serve()` has polled, which
-    // happens after the accessories register.
+    // The One Pass call needs the household's complex and unit.
+    // Those are read on demand rather than captured here:
+    // the complex is only known once `serve()` has polled,
+    // which happens after the accessories register.
     private createLiveView(): OnePassLiveView | undefined {
         const onePass = this.config.onePass;
         if(!onePass?.enabled) {
@@ -292,8 +293,9 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
                     continue;
 
                 const config = device.camera || defaultCameraConfig();
-                // Only the front door is reachable over One Pass - the lobby camera has no
-                // monitoring context on the PBX and stays on visitor snapshots.
+                // Only the front door is reachable over One Pass -
+                // the lobby camera has no monitoring context on the PBX,
+                // and stays on visitor snapshots.
                 const liveView = cameraDevice.cameraLocation === CameraLocation.FRONT_DOOR
                     ? this.createLiveView()
                     : undefined;

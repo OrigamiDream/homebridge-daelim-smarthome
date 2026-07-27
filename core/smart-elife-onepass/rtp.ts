@@ -13,17 +13,18 @@ export function stunBindingRequest(): Buffer {
     return packet;
 }
 
-// STUN and RTP share the port, so they are told apart the RFC 5764 way: RTP versions
-// start at 0b10 while STUN message types have their top two bits clear.
+// STUN and RTP share the port, so they are told apart the RFC 5764 way:
+// RTP versions start at 0b10, while STUN message types have their top two bits clear.
 export function isStun(packet: Buffer): boolean {
     return packet.length >= 20
         && (packet[0] & 0xc0) === 0
         && packet.readUInt32BE(4) === STUN_MAGIC_COOKIE;
 }
 
-// Behind NAT the PBX sends RTCP back to the port it latched, which is the RTP port. The
-// reports have to be dropped rather than relayed: ffmpeg discards them on payload type
-// without advancing its sequence counter, so every one it sees reads as a lost packet.
+// Behind NAT the PBX sends RTCP back to the port it latched, which is the RTP port.
+// The reports have to be dropped rather than relayed:
+// ffmpeg discards them on payload type without advancing its sequence counter,
+// so every one it sees reads as a lost packet.
 export function isRtcp(packet: Buffer): boolean {
     if(packet.length < 2) {
         return false;
@@ -33,13 +34,15 @@ export function isRtcp(packet: Buffer): boolean {
 }
 
 export const PCMU_SILENCE = Buffer.alloc(160, 0xff);
-// H.264 filler data (NAL type 12). Valid to emit and ignored by every decoder, which
-// makes it a safe payload for packets whose only job is to open the return path.
+// H.264 filler data (NAL type 12).
+// Valid to emit and ignored by every decoder,
+// which makes it a safe payload for packets whose only job is to open the return path.
 export const H264_FILLER = Buffer.from([0x0c, 0x80]);
 
-// The SDP we offer necessarily advertises a private address, so the PBX can only reach us
-// after it latches onto the source of packets we send (symmetric RTP). STUN alone is not
-// enough - res_rtp_asterisk learns the remote address from received *RTP*.
+// The SDP we offer necessarily advertises a private address,
+// so the PBX can only reach us after it latches onto the source of packets we send
+// (symmetric RTP).
+// STUN alone is not enough - res_rtp_asterisk learns the remote address from received *RTP*.
 export class RtpSender {
 
     private sequence = crypto.randomBytes(2).readUInt16BE(0);
@@ -70,14 +73,16 @@ export class RtpSender {
     }
 }
 
-// FFmpeg keeps reading one continuous stream from a fixed loopback port while the SIP
-// dialog underneath may be re-established. Each new call leg brings a fresh SSRC and
-// sequence space, so packets are rewritten into a single synthetic stream instead - that
-// way a reconnect does not force the encoder (and the HomeKit session) to restart.
+// FFmpeg keeps reading one continuous stream from a fixed loopback port,
+// while the SIP dialog underneath may be re-established.
+// Each new call leg brings a fresh SSRC and sequence space,
+// so packets are rewritten into a single synthetic stream instead -
+// that way a reconnect does not force the encoder (and the HomeKit session) to restart.
 export class RtpRelay {
 
-    // One 90 kHz frame at 25 fps - the gap inserted across a reconnect so the clock
-    // never rewinds and ffmpeg does not read the seam as a huge backwards jump.
+    // One 90 kHz frame at 25 fps - the gap inserted across a reconnect,
+    // so the clock never rewinds
+    // and ffmpeg does not read the seam as a huge backwards jump.
     private static readonly SEAM_TICKS = 3600;
 
     private readonly ssrc = crypto.randomBytes(4).readUInt32BE(0);
@@ -91,9 +96,11 @@ export class RtpRelay {
     bytes = 0;
     lastPacketAt = 0;
 
-    // One loopback port per viewer. A port cannot be shared: when two readers bind the
-    // same UDP port only one of them receives the packets, so a second HomeKit viewer
-    // would sit on a black screen. Every packet is fanned out to all of them instead.
+    // One loopback port per viewer.
+    // A port cannot be shared: when two readers bind the same UDP port,
+    // only one of them receives the packets,
+    // so a second HomeKit viewer would sit on a black screen.
+    // Every packet is fanned out to all of them instead.
     private readonly destinations = new Set<number>();
 
     constructor(private readonly socket: Socket,
@@ -112,8 +119,8 @@ export class RtpRelay {
         return this.destinations.size;
     }
 
-    // Called whenever the underlying call is replaced, so the next packet re-bases the
-    // timestamp continuation onto the new leg.
+    // Called whenever the underlying call is replaced,
+    // so the next packet re-bases the timestamp continuation onto the new leg.
     reset(): void {
         this.sourceSsrc = undefined;
     }
@@ -132,8 +139,9 @@ export class RtpRelay {
             this.started = true;
         }
 
-        // Packets are forwarded in arrival order over loopback, so a plain monotonic
-        // counter is a valid sequence space and avoids carrying the source's gaps.
+        // Packets are forwarded in arrival order over loopback,
+        // so a plain monotonic counter is a valid sequence space
+        // and avoids carrying the source's gaps.
         const rewritten = Buffer.from(packet);
         this.lastTimestamp = (timestamp + this.timestampOffset) >>> 0;
         rewritten.writeUInt16BE(this.sequence, 2);

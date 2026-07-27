@@ -7,8 +7,8 @@ import OnePassClient, {OnePassAuthError} from "./onepass-client";
 import {MonitorMedia, OnePassBusyError, OnePassMonitorSession} from "./monitor";
 
 const DEFAULT_LINGER_SECONDS = 5;
-// `sipPw` is reissued on every login, so cached credentials are refreshed well before the
-// server is likely to have rotated them under us.
+// `sipPw` is reissued on every login,
+// so cached credentials are refreshed well before the server is likely to have rotated them.
 const CREDENTIAL_TTL_MS = 30 * 60 * 1000;
 
 export interface LiveViewLease {
@@ -22,7 +22,8 @@ export interface LiveViewLease {
 
 export interface OnePassHousehold {
     // Smart eLife's `complexKey`, which One Pass carries verbatim as `projectCode2`.
-    // The two services number complexes differently, so this is the only reliable join.
+    // The two services number complexes differently,
+    // so this is the only reliable join.
     complexKey: string
     building: string
     unit: string
@@ -37,9 +38,10 @@ function bindSocket(port: number): Promise<Socket> {
     });
 }
 
-// Fronts the One Pass monitoring call for the camera accessory. The PBX only allows one
-// session on the door line at a time, so every HomeKit viewer shares a single call and
-// the call is torn down shortly after the last of them goes away.
+// Fronts the One Pass monitoring call for the camera accessory.
+// The PBX only allows one session on the door line at a time,
+// so every HomeKit viewer shares a single call,
+// and the call is torn down shortly after the last of them goes away.
 export default class OnePassLiveView {
 
     private readonly client: OnePassClient;
@@ -52,8 +54,9 @@ export default class OnePassLiveView {
     private lingerTimer?: NodeJS.Timeout;
     private readonly endListeners: (() => void)[] = [];
 
-    // The household is resolved lazily: the Smart eLife session only learns its complex
-    // while `serve()` runs, which is after the accessories have registered.
+    // The household is resolved lazily:
+    // the Smart eLife session only learns its complex while `serve()` runs,
+    // which is after the accessories have registered.
     constructor(private readonly log: Logging | LoggerBase,
                 private readonly config: OnePassConfig,
                 private readonly household: () => OnePassHousehold | undefined) {
@@ -87,8 +90,9 @@ export default class OnePassLiveView {
         return credentials;
     }
 
-    // Resolves once media is flowing. Throws `OnePassBusyError` when the door line is
-    // already in use, which the caller is expected to translate into a fallback.
+    // Resolves once media is flowing.
+    // Throws `OnePassBusyError` when the door line is already in use,
+    // which the caller is expected to translate into a fallback.
     async acquire(): Promise<LiveViewLease> {
         if(!this.enabled) {
             throw new Error("One Pass live view is not enabled.");
@@ -100,13 +104,14 @@ export default class OnePassLiveView {
         this.viewers += 1;
         try {
             const media = await (this.starting ||= this.startSession());
-            // A lease may only ever decrement the count once. `stopStream()` can be
-            // reached from several directions (HomeKit STOP, an ffmpeg exit, a forced
-            // teardown), and a double release would strand the call with viewers still
-            // watching - which reads as the picture freezing a few seconds in.
-            // A port of its own per viewer: two ffmpeg readers cannot share one UDP
-            // port, so a shared port would leave every viewer but the first with a
-            // black screen.
+            // A lease may only ever decrement the count once.
+            // `stopStream()` can be reached from several directions
+            // (HomeKit STOP, an ffmpeg exit, a forced teardown),
+            // and a double release would strand the call with viewers still watching -
+            // which reads as the picture freezing a few seconds in.
+            // A port of its own per viewer:
+            // two ffmpeg readers cannot share one UDP port,
+            // so a shared port would leave every viewer but the first with a black screen.
             const relayPort = await pickPort({type: "udp", ip: "127.0.0.1", reserveTimeout: 15});
             this.session?.addConsumer(relayPort);
             let released = false;
@@ -174,8 +179,8 @@ export default class OnePassLiveView {
         const linger = (this.config.lingerSeconds ?? DEFAULT_LINGER_SECONDS) * 1000;
         this.lingerTimer = setTimeout(() => {
             this.lingerTimer = undefined;
-            // Re-check rather than trusting the timer: a viewer that arrived while the
-            // callback was already queued must keep the call alive.
+            // Re-check rather than trusting the timer:
+            // a viewer that arrived while the callback was already queued must keep the call alive.
             if(this.viewers > 0) {
                 return;
             }
@@ -183,8 +188,9 @@ export default class OnePassLiveView {
         }, linger);
     }
 
-    // Notified whenever a running call goes away, so the streams feeding off it can be
-    // torn down instead of being left pointed at a relay that will never send again.
+    // Notified whenever a running call goes away,
+    // so the streams feeding off it can be torn down
+    // instead of being left pointed at a relay that will never send again.
     onEnded(listener: () => void): void {
         this.endListeners.push(listener);
     }

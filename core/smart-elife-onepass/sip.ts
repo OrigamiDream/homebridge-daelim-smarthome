@@ -158,9 +158,10 @@ export function parseSdp(body: string): SdpAnswer {
     return answer;
 }
 
-// Mirrors the offer the One Pass app makes. Narrowing it (audio=inactive, video=recvonly)
-// makes the PBX answer 488, so the full sendrecv offer has to go out even though we only
-// ever consume the video stream.
+// Mirrors the offer the One Pass app makes.
+// Narrowing it (audio=inactive, video=recvonly) makes the PBX answer 488,
+// so the full sendrecv offer has to go out,
+// even though we only ever consume the video stream.
 export function buildOffer(localAddress: string, audioPort: number, videoPort: number): string {
     const origin = Date.now();
     return [

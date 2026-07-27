@@ -104,13 +104,15 @@ interface ActiveSession {
     sdpPath?: string;
 }
 
-// Supplied by providers that can offer a real-time feed for the camera. When it is absent,
-// disabled, or fails to produce a lease, the delegate falls back to the snapshot feed.
+// Supplied by providers that can offer a real-time feed for the camera.
+// When it is absent, disabled, or fails to produce a lease,
+// the delegate falls back to the snapshot feed.
 export interface LiveViewSource {
     readonly enabled: boolean;
     acquire(): Promise<LiveViewLease>;
-    // Fires when a running call ends. Streams reading from it are dead at that point and
-    // must be stopped, or ffmpeg sits on a silent socket and the picture freezes.
+    // Fires when a running call ends.
+    // Streams reading from it are dead at that point and must be stopped,
+    // or ffmpeg sits on a silent socket and the picture freezes.
     onEnded(listener: () => void): void;
 }
 
@@ -153,9 +155,10 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 private readonly processor: string,
                 private readonly liveView?: LiveViewSource) {
         this.cameraName = this.context.cameraDisplayName;
-        // When the call behind the live feed goes away, end the HomeKit sessions built on
-        // it. Left alone they would keep an ffmpeg alive on a relay that never sends
-        // again, which is what a frozen picture looks like from the Home app.
+        // When the call behind the live feed goes away,
+        // end the HomeKit sessions built on it.
+        // Left alone they would keep an ffmpeg alive on a relay that never sends again,
+        // which is what a frozen picture looks like from the Home app.
         this.liveView?.onEnded(() => {
             for(const [sessionId, session] of Array.from(this.ongoingSessions)) {
                 if(!session.liveLease) continue;
@@ -466,9 +469,9 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
         }
     }
 
-    // Opens the real-time feed when one is configured. Every failure - the door line being
-    // busy, One Pass not reachable, bad credentials - degrades to the snapshot feed rather
-    // than failing the HomeKit session.
+    // Opens the real-time feed when one is configured.
+    // Every failure - the door line being busy, One Pass not reachable, bad credentials -
+    // degrades to the snapshot feed rather than failing the HomeKit session.
     private async acquireLiveView(): Promise<LiveViewLease | undefined> {
         if(!this.liveView?.enabled) {
             return undefined;
@@ -517,11 +520,12 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
 
             // Video
             if(liveLease) {
-                // The SDP describes the loopback port the One Pass relay feeds, and is
-                // handed over on stdin so no temporary file is needed.
+                // The SDP describes the loopback port the One Pass relay feeds,
+                // and is handed over on stdin so no temporary file is needed.
                 args.push("-protocol_whitelist pipe,udp,rtp");
-                // The relay hands packets over in order, so the reorder queue only adds
-                // latency - and its overflow warnings read as packet loss that isn't real.
+                // The relay hands packets over in order,
+                // so the reorder queue only adds latency -
+                // and its overflow warnings read as packet loss that isn't real.
                 args.push("-reorder_queue_size 0");
                 // 64 KiB (the default) overflows on 720p bursts even over loopback.
                 args.push("-buffer_size 2097152");
@@ -660,8 +664,9 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 activeSession.returnProcess = new FFmpegProcess(`${this.cameraName}] [Two-way`, request.sessionID, this.processor, ffmpegReturnArgs, this.log, this);
                 activeSession.returnProcess.stdin.end(sdpReturnAudio.join("\r\n") + "\r\n");
             }
-            // The snapshot slideshow only applies to the fallback path - a live feed
-            // arrives over RTP and ffmpeg's stdin is already closed by the SDP above.
+            // The snapshot slideshow only applies to the fallback path -
+            // a live feed arrives over RTP,
+            // and ffmpeg's stdin is already closed by the SDP above.
             if(liveLease) {
                 this.ongoingSessions.set(request.sessionID, activeSession);
                 this.pendingSessions.delete(request.sessionID);

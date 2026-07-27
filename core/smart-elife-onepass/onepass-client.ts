@@ -6,7 +6,7 @@ import {OnePassConfig, OnePassCredentials} from "../interfaces/smart-elife-onepa
 const COMPLEX_LIST_URL = "https://cloud-api.uasis.com/oapi/v2/entry/complex_list?type=daelim";
 const DEFAULT_API_PORT = 25204;
 
-// The One Pass web app runs inside the native shell and every request carries these.
+// The One Pass web app runs inside the native shell, and every request carries these.
 // The API rejects the call outright without a matching Origin.
 const HTTP_HEADERS = {
     "Content-Type": "application/json",
@@ -29,9 +29,10 @@ interface ComplexEntry {
 export class OnePassAuthError extends Error {
 }
 
-// One Pass is a separate service from Smart eLife: it exposes the SIP identities used by
-// the interphone. Credentials are short lived - `sipPw` is reissued on every login - so
-// they are fetched on demand rather than configured by hand.
+// One Pass is a separate service from Smart eLife:
+// it exposes the SIP identities used by the interphone.
+// Credentials are short lived - `sipPw` is reissued on every login -
+// so they are fetched on demand rather than configured by hand.
 export default class OnePassClient {
 
     private complexes?: ComplexEntry[];
@@ -51,8 +52,8 @@ export default class OnePassClient {
                 port: target.port || 443,
                 path: `${target.pathname}${target.search}`,
                 method: payload ? "POST" : "GET",
-                // The per-complex hosts serve certificates issued for the shared
-                // `uasis.com` wildcard but are reached by IP in some complexes.
+                // The per-complex hosts serve certificates issued for the shared `uasis.com` wildcard,
+                // but are reached by IP in some complexes.
                 rejectUnauthorized: false,
                 headers: {
                     ...HTTP_HEADERS,
@@ -91,11 +92,13 @@ export default class OnePassClient {
         return this.complexes;
     }
 
-    // `host` may be pinned in the config; otherwise the complex is looked up in the One
-    // Pass listing. The two services number complexes differently - Smart eLife's `djCd`
-    // never equals One Pass's `projectCode` - but Smart eLife's `complexKey` is carried
-    // verbatim as One Pass's `projectCode2`, so that is the join. `config.complexCode`,
-    // when set, is a One Pass `projectCode` and wins.
+    // `host` may be pinned in the config;
+    // otherwise the complex is looked up in the One Pass listing.
+    // The two services number complexes differently -
+    // Smart eLife's `djCd` never equals One Pass's `projectCode` -
+    // but Smart eLife's `complexKey` is carried verbatim as One Pass's `projectCode2`,
+    // so that is the join.
+    // `config.complexCode`, when set, is a One Pass `projectCode` and wins.
     private async resolveHost(complexKey: string): Promise<string> {
         if(this.config.host) {
             return this.config.host;
@@ -121,9 +124,9 @@ export default class OnePassClient {
                 ho: unit,
                 hoIndex: this.config.hoIndex ?? 0,
                 // `pushToken`/`voipToken` are deliberately omitted rather than sent empty.
-                // The app supplies them to register for VoIP wake-ups, so blanking them
-                // risks clearing the registration the phone app depends on. The server
-                // issues SIP credentials either way.
+                // The app supplies them to register for VoIP wake-ups,
+                // so blanking them risks clearing the registration the phone app depends on.
+                // The server issues SIP credentials either way.
                 osType: "ios",
             },
         });
