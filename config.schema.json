@@ -293,29 +293,18 @@
         "key": "devices[]",
         "type": "fieldset",
         "title": "e편한세상 One Pass 설정",
-        "description": "스마트 eLife 전용. e편한세상 One Pass 인터폰 회선으로 이 초인종 카메라의 실시간 영상을 불러옵니다.",
         "expandable": true,
         "expanded": false,
         "items": [
+          { "type": "help", "helpvalue": "실시간 영상 사용" },
           "onePass.enabled",
-          {
-            "type": "fieldset",
-            "title": "고급 설정",
-            "expandable": true,
-            "expanded": false,
-            "items": [
-              "onePass.userId",
-              "onePass.building",
-              "onePass.unit",
-              "onePass.complexCode",
-              "onePass.host",
-              "onePass.port",
-              "onePass.lingerSeconds"
-            ],
-            "condition": {
-              "functionBody": "return model.onePass && model.onePass.enabled"
-            }
-          }
+          { "key": "onePass.userId", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
+          { "key": "onePass.building", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
+          { "key": "onePass.unit", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
+          { "key": "onePass.complexCode", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
+          { "key": "onePass.host", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
+          { "key": "onePass.port", "type": "number", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
+          { "key": "onePass.lingerSeconds", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } }
         ],
         "condition": {
           "functionBody": "return model.devices && model.devices[arrayIndices] && model.devices[arrayIndices].deviceType === 'camera' && model.devices[arrayIndices].deviceId === 'CMFCAM001'"
