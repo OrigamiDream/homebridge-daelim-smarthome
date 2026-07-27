@@ -92,6 +92,24 @@ export default class OnePassClient {
         return this.complexes;
     }
 
+    // Whether the complex the live view would reach is one One Pass carries.
+    // The listing is public, so this answers before any credential is involved,
+    // which is what lets the setup form warn while the user is still looking at the switch.
+    // It follows the same precedence as `resolveHost()` - a pinned code or host wins -
+    // so entering the code by hand also settles the warning.
+    // A complex One Pass serves but leaves without a `projectCode2` answers `false`
+    // until that code is entered: the two listings cannot be joined without it.
+    async isComplexServed(complexKey: string): Promise<boolean> {
+        if(this.config.host) {
+            return true;
+        }
+        const complexes = await this.fetchComplexes();
+        if(this.config.complexCode) {
+            return complexes.some((entry) => entry.projectCode === this.config.complexCode);
+        }
+        return complexes.some((entry) => !!entry.projectCode2 && entry.projectCode2 === complexKey);
+    }
+
     // `host` may be pinned in the config;
     // otherwise the complex is looked up in the One Pass listing.
     // The two services number complexes differently -

@@ -14,6 +14,8 @@ import {
     EXTERIOR_COMMUNAL_DOOR_CAMERA_DEVICE,
     EXTERIOR_FRONT_DOOR_CAMERA_DEVICE
 } from "../../homebridge/accessories/smart-elife/camera";
+import OnePassClient from "../../core/smart-elife-onepass/onepass-client";
+import {defaultOnePassConfig} from "../../core/interfaces/smart-elife-onepass-config";
 
 export default class SmartELifeUiServer extends AbstractUiProvider {
 
@@ -46,6 +48,28 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         this.server.onRequest("/smart-elife/passcode", this.authorizePasscode.bind(this));
         this.server.onRequest("/smart-elife/invalidate", this.invalidate.bind(this));
         this.server.onRequest("/smart-elife/fetch-devices", this.onRequestDevices.bind(this));
+        this.server.onRequest("/smart-elife/onepass-support", this.checkOnePassSupport.bind(this));
+    }
+
+    // Answers whether One Pass carries the signed-in household's complex.
+    // An absent `supported` means the question could not be answered -
+    // no session yet, or the listing was unreachable -
+    // and the caller stays quiet rather than worrying a user whose complex is fine.
+    async checkOnePassSupport(p: any): Promise<{ supported?: boolean }> {
+        const complexKey = this.client?.getComplex()?.complexKey;
+        if(!complexKey) {
+            return {};
+        }
+        try {
+            // The form passes what the user has typed so far,
+            // so a pinned complex code counts before it has been saved.
+            const config = { ...defaultOnePassConfig(), ...(p?.onePass || {}) };
+            const client = new OnePassClient(this.log, config, () => "");
+            return { supported: await client.isComplexServed(complexKey) };
+        } catch(e) {
+            this.log.debug("Could not check the One Pass coverage: %s", (e as Error)?.message || e);
+            return {};
+        }
     }
 
     async onRequestDevices(p: any) {

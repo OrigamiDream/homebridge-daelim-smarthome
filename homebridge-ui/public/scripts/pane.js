@@ -858,10 +858,39 @@ class CompletePane extends Pane {
             const configSchema = await window.homebridge.getPluginConfigSchema();
             const configForm = window.homebridge.createForm(configSchema, this.config);
             configForm.onChange((change) => {
+                const wasEnabled = this.isLiveViewEnabled();
                 Object.assign(this.config, change);
                 this.updatePluginConfig();
+                if(!wasEnabled && this.isLiveViewEnabled()) {
+                    this.warnUnlessOnePassIsServed();
+                }
             });
         });
+    }
+
+    isLiveViewEnabled() {
+        return this.config.provider === "smart-elife" && this.config.onePass?.enabled === true;
+    }
+
+    // The live view degrades to snapshots on every failure, so a household whose complex
+    // One Pass does not carry sees the switch do nothing at all. The moment it is switched
+    // on is the only one where the user is looking, so the warning belongs here.
+    // Silence means either "supported" or "could not tell" - both are wrong to warn about.
+    async warnUnlessOnePassIsServed() {
+        let response;
+        try {
+            response = await window.homebridge.request("/smart-elife/onepass-support", {
+                onePass: this.config.onePass,
+            });
+        } catch(e) {
+            return;
+        }
+        if(response?.supported !== false) {
+            return;
+        }
+        window.homebridge.toast.warning(
+            "폰의 One Pass 앱에서 세대현관 보기가 된다면, 고급 설정에서 'One Pass 단지 코드'를 직접 입력하세요.",
+            "이 단지는 실시간 영상을 쓸 수 없습니다");
     }
 
 }
