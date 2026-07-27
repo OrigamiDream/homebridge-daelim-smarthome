@@ -97,7 +97,7 @@ export default class Accessories<T extends AccessoryInterface> {
         });
 
         const context = this.getAccessoryInterface(accessory);
-        accessory.getService(this.api.hap.Service.AccessoryInformation)!
+        this.ensureServiceAvailability(this.api.hap.Service.AccessoryInformation, accessory)
             .setCharacteristic(this.api.hap.Characteristic.Manufacturer, Utils.homekitString(Utils.MANUFACTURER_NAME))
             .setCharacteristic(this.api.hap.Characteristic.Model, Utils.homekitString(context.displayName))
             .setCharacteristic(this.api.hap.Characteristic.SerialNumber, Utils.homekitString(context.deviceId))
@@ -105,12 +105,7 @@ export default class Accessories<T extends AccessoryInterface> {
 
         const removals = [];
         for(const service of accessory.services) {
-            // `AccessoryInformation` is mandatory: HAP dereferences it unconditionally when
-            // it deserializes the accessory cache, so an accessory pruned down to zero of
-            // them takes the whole bridge down on the *next* start, long after the prune.
-            // The base `serviceTypes` already includes it, but a subclass override of
-            // `isSupportedService()` can miss it, so the guard lives here rather than there.
-            if(service.UUID === this.api.hap.Service.AccessoryInformation.UUID) {
+            if(this.isMandatoryService(service)) {
                 continue;
             }
             if(this.isSupportedService(service, accessory)) {
@@ -128,6 +123,23 @@ export default class Accessories<T extends AccessoryInterface> {
 
     protected async identify(accessory: PlatformAccessory) {
         this.log.info("Identifying %s", accessory.displayName);
+    }
+
+    // Returns the service, adding it when the accessory does not carry one yet. A cached
+    // accessory can come back without a service the code below is about to write to, and
+    // HAP itself only guarantees the mandatory ones on a freshly constructed accessory.
+    protected ensureServiceAvailability(serviceType: ServiceType, accessory: PlatformAccessory): Service {
+        const context = this.getAccessoryInterface(accessory);
+        return accessory.getService(serviceType)
+            || accessory.addService(serviceType, context.displayName, serviceType.UUID);
+    }
+
+    // Services HAP requires on every accessory, whatever a subclass considers supported.
+    // `AccessoryInformation` in particular is dereferenced unconditionally while the
+    // accessory cache is deserialized, so an accessory that lost it takes the whole bridge
+    // down on the *next* start - long after whatever removed it ran.
+    protected isMandatoryService(service: Service): boolean {
+        return service.UUID === this.api.hap.Service.AccessoryInformation.UUID;
     }
 
     protected isSupportedService(service: Service, _: PlatformAccessory): boolean {
