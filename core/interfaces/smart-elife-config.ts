@@ -98,6 +98,7 @@ export enum PushType {
 export const DATA4_PUSH_TYPES: { [code: string]: PushType } = {
     "55": PushType.FRONT_DOOR, // 도어락: "수동에 의하여 문이 열렸습니다." (sent only when push_doorlock is enabled)
     "58": PushType.CAR, // 입출차: "등록 ... 차량이 입차하였습니다."
+    "63": PushType.VISITOR, // 출입: "방문자 이미지가 저장되었습니다." (doorbell camera snapshot)
     "64": PushType.FRONT_DOOR, // 출입: "공동 현관 출입이 감지되었습니다." (refined by body into COMMUNAL_DOOR)
 };
 

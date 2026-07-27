@@ -155,14 +155,21 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
             this.log.warn("Could not fetch the list of visitors");
             return undefined;
         }
-        const snapshots: VisitorOnCameraInfo[] = response["data"]["list"]
+        // A `000` result does not guarantee the payload shape,
+        // and this runs off a push callback where a throw would take the bridge down.
+        const list = response["data"]?.["list"];
+        if(!Array.isArray(list)) {
+            this.log.warn("The visitor board returned no list: %s", JSON.stringify(response["data"]));
+            return undefined;
+        }
+        const snapshots: VisitorOnCameraInfo[] = list
             .map((e: any): VisitorOnCameraInfo => {
                 return {
                     cameraLocation: e["door_type"] as CameraLocation,
                     date: e["reg_num"],
                 };
             });
-        if(!snapshots || snapshots.length === 0) {
+        if(snapshots.length === 0) {
             this.log.warn("Could not fetch the list of visitors.");
             return undefined;
         }
@@ -204,6 +211,13 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
                 case CameraLocation.COMMUNAL_DOOR:
                     cameraDevice = EXTERIOR_COMMUNAL_DOOR_CAMERA_DEVICE;
                     break;
+                default:
+                    // `door_type` is cast from the wire without validation,
+                    // so an unexpected value would leave `cameraDevice` unassigned.
+                    // The raw value is logged because that is the only way
+                    // to notice the server renaming it.
+                    this.log.warn("Unknown visitor door_type, discarding the snapshot: %s", String(cameraInfo.cameraLocation));
+                    return;
             }
             const device = this.findDevice(cameraDevice.deviceId);
             if(!device)
@@ -227,12 +241,12 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
                 context.motionDetected = false;
 
                 accessory.getService(this.api.hap.Service.MotionSensor)
-                    ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+                    ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
             }, (device.duration?.camera || CAMERA_TIMEOUT_DURATION) * 1000);
             context.motionDetected = true;
 
             accessory.getService(this.api.hap.Service.MotionSensor)
-                ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+                ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
         });
         setTimeout(() => {
             for(const cameraDevice of [EXTERIOR_FRONT_DOOR_CAMERA_DEVICE, EXTERIOR_COMMUNAL_DOOR_CAMERA_DEVICE]) {

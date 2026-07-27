@@ -36,7 +36,10 @@ export interface ListenerMetadata {
 }
 
 export type Listener = (data: any | undefined, error: ListenerError, metadata?: ListenerMetadata) => void;
-export type PushListener = (title: string | undefined, message: string | undefined) => void;
+// A listener may run asynchronously - the camera one fetches the visitor snapshot
+// over the network - so the return type has to admit a promise
+// for the dispatcher to be able to catch its rejection.
+export type PushListener = (title: string | undefined, message: string | undefined) => void | Promise<void>;
 
 interface ListenerInfo {
     deviceType: DeviceType
@@ -597,10 +600,21 @@ export default class SmartELifeClient {
 
     private parsePushType(data: { [key: string]: unknown } | undefined, title?: string, body?: string): PushType {
         const pushType = this.parseRawPushType(data, title);
-        // The access (출입) push category covers both the household front door and
-        // the communal door; only the notification body tells them apart.
-        if(pushType === PushType.FRONT_DOOR && !!body && body.includes("공동")) {
-            return PushType.COMMUNAL_DOOR;
+        // The access (출입) push category covers the household front door,
+        // the communal door and the doorbell camera alike;
+        // only the notification body tells them apart.
+        // Without this an unmapped `data4` falls back to the title,
+        // and every one of them would resolve to FRONT_DOOR.
+        if(pushType === PushType.FRONT_DOOR && !!body) {
+            // A visitor snapshot is not tied to either door -
+            // the camera accessory reads `door_type` off the visitor board
+            // to decide which one it belongs to.
+            if(body.includes("방문자")) {
+                return PushType.VISITOR;
+            }
+            if(body.includes("공동")) {
+                return PushType.COMMUNAL_DOOR;
+            }
         }
         return pushType;
     }
@@ -642,6 +656,25 @@ export default class SmartELifeClient {
         return PushType.UNKNOWN;
     }
 
+    // A rejected listener would otherwise reach the process as an unhandled rejection,
+    // which terminates the bridge on current Node versions.
+    // Nothing upstream can act on the failure anyway,
+    // so it is contained here and only reported.
+    private dispatchPushListener(info: PushListenerInfo, title?: string, body?: string) {
+        try {
+            void Promise.resolve(info.listener(title, body)).catch((e) => {
+                this.reportPushListenerFailure(info.pushType, e);
+            });
+        } catch(e) {
+            this.reportPushListenerFailure(info.pushType, e);
+        }
+    }
+
+    private reportPushListenerFailure(pushType: PushType, e: unknown) {
+        this.log.error("Push listener for %s failed: %s", pushType.toString(), (e as Error)?.message || e);
+        this.log.debug("Push listener failure: %s", (e as Error)?.stack || "no stack available");
+    }
+
     private async configurePushNotification() {
         if(this.push) {
             this.log("Configuring Push");
@@ -660,7 +693,7 @@ export default class SmartELifeClient {
 
                 for(const listener of this.pushListeners) {
                     if(listener.pushType !== pushType) continue;
-                    listener.listener(title, body);
+                    this.dispatchPushListener(listener, title, body);
                 }
             });
             await this.push.connect();
