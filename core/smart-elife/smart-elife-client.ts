@@ -36,7 +36,10 @@ export interface ListenerMetadata {
 }
 
 export type Listener = (data: any | undefined, error: ListenerError, metadata?: ListenerMetadata) => void;
-export type PushListener = (title: string | undefined, message: string | undefined) => void;
+// A listener may run asynchronously - the camera one fetches the visitor snapshot
+// over the network - so the return type has to admit a promise
+// for the dispatcher to be able to catch its rejection.
+export type PushListener = (title: string | undefined, message: string | undefined) => void | Promise<void>;
 
 interface ListenerInfo {
     deviceType: DeviceType
@@ -653,6 +656,25 @@ export default class SmartELifeClient {
         return PushType.UNKNOWN;
     }
 
+    // A rejected listener would otherwise reach the process as an unhandled rejection,
+    // which terminates the bridge on current Node versions.
+    // Nothing upstream can act on the failure anyway,
+    // so it is contained here and only reported.
+    private dispatchPushListener(info: PushListenerInfo, title?: string, body?: string) {
+        try {
+            void Promise.resolve(info.listener(title, body)).catch((e) => {
+                this.reportPushListenerFailure(info.pushType, e);
+            });
+        } catch(e) {
+            this.reportPushListenerFailure(info.pushType, e);
+        }
+    }
+
+    private reportPushListenerFailure(pushType: PushType, e: unknown) {
+        this.log.error("Push listener for %s failed: %s", pushType.toString(), (e as Error)?.message || e);
+        this.log.debug("Push listener failure: %s", (e as Error)?.stack || "no stack available");
+    }
+
     private async configurePushNotification() {
         if(this.push) {
             this.log("Configuring Push");
@@ -671,7 +693,7 @@ export default class SmartELifeClient {
 
                 for(const listener of this.pushListeners) {
                     if(listener.pushType !== pushType) continue;
-                    listener.listener(title, body);
+                    this.dispatchPushListener(listener, title, body);
                 }
             });
             await this.push.connect();
