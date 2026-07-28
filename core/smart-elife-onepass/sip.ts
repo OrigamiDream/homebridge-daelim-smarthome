@@ -39,8 +39,32 @@ export function randomBranch(): string {
     return `z9hG4bK${randomToken(10)}`;
 }
 
-function md5(value: string): string {
-    return crypto.createHash("md5").update(value).digest("hex");
+// RFC 8760 added SHA-256 alongside the original MD5.
+// The answer has to be hashed with the algorithm the challenge named,
+// because a server that asked for one rejects an answer built with the other.
+const DIGEST_ALGORITHMS: Record<string, string> = {
+    "MD5": "md5",
+    "SHA-256": "sha256",
+    "SHA256": "sha256",
+};
+
+// Everything outside that table is refused rather than approximated.
+// The `-sess` variants fold the nonces into ha1,
+// and `SHA-512-256` is a different hash altogether,
+// so answering any of them with MD5 produces a response the server rejects -
+// and a rejection reads as bad credentials,
+// which sends the caller round the sign-in-and-retry loop
+// instead of saying what is actually unsupported.
+function digestOf(algorithm?: string): {name: string, hash: (value: string) => string} {
+    const requested = (algorithm || "MD5").trim();
+    const hash = DIGEST_ALGORITHMS[requested.toUpperCase()];
+    if(!hash) {
+        throw new Error(`The One Pass PBX asked for a digest algorithm we do not implement: ${requested}`);
+    }
+    return {
+        name: requested,
+        hash: (value: string) => crypto.createHash(hash).update(value).digest("hex"),
+    };
 }
 
 export function parseMessage(raw: string): SipMessage {
@@ -95,21 +119,30 @@ export function buildAuthorization(challenge: DigestChallenge,
                                    method: string,
                                    uri: string): string {
     // Asterisk always offers qop="auth"; the qop-less branch is kept for older PBXs.
-    const qop = challenge.qop?.split(",").map((value) => value.trim()).includes("auth") ? "auth" : undefined;
+    // A challenge that names qop values expects one of them back,
+    // and `auth-int` additionally hashes the request body, which this does not do,
+    // so an offer without `auth` in it cannot be answered here.
+    // Falling through to the qop-less form would look like a wrong password.
+    const offered = challenge.qop?.split(",").map((value) => value.trim()).filter(Boolean);
+    if(offered?.length && !offered.includes("auth")) {
+        throw new Error(`The One Pass PBX asked for a digest qop we do not implement: ${challenge.qop}`);
+    }
+    const qop = offered?.includes("auth") ? "auth" : undefined;
     const cnonce = randomToken(16);
     const nc = "00000001";
-    const ha1 = md5(`${username}:${challenge.realm}:${password}`);
-    const ha2 = md5(`${method}:${uri}`);
+    const digest = digestOf(challenge.algorithm);
+    const ha1 = digest.hash(`${username}:${challenge.realm}:${password}`);
+    const ha2 = digest.hash(`${method}:${uri}`);
     const response = qop
-        ? md5(`${ha1}:${challenge.nonce}:${nc}:${cnonce}:${qop}:${ha2}`)
-        : md5(`${ha1}:${challenge.nonce}:${ha2}`);
+        ? digest.hash(`${ha1}:${challenge.nonce}:${nc}:${cnonce}:${qop}:${ha2}`)
+        : digest.hash(`${ha1}:${challenge.nonce}:${ha2}`);
 
     const parts = [
         `username="${username}"`,
         `realm="${challenge.realm}"`,
         `nonce="${challenge.nonce}"`,
         ...(challenge.opaque ? [`opaque="${challenge.opaque}"`] : []),
-        "algorithm=MD5",
+        `algorithm=${digest.name}`,
         ...(qop ? [`qop="${qop}"`] : []),
         `uri="${uri}"`,
         `response="${response}"`,
