@@ -204,8 +204,13 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
             const complexKey = this.client.getComplex()?.complexKey;
             const building = onePass.building || userInfo?.apartment.building;
             const unit = onePass.unit || userInfo?.apartment.unit;
-            if((!complexKey && !onePass.complexCode) || !building || !unit) {
-                this.log.warn("One Pass live view is enabled but the household is not resolved yet. Set `complexCode`, `building` and `unit` explicitly if this persists.");
+            // A pinned `host` is the documented way out of a failed complex lookup,
+            // and the client honours it ahead of either code,
+            // so it settles which server to reach on its own.
+            // Requiring a complex alongside it would leave that escape hatch
+            // depending on the very lookup it exists to bypass.
+            if((!complexKey && !onePass.complexCode && !onePass.host) || !building || !unit) {
+                this.log.warn("One Pass live view is enabled but the household is not resolved yet. Set `complexCode` (or `host`), `building` and `unit` explicitly if this persists.");
                 return undefined;
             }
             return {

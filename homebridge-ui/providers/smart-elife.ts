@@ -56,11 +56,14 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
     // no session yet, or the listing was unreachable -
     // and the caller stays quiet rather than worrying a user whose complex is fine.
     async checkOnePassSupport(p: any): Promise<{ supported?: boolean }> {
-        const complexKey = this.client?.getComplex()?.complexKey;
-        if(!complexKey) {
-            return {};
-        }
         try {
+            // The wizard signs in and stops there, never reaching `serve()`,
+            // which is where the plugin proper learns its complex.
+            // Asking for the lookup here is what makes the question answerable at all.
+            const complexKey = (await this.client?.resolveComplex())?.complexKey;
+            if(!complexKey) {
+                return {};
+            }
             // The form passes what the user has typed so far,
             // so a pinned complex code counts before it has been saved.
             const config = { ...defaultOnePassConfig(), ...(p?.onePass || {}) };

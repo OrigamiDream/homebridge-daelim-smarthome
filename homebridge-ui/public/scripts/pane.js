@@ -872,9 +872,11 @@ class CompletePane extends Pane {
         return this.config.provider === "smart-elife" && this.config.onePass?.enabled === true;
     }
 
-    // The live view degrades to snapshots on every failure, so a household whose complex
-    // One Pass does not carry sees the switch do nothing at all. The moment it is switched
-    // on is the only one where the user is looking, so the warning belongs here.
+    // The live view degrades to snapshots on every failure,
+    // so a household whose complex One Pass does not carry
+    // sees the switch do nothing at all.
+    // The moment it is switched on is the only one where the user is looking,
+    // so the warning belongs here.
     // Silence means either "supported" or "could not tell" - both are wrong to warn about.
     async warnUnlessOnePassIsServed() {
         let response;
@@ -936,6 +938,11 @@ class ResetConfirmablePane extends Pane {
             this.config.username = undefined;
             this.config.password = undefined;
             this.config.uuid = undefined;
+            // The One Pass block names a household of its own -
+            // id, building, unit, complex code, host -
+            // so leaving it behind would point the next account's live view at this one,
+            // with the switch already on.
+            this.config.onePass = undefined;
             this.config.devices = [];
 
             await window.homebridge.request(`/${provider}/invalidate`, {});

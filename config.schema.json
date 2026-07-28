@@ -86,6 +86,12 @@
             "minimum": 1,
             "maximum": 65535
           },
+          "sipFingerprint": {
+            "title": "인터폰 서버 인증서 지문",
+            "type": "string",
+            "description": "인터폰 서버(SIP)의 인증서를 검증할 SHA-256 지문. 미입력 시 플러그인에 내장된 지문을 씁니다. '예상과 다른 인증서' 오류가 날 때만, 신뢰할 수 있는 회선에서 확인한 값을 입력하세요. openssl이 출력한 'sha256 Fingerprint=...' 줄 전체를 붙여넣어도 됩니다.",
+            "pattern": "^\\s*(?:[Ss][Hh][Aa]-?256\\s+[Ff]ingerprint\\s*=\\s*)?[A-Fa-f0-9]{2}(?:[\\s:-]?[A-Fa-f0-9]{2}){31}\\s*$"
+          },
           "lingerSeconds": {
             "title": "통화 유지 시간",
             "type": "integer",
@@ -304,6 +310,7 @@
           { "key": "onePass.complexCode", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
           { "key": "onePass.host", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
           { "key": "onePass.port", "type": "number", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
+          { "key": "onePass.sipFingerprint", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } },
           { "key": "onePass.lingerSeconds", "condition": { "functionBody": "return model.onePass && model.onePass.enabled" } }
         ],
         "condition": {

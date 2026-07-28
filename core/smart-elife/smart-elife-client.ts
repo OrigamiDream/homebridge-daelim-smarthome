@@ -510,6 +510,16 @@ export default class SmartELifeClient {
         return this.complex;
     }
 
+    // The same lookup, fetched on demand.
+    // The setup wizard signs in and stops there without ever reaching `serve()`,
+    // so waiting on the cached value would leave it with nothing to answer from.
+    public async resolveComplex(): Promise<SmartELifeComplex | undefined> {
+        if(!this.complex) {
+            this.complex = await this.fetchComplex();
+        }
+        return this.complex;
+    }
+
     public getWebSocketCredentials(): WebSocketCredentials {
         // This variables will be initialized after `sign-in` succeeded.
         if(!this.wsCredentials)
@@ -771,7 +781,7 @@ export default class SmartELifeClient {
             ]);
         });
 
-        this.complex = await this.fetchComplex();
+        await this.resolveComplex();
         if(this.complex) {
             this.log(`Complex: ${this.complex.complexDisplayName}`);
             const { dongs, ...redacted } = this.complex;
