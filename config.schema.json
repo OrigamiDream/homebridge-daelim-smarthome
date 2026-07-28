@@ -50,7 +50,8 @@
             "displayName": {
               "title": "메뉴 표기 이름",
               "type": "string",
-              "required": true
+              "required": true,
+              "description": "등록 가능한 기기의 이름 및 활성화 여부를 설정할 수 있습니다."
             },
             "name": {
               "title": "기기 이름",
@@ -74,32 +75,32 @@
               "type": "object",
               "properties": {
                 "elevator": {
-                  "title": "엘레베이터 스위치 활성화 기간",
+                  "title": "엘리베이터 스위치 활성화 시간",
                   "type": "integer",
                   "placeholder": 120,
                   "minimum": 1,
-                  "description": "엘레베이터 호출 시 스위치가 활성화 되어 있는 시간 (초 단위). 스마트 eLife에서는 엘레베이터 도착 시 이 시간이 지나기 전에 자동으로 꺼지며, e편한세상 스마트홈 2.0은 이 시간이 지나야 꺼집니다. 미설정 시 기본값은 각각 120초, 30초입니다."
+                  "description": "엘리베이터 호출 시 스위치가 활성화 되어 있는 시간 (초 단위). 스마트 eLife에서는 엘리베이터 도착 시 이 시간이 지나기 전에 자동으로 꺼지며, e편한세상 스마트홈 2.0은 이 시간이 지나야 꺼집니다. 미설정 시 기본값은 각각 120초, 30초입니다."
                 },
                 "vehicle": {
-                  "title": "입차 모션 센서 활성화 기간",
+                  "title": "입차 모션 센서 활성화 시간",
                   "type": "integer",
                   "placeholder": 5,
                   "minimum": 1,
                   "description": "입차 시 모션 센서가 활성화 되어 있는 시간 (초 단위)."
                 },
                 "door": {
-                  "title": "세대현관 및 공동현관 모션 센서 활성화 기간",
+                  "title": "세대현관 및 공동현관 모션 센서 활성화 시간",
                   "type": "integer",
                   "placeholder": 5,
                   "minimum": 1,
                   "description": "세대현관 공동현관이 열렸을 때 모션 센서가 활성화 되어 있는 시간 (초 단위)."
                 },
                 "camera": {
-                  "title": "세대현관 및 공동현관에 방문자 모션 센서 활성화 기간",
+                  "title": "세대현관 초인종 및 공동현관 초인종 모션 센서 활성화 시간",
                   "type": "integer",
                   "placeholder": 180,
                   "minimum": 1,
-                  "description": "세대현관 및 공동현관 인터폰에 방문자 방문 시 모션 센서 활성화 및 HomeKit Secure Video에 이미지가 나타나 있는 시간 (초 단위)."
+                  "description": "세대현관 또는 공동현관 초인종이 호출될 때 모션 센서를 활성화시키고 HomeKit Secure Video에 이미지를 표시할 시간을 설정할 수 있습니다 (초 단위)."
                 }
               }
             },
@@ -179,14 +180,13 @@
     "key": "devices",
     "type": "tabarray",
     "title": "{{ value.displayName }}",
-    "description": "등록 가능한 기기의 이름 및 활성화 여부를 설정할 수 있습니다.",
     "items": [
       "devices[].displayName",
       "devices[].disabled",
       {
         "key": "devices[]",
         "type": "fieldset",
-        "title": "엘레베이터 호출 세부 설정",
+        "title": "엘리베이터 호출 세부 설정",
         "expandable": true,
         "expanded": false,
         "items": [
@@ -225,7 +225,7 @@
       {
         "key": "devices[]",
         "type": "fieldset",
-        "title": "세대현관 및 공동현관 인터폰 카메라 세부 설정",
+        "title": "{{value.displayName || '초인종 카메라'}} 세부 설정",
         "expandable": true,
         "expanded": false,
         "items": [
