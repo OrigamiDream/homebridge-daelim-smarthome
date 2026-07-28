@@ -13,6 +13,7 @@ export interface SdpMedia {
     address?: string
     payloads: string[]
     rtpmap: Record<string, string>
+    fmtp: Record<string, string>
 }
 
 export interface SdpAnswer {
@@ -177,11 +178,17 @@ export function parseSdp(body: string): SdpAnswer {
                 port: parseInt(fields[1], 10),
                 payloads: fields.slice(3),
                 rtpmap: {},
+                fmtp: {},
             };
         } else if(current && line.startsWith("a=rtpmap:")) {
             const match = /^a=rtpmap:(\d+)\s+([^/]+)\//.exec(line);
             if(match) {
                 answer.media[current].rtpmap[match[1]] = match[2];
+            }
+        } else if(current && line.startsWith("a=fmtp:")) {
+            const match = /^a=fmtp:(\d+)\s+(.+)$/.exec(line);
+            if(match) {
+                answer.media[current].fmtp[match[1]] = match[2].trim();
             }
         }
     }
