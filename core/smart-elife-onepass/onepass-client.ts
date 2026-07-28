@@ -1,10 +1,21 @@
 import * as https from "node:https";
+import * as net from "node:net";
+import * as tls from "node:tls";
 import {LoggerBase} from "../utils";
 import {Logging} from "homebridge";
 import {OnePassConfig, OnePassCredentials} from "../interfaces/smart-elife-onepass-config";
 
 const COMPLEX_LIST_URL = "https://cloud-api.uasis.com/oapi/v2/entry/complex_list?type=daelim";
 const DEFAULT_API_PORT = 25204;
+// The name every One Pass certificate is issued for.
+// The central host and all forty-seven per-complex hosts answer with the same
+// public-CA wildcard, whose SANs are `DNS:*.uasis.com, DNS:uasis.com`
+// and carry no address at all.
+const ONE_PASS_CERTIFICATE_NAME = "uasis.com";
+// Node measures this as socket idle time,
+// so a stalled handshake can take close to twice as long to trip it.
+// Kept short for that reason - a healthy One Pass answers in well under a second.
+const REQUEST_TIMEOUT_MS = 10 * 1000;
 
 // The One Pass web app runs inside the native shell, and every request carries these.
 // The API rejects the call outright without a matching Origin.
@@ -47,14 +58,35 @@ export default class OnePassClient {
         return new Promise((resolve, reject) => {
             const target = new URL(url);
             const payload = body === undefined ? undefined : JSON.stringify(body);
+            // Several of the ways a request can end arrive as separate events,
+            // and more than one of them can fire for the same failure.
+            let settled = false;
+            const settle = (error?: Error, value?: any) => {
+                if(settled) return;
+                settled = true;
+                error ? reject(error) : resolve(value);
+            };
+            const settleError = (error: Error) => settle(error);
+            // The listing gives every complex a `*.uasis.com` name,
+            // so the ordinary checks hold and nothing has to be relaxed for them.
+            //
+            // A bare address can still arrive - from a `host` pinned by hand,
+            // or from a listing entry that has no domain -
+            // and no address appears among the certificate's names,
+            // so the address itself can never be the thing that is checked.
+            // Check the name the certificate was issued for rather than skipping the check:
+            // an attacker then needs a public CA to hand them one for uasis.com,
+            // instead of any valid certificate at all, which is what waiving it accepts.
+            const byAddress = !!net.isIP(target.hostname);
             const request = https.request({
                 host: target.hostname,
                 port: target.port || 443,
                 path: `${target.pathname}${target.search}`,
                 method: payload ? "POST" : "GET",
-                // The per-complex hosts serve certificates issued for the shared `uasis.com` wildcard,
-                // but are reached by IP in some complexes.
-                rejectUnauthorized: false,
+                ...(byAddress ? {
+                    checkServerIdentity: (_host: string, certificate: tls.PeerCertificate) =>
+                        tls.checkServerIdentity(ONE_PASS_CERTIFICATE_NAME, certificate),
+                } : {}),
                 headers: {
                     ...HTTP_HEADERS,
                     ...(payload ? {"Content-Length": Buffer.byteLength(payload)} : {}),
@@ -65,13 +97,28 @@ export default class OnePassClient {
                 response.on("end", () => {
                     const text = Buffer.concat(chunks).toString("utf-8");
                     try {
-                        resolve(JSON.parse(text));
+                        settle(undefined, JSON.parse(text));
                     } catch {
-                        reject(new Error(`One Pass returned a non-JSON body: ${text.slice(0, 200)}`));
+                        settle(new Error(`One Pass returned a non-JSON body: ${text.slice(0, 200)}`));
                     }
                 });
+                // A response cut off part-way through never raises `end`,
+                // and by then the socket is gone,
+                // so the deadline below cannot fire either.
+                // Nor does `error` reach the request - it is raised on the response.
+                // Left alone this promise never settles at all,
+                // and `starting` hands that same hung promise to every viewer that follows.
+                response.on("aborted", () =>
+                    settle(new Error(`One Pass closed the connection to ${target.hostname} mid-response.`)));
+                response.on("error", settleError);
             });
-            request.on("error", reject);
+            request.on("error", settleError);
+            // A host that swallows the packets rather than refusing them
+            // would otherwise hold this open until the OS gives up,
+            // and the camera waits on it before it can fall back to snapshots.
+            request.setTimeout(REQUEST_TIMEOUT_MS, () => {
+                request.destroy(new Error(`One Pass did not answer ${target.hostname} in time.`));
+            });
             if(payload) {
                 request.write(payload);
             }
