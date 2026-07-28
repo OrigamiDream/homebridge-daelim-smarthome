@@ -120,7 +120,9 @@ export interface LiveViewLease {
     media: {
         payloadType: string;
         relayPort: number;
+        fmtp?: string;
     };
+    activate(): void;
     release(): void;
 }
 
@@ -136,6 +138,19 @@ interface TransitionSnapshot {
 
 export const CAMERA_TIMEOUT_DURATION = 3 * 60; // 3 minutes
 export const CAMERA_TRANSITION_DURATION = 0.5; // 0.5 seconds
+// How long a live view may take before the stream falls back to snapshots.
+// The door line is slow and remarkably consistent about it: four calls to the real
+// PBX took 7.32, 7.33, 7.35 and 7.38 seconds, almost all of it the PBX taking its
+// time over the INVITE - the sign-in before it is around 200ms, and the first video
+// packet lands about 20ms after the answer. So the budget cannot be tight; it is set
+// at roughly double the measured time, which still bounds a wait its own timeouts
+// would otherwise let run into minutes.
+const LIVE_VIEW_ACQUIRE_TIMEOUT = 15 * 1000;
+// A live view is joined to the stream once ffmpeg first logs,
+// which is as close as the process gets to announcing that its input is open.
+// One that never logs still has to receive video,
+// so this is the point where it is joined regardless.
+const LIVE_VIEW_ACTIVATE_DEADLINE = 3 * 1000;
 
 export default class VisitorOnCameraStreamingDelegate implements CameraStreamingDelegate {
 
@@ -146,6 +161,12 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     private alternativeSnapshot?: Buffer;
     private pendingSessions: Map<string, SessionInfo> = new Map();
     private ongoingSessions: Map<string, ActiveSession> = new Map();
+    // Leases held between being acquired
+    // and the session that owns them being registered.
+    // `stopStream()` releases through `ActiveSession`,
+    // so anything that fails in that window would otherwise strand a viewer,
+    // and a stranded viewer holds the interphone line open until Homebridge restarts.
+    private unownedLeases: Map<string, LiveViewLease> = new Map();
 
     constructor(private readonly api: API,
                 private readonly hap: HAP,
@@ -472,17 +493,54 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     // Opens the real-time feed when one is configured.
     // Every failure - the door line being busy, One Pass not reachable, bad credentials -
     // degrades to the snapshot feed rather than failing the HomeKit session.
+    //
+    // Taking too long counts as a failure.
+    // The snapshot path sits behind this same await,
+    // and the timeouts underneath it - sign-in, TLS, INVITE, the first packet,
+    // and a retry over the lot of them - add up to minutes,
+    // far past the point where HomeKit gives up on the stream.
+    // A fallback that arrives after the viewer has gone is no fallback,
+    // so the wait is bounded here rather than left to the sum of its parts.
     private async acquireLiveView(): Promise<LiveViewLease | undefined> {
         if(!this.liveView?.enabled) {
             return undefined;
         }
+        let abandoned = false;
+        let timer: NodeJS.Timeout | undefined;
+        const pending = this.liveView.acquire();
+        // The call carries on setting itself up either way.
+        // A lease that turns up late is released rather than leaked -
+        // the linger window keeps the call warm briefly in case HomeKit tries again.
+        pending.then(
+            (lease) => {
+                if(abandoned) {
+                    lease.release();
+                }
+            },
+            () => undefined);
         try {
-            const lease = await this.liveView.acquire();
+            const lease = await Promise.race([
+                pending,
+                new Promise<undefined>((resolve) => {
+                    timer = setTimeout(() => {
+                        abandoned = true;
+                        resolve(undefined);
+                    }, LIVE_VIEW_ACQUIRE_TIMEOUT);
+                }),
+            ]);
+            if(!lease) {
+                this.log.warn(`[${this.cameraName}] Live view did not come up within ${LIVE_VIEW_ACQUIRE_TIMEOUT / 1000}s, falling back to snapshots.`);
+                return undefined;
+            }
             this.log.info(`[${this.cameraName}] Live view acquired.`);
             return lease;
         } catch(err) {
             this.log.warn(`[${this.cameraName}] Live view unavailable, falling back to snapshots: ${(err as Error)?.message || err}`);
             return undefined;
+        } finally {
+            if(timer) {
+                clearTimeout(timer);
+            }
         }
     }
 
@@ -490,10 +548,22 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
         const sessionInfo = this.pendingSessions.get(request.sessionID);
         if(sessionInfo) {
             const liveLease = await this.acquireLiveView();
-            if(liveLease && !this.pendingSessions.has(request.sessionID)) {
+            if(!this.pendingSessions.has(request.sessionID)) {
                 // HomeKit gave up while the call was being set up.
-                liveLease.release();
+                // Answering the request it abandoned is what closes it out.
+                // Carrying on would leave an ffmpeg and an interphone call running
+                // for a camera nobody is looking at,
+                // and with no RTCP ever arriving
+                // there is no inactivity timer to end either of them.
+                liveLease?.release();
+                callback(new Error("The video stream was stopped before it started"));
                 return;
+            }
+            if(liveLease) {
+                // Hand the lease somewhere `stopStream()` can reach
+                // until the session that owns it exists,
+                // so that nothing between here and there can strand it.
+                this.unownedLeases.set(request.sessionID, liveLease);
             }
             const codec = this.cameraConfig.codec || "libx264";
             const mtu = this.cameraConfig.packetSize || 1316; // request.video.mtu is not used
@@ -635,7 +705,16 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 sdp.push("t=0 0");
                 sdp.push(`m=video ${liveLease.media.relayPort} RTP/AVP ${liveLease.media.payloadType}`);
                 sdp.push(`a=rtpmap:${liveLease.media.payloadType} H264/90000`);
+                if(liveLease.media.fmtp) {
+                    sdp.push(`a=fmtp:${liveLease.media.payloadType} ${liveLease.media.fmtp}`);
+                }
                 activeSession.mainProcess.stdin.end(sdp.join("\r\n") + "\r\n");
+                // Join the relay once ffmpeg is actually up,
+                // rather than a fixed moment after it was asked to start,
+                // so the retained keyframe is not replayed
+                // at a port nothing is listening on yet.
+                activeSession.mainProcess.onStarted(() => liveLease.activate());
+                setTimeout(() => liveLease.activate(), LIVE_VIEW_ACTIVATE_DEADLINE);
             }
             if(this.cameraConfig.returnAudioTarget) {
                 const returnArgs: string[] = [];
@@ -669,6 +748,7 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
             // and ffmpeg's stdin is already closed by the SDP above.
             if(liveLease) {
                 this.ongoingSessions.set(request.sessionID, activeSession);
+                this.unownedLeases.delete(request.sessionID);
                 this.pendingSessions.delete(request.sessionID);
                 return;
             }
@@ -715,6 +795,7 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
             }, 1000 / 30); // 30 fps
 
             this.ongoingSessions.set(request.sessionID, activeSession);
+            this.unownedLeases.delete(request.sessionID);
             this.pendingSessions.delete(request.sessionID);
         } else {
             this.log.error(`[${this.cameraName}] Error finding session information`);
@@ -723,6 +804,20 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     }
 
     public stopStream(sessionId: string): void {
+        // A session HomeKit stops while it is still being set up
+        // never reaches `ongoingSessions`,
+        // so dropping it here is the only signal `startStream()` gets
+        // that the viewer went away while it was waiting on the live view.
+        this.pendingSessions.delete(sessionId);
+        const unowned = this.unownedLeases.get(sessionId);
+        if(unowned) {
+            this.unownedLeases.delete(sessionId);
+            try {
+                unowned.release();
+            } catch(err) {
+                this.log.error(`[${this.cameraName}] Error occurred releasing the live view: ${err}`);
+            }
+        }
         const session = this.ongoingSessions.get(sessionId);
         if(session) {
             if(session.timeout) {
@@ -764,6 +859,9 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
             case StreamRequestTypes.START:
                 this.startStream(request, callback).catch((err) => {
                     this.log.error(`[${this.cameraName}] Could not start the video stream: ${err}`);
+                    // Whatever got as far as being created has to be given back,
+                    // including a live view lease that no session ever took ownership of.
+                    this.stopStream(request.sessionID);
                     callback(err instanceof Error ? err : new Error(String(err)));
                 });
                 break;
@@ -846,6 +944,8 @@ interface FFmpegProgress {
 export class FFmpegProcess {
     private readonly process: ChildProcessWithoutNullStreams;
     private killTimeout?: NodeJS.Timeout;
+    private logged = false;
+    private startListener?: () => void;
     readonly stdin: Writable;
 
     constructor(cameraName: string, sessionId: string, processor: string, ffmpegArgs: string, log: Logging, delegate: VisitorOnCameraStreamingDelegate, callback?: StreamRequestCallback) {
@@ -880,6 +980,11 @@ export class FFmpegProcess {
             terminal: false
         });
         stderr.on("line", (line: string) => {
+            if(!this.logged) {
+                this.logged = true;
+                this.startListener?.();
+                this.startListener = undefined;
+            }
             if(callback) {
                 callback();
                 callback = undefined;
@@ -920,6 +1025,18 @@ export class FFmpegProcess {
                 }
             }
         });
+    }
+
+    // Fires on the first line ffmpeg logs.
+    // That is the closest this side gets to observing the input being opened:
+    // it lands a few milliseconds before the RTP port is bound,
+    // and well after the process start-up that actually varies with load.
+    onStarted(listener: () => void): void {
+        if(this.logged) {
+            listener();
+            return;
+        }
+        this.startListener = listener;
     }
 
     parseProgress(data: Uint8Array): FFmpegProgress | undefined {
