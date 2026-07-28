@@ -21,11 +21,22 @@ import {
 import {H264_FILLER, isRtcp, isStun, PCMU_SILENCE, RtpRelay, RtpSender, stunBindingRequest} from "./rtp";
 
 const SIP_TIMEOUT_MS = 20 * 1000;
+const SIP_CONNECT_TIMEOUT_MS = 10 * 1000;
 const LATCH_INTERVAL_MS = 2 * 1000;
 const AUDIO_INTERVAL_MS = 20;
 const VIDEO_INTERVAL_MS = 40;
 const STALL_TIMEOUT_MS = 5 * 1000;
+// The PBX only starts sending once it has latched onto the RTP we push at it,
+// so the first packet of a leg is allowed longer
+// than a running stream is allowed to skip.
+const FIRST_PACKET_TIMEOUT_MS = 10 * 1000;
 const RECONNECT_BACKOFF_MS = 15 * 1000;
+// `activate()` is called once ffmpeg has logged for the first time,
+// which is the closest observable moment to it opening its input -
+// measured at 62ms after spawn against a bind at 77ms.
+// This only has to cover the gap between those two,
+// not the process start-up before them, which is the part that varies with load.
+const CONSUMER_STARTUP_DELAY_MS = 250;
 // The door camera line is single-session.
 // These are the codes the PBX answers with
 // when the phone app (or another household member) already holds it.
@@ -36,18 +47,86 @@ const BUSY_STATUS_CODES = [
     600, // Busy Everywhere
     603, // Decline
 ];
+// Every CVNET PBX reachable on 5061 serves this same self-signed certificate -
+// one baked into the firmware, dated out to the year 3023 -
+// which is what the One Pass app pins against.
+// A chain cannot be built for it and it is addressed by IP,
+// so pinning is the only verification available.
+// `onePass.sipFingerprint` overrides it if a complex ever ships a different one.
+const CVNET_SIP_FINGERPRINT = "00469B240794BD4BFCCF31E9FB08F1A0694BDE9F022FD51CBC40D2C378ECAD93";
 
 export class OnePassBusyError extends Error {
+}
+
+// The PBX refused the credentials themselves rather than merely asking for them,
+// which means the `sipPw` they were built from is no longer the one it expects.
+export class OnePassSipAuthError extends Error {
+}
+
+interface SipWaiter {
+    match: (message: SipMessage) => boolean
+    // Runs for messages that did not match,
+    // so a transaction the PBX is still working on can push its own deadline out.
+    observe?: (message: SipMessage) => void
+    resolve: (message: SipMessage) => void
+    reject: (error: Error) => void
+}
+
+// Node reports `AA:BB:...`,
+// while a fingerprint pasted out of `openssl` or a browser
+// may include `sha256 Fingerprint=`, omit separators, or use lower case.
+// Discard only the known label rather than every non-hex character:
+// letters in the label itself are valid hex and would otherwise corrupt the pin.
+// Anything that does not read as 32 bytes is simply not a fingerprint.
+function readFingerprint(value?: string): string | undefined {
+    if(!value?.trim()) {
+        return undefined;
+    }
+    const equals = value.lastIndexOf("=");
+    const candidate = (equals >= 0 ? value.slice(equals + 1) : value).trim();
+    const fingerprint = candidate.replace(/[:\s-]/g, "").toUpperCase();
+    return /^[A-F0-9]{64}$/.test(fingerprint) ? fingerprint : undefined;
+}
+
+// The same reading, for the pin the user configured
+// rather than the one a server presented.
+// Only this side may refuse: a value that cannot be read has to be reported,
+// because falling back to the built-in pin would quietly verify
+// against something other than what was asked for.
+function parseFingerprint(value?: string): string | undefined {
+    if(!value?.trim()) {
+        return undefined;
+    }
+    const fingerprint = readFingerprint(value);
+    if(!fingerprint) {
+        throw new Error("The One Pass SIP certificate fingerprint must be 32 SHA-256 bytes in hex.");
+    }
+    return fingerprint;
 }
 
 export interface MonitorMedia {
     // Payload type ffmpeg should expect on the relayed H.264 stream.
     // The loopback port is handed out per viewer by the live view, not fixed here.
     payloadType: string
+    // Codec parameters from the PBX answer,
+    // including sprop-parameter-sets on the servers that supply them.
+    // Passing those to ffmpeg frees the decoder
+    // from needing an early RTP copy of SPS/PPS.
+    fmtp?: string
+}
+
+// One direction of media: the even RTP port we offer,
+// plus the odd RTCP port of the pair, held open for as long as the call lasts
+// so nothing else on the host can take the port the SDP has already promised away.
+export interface MonitorStream {
+    socket: Socket
+    port: number
+    rtcp: Socket
 }
 
 // The address we advertise is cosmetic -
-// it is almost always private, and the PBX reaches us by latching onto our RTP source instead.
+// it is almost always private,
+// and the PBX reaches us by latching onto our RTP source instead.
 // The One Pass app itself advertises a CLAT address that is unroutable from the PBX.
 // Still, name a real interface so the Contact and SDP origin are well-formed.
 function localAddress(): string {
@@ -68,9 +147,10 @@ function localAddress(): string {
 class MonitorCall {
 
     private readonly localAddress: string;
+    private readonly fingerprint: string;
     private readonly callId = randomToken(16);
     private readonly fromTag = randomToken(10);
-    private readonly waiters: {match: (message: SipMessage) => boolean, resolve: (message: SipMessage) => void}[] = [];
+    private readonly waiters: SipWaiter[] = [];
 
     private socket?: tls.TLSSocket;
     private buffer = "";
@@ -78,12 +158,13 @@ class MonitorCall {
     private toTag?: string;
     private remoteTarget?: string;
     private closed = false;
-
-    onClosed?: () => void;
+    private hangingUp = false;
 
     constructor(private readonly log: Logging | LoggerBase,
-                private readonly credentials: OnePassCredentials) {
+                private readonly credentials: OnePassCredentials,
+                sipFingerprint?: string) {
         this.localAddress = localAddress();
+        this.fingerprint = parseFingerprint(sipFingerprint) || CVNET_SIP_FINGERPRINT;
     }
 
     private get target(): string {
@@ -103,21 +184,62 @@ class MonitorCall {
 
     connect(): Promise<void> {
         return new Promise((resolve, reject) => {
+            let settled = false;
+            const finish = (error?: Error) => {
+                if(settled) return;
+                settled = true;
+                error ? reject(error) : resolve();
+            };
+            const fail = (error: Error) => {
+                // Settle before tearing the socket down.
+                // Destroying it raises `close`, which settles with a reason of its own,
+                // and whichever lands first is the one the caller gets to see -
+                // so the specific reason has to be in place before that can happen.
+                finish(error);
+                socket.destroy();
+            };
             const socket = tls.connect({
                 host: this.credentials.sipDomain,
                 port: this.credentials.sipPort,
-                // The PBX presents a self-signed certificate and is usually addressed by IP;
-                // the app pins it rather than validating a chain.
+                // The PBX presents a self-signed certificate and is addressed by IP,
+                // so no chain can be built for it and no name can be checked.
+                // Verification happens against the pinned fingerprint below instead,
+                // which is what the app does;
+                // this flag only lets the handshake get far enough to be pinned.
                 rejectUnauthorized: false,
-            }, () => resolve());
+            }, () => {
+                const presented = socket.getPeerCertificate()?.fingerprint256;
+                // Reading, not validating:
+                // a certificate whose fingerprint does not parse is one that fails the pin,
+                // and this runs inside a TLS callback
+                // where a throw would take the bridge down instead.
+                if(readFingerprint(presented) !== this.fingerprint) {
+                    fail(new Error(`The One Pass PBX presented an unexpected certificate: ${presented || "none"}`));
+                    return;
+                }
+                // The handshake is done, so drop the deadline -
+                // it is an idle timeout, and a quiet call is normal from here on.
+                socket.setTimeout(0);
+                finish();
+            });
+            // A router that drops the SYN rather than refusing it
+            // would otherwise leave this pending until the OS gives up,
+            // with the snapshot fallback and the HomeKit callback waiting behind it.
+            socket.setTimeout(SIP_CONNECT_TIMEOUT_MS, () => {
+                fail(new Error("The One Pass PBX did not accept a connection in time."));
+            });
             socket.on("error", (error) => {
                 this.log.debug("One Pass SIP socket error: %s", error.message);
-                reject(error);
+                fail(error);
             });
             socket.on("data", (chunk) => this.onData(chunk));
             socket.on("close", () => {
                 this.closed = true;
-                this.onClosed?.();
+                finish(new Error("The One Pass SIP connection closed before the call was established."));
+                const waiters = this.waiters.splice(0);
+                for(const waiter of waiters) {
+                    waiter.reject(new Error("The One Pass SIP connection closed while waiting for a response."));
+                }
             });
             this.socket = socket;
         });
@@ -142,7 +264,10 @@ class MonitorCall {
             this.buffer = this.buffer.slice(total);
             this.log.debug("One Pass SIP <- %s", message.start);
             for(const waiter of this.waiters.slice()) {
-                if(!waiter.match(message)) continue;
+                if(!waiter.match(message)) {
+                    waiter.observe?.(message);
+                    continue;
+                }
                 this.waiters.splice(this.waiters.indexOf(waiter), 1);
                 waiter.resolve(message);
             }
@@ -154,16 +279,32 @@ class MonitorCall {
         this.socket?.write(text);
     }
 
-    private waitFor(match: (message: SipMessage) => boolean): Promise<SipMessage> {
+    // `progress` marks the messages that mean the PBX is still working on the request.
+    // They buy the same wait over again rather than counting against it.
+    private waitFor(match: (message: SipMessage) => boolean,
+                    progress?: (message: SipMessage) => boolean): Promise<SipMessage> {
         return new Promise((resolve, reject) => {
-            const waiter = {match, resolve};
-            this.waiters.push(waiter);
-            setTimeout(() => {
+            const waiter: SipWaiter = {
+                match,
+                observe: progress && ((message: SipMessage) => {
+                    if(progress(message)) timer.refresh();
+                }),
+                resolve: (message: SipMessage) => {
+                    clearTimeout(timer);
+                    resolve(message);
+                },
+                reject: (error: Error) => {
+                    clearTimeout(timer);
+                    reject(error);
+                },
+            };
+            const timer = setTimeout(() => {
                 const index = this.waiters.indexOf(waiter);
                 if(index < 0) return;
                 this.waiters.splice(index, 1);
                 reject(new Error("The One Pass PBX did not respond in time."));
             }, SIP_TIMEOUT_MS);
+            this.waiters.push(waiter);
         });
     }
 
@@ -171,7 +312,7 @@ class MonitorCall {
         return message.statusCode !== undefined && /INVITE/.test(message.headers["cseq"] || "");
     }
 
-    private buildInvite(branch: string, offer: string, authorization?: string): string {
+    private buildInvite(branch: string, offer: string, authorizationHeader?: string): string {
         return buildRequest(`INVITE ${this.target} SIP/2.0`, [
             `Via: SIP/2.0/TLS ${this.localAddress};rport;branch=${branch}`,
             this.fromHeader,
@@ -181,7 +322,7 @@ class MonitorCall {
             `CSeq: ${this.cseq} INVITE`,
             "Content-Type: application/sdp",
             "Max-Forwards: 70",
-            ...(authorization ? [`Authorization: ${authorization}`] : []),
+            ...(authorizationHeader ? [authorizationHeader] : []),
             "Allow: INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, SUBSCRIBE, NOTIFY, INFO, PUBLISH, MESSAGE",
             "Privacy: none",
             "User-Agent: cvnetsip/1.0.0",
@@ -198,6 +339,10 @@ class MonitorCall {
         let response = await this.waitForFinal();
 
         if(response.statusCode === 401 || response.statusCode === 407) {
+            // A proxy challenge and an endpoint challenge
+            // are carried in different headers in both directions,
+            // and a PBX that asks with one ignores credentials sent in the other.
+            const proxy = response.statusCode === 407;
             this.toTag = parseTag(response.headers["to"]);
             // A non-2xx ACK stays in the INVITE transaction: same branch, same request URI.
             this.send(buildRequest(`ACK ${this.target} SIP/2.0`, [
@@ -210,20 +355,28 @@ class MonitorCall {
                 "Max-Forwards: 70",
             ]));
 
-            const challenge = parseChallenge(response.headers["www-authenticate"] || response.headers["proxy-authenticate"]);
+            const challenge = parseChallenge(
+                response.headers[proxy ? "proxy-authenticate" : "www-authenticate"]);
             if(!challenge) {
                 throw new Error("The One Pass PBX sent an authentication challenge we could not parse.");
             }
-            const authorization = buildAuthorization(
+            const credentials = buildAuthorization(
                 challenge, this.credentials.sipId, this.credentials.sipPw, "INVITE", this.target);
 
             this.cseq += 1;
             this.toTag = undefined;
             branch = randomBranch();
-            this.send(this.buildInvite(branch, offer, authorization));
+            this.send(this.buildInvite(branch, offer,
+                `${proxy ? "Proxy-Authorization" : "Authorization"}: ${credentials}`));
             response = await this.waitForFinal();
         }
 
+        // Still challenged after answering, or refused outright:
+        // the credentials are the problem, not the request.
+        if(response.statusCode === 401 || response.statusCode === 403 || response.statusCode === 407) {
+            throw new OnePassSipAuthError(
+                `The One Pass PBX rejected the SIP credentials: ${response.statusCode} ${response.reason}`);
+        }
         if(response.statusCode !== 200) {
             const error = `The One Pass PBX rejected the call: ${response.statusCode} ${response.reason}`;
             throw BUSY_STATUS_CODES.includes(response.statusCode || 0)
@@ -241,12 +394,15 @@ class MonitorCall {
         return parseSdp(response.body);
     }
 
-    private async waitForFinal(): Promise<SipMessage> {
-        let response = await this.waitFor((message) => this.isInviteResponse(message));
-        while((response.statusCode || 0) < 200) {
-            response = await this.waitFor((message) => this.isInviteResponse(message) && (message.statusCode || 0) >= 200);
-        }
-        return response;
+    // One waiter, for the response that ends the transaction.
+    // Resolving on a provisional and registering the next waiter afterwards
+    // drops the 200 OK whenever the two arrive in the same TLS chunk:
+    // `onData()` walks that chunk synchronously,
+    // while the re-registration is a microtask behind it.
+    private waitForFinal(): Promise<SipMessage> {
+        return this.waitFor(
+            (message) => this.isInviteResponse(message) && (message.statusCode || 0) >= 200,
+            (message) => this.isInviteResponse(message));
     }
 
     private waitForRetransmissions(): void {
@@ -263,7 +419,8 @@ class MonitorCall {
 
     private sendAck(): void {
         // A 2xx ACK is its own transaction:
-        // fresh branch, addressed to the dialog's remote target rather than the original request URI.
+        // fresh branch, addressed to the dialog's remote target
+        // rather than to the original request URI.
         this.send(buildRequest(`ACK ${this.remoteTarget} SIP/2.0`, [
             `Via: SIP/2.0/TLS ${this.localAddress};rport;branch=${randomBranch()}`,
             this.fromHeader,
@@ -276,6 +433,10 @@ class MonitorCall {
     }
 
     hangUp(): void {
+        if(this.hangingUp) {
+            return;
+        }
+        this.hangingUp = true;
         if(this.closed || !this.remoteTarget) {
             this.socket?.destroy();
             return;
@@ -304,59 +465,156 @@ class MonitorCall {
 export class OnePassMonitorSession {
 
     private call?: MonitorCall;
+    private openingCall?: MonitorCall;
     private latchTimer?: NodeJS.Timeout;
     private audioTimer?: NodeJS.Timeout;
     private videoTimer?: NodeJS.Timeout;
     private stalledTimer?: NodeJS.Timeout;
     private relay?: RtpRelay;
+    private readonly consumerTimers = new Map<number, NodeJS.Timeout>();
     private stopped = false;
     private reconnecting = false;
     private retryAfter = 0;
+    private legStartedAt = 0;
 
     constructor(private readonly log: Logging | LoggerBase,
-                private readonly credentials: OnePassCredentials,
-                private readonly audio: Socket,
-                private readonly video: Socket,
-                private readonly relaySocket: Socket,
-                private readonly audioPort: number,
-                private readonly videoPort: number) {
+                private credentials: OnePassCredentials,
+                private readonly refreshCredentials: () => Promise<OnePassCredentials>,
+                private readonly sipFingerprint: string | undefined,
+                private readonly audio: MonitorStream,
+                private readonly video: MonitorStream,
+                private readonly relaySocket: Socket) {
+        // A UDP send that fails - an interface that went away mid-call, a media address
+        // the PBX named that cannot be reached - does not throw where it is called from.
+        // It arrives here, later, as an event, and an event nobody is listening for is
+        // fatal to the whole Homebridge process rather than to this call.
+        // There is nothing useful to do about one beyond noticing: the media will dry up,
+        // and the stall watchdog rebuilds the dialog on its own.
+        for(const socket of this.sockets()) {
+            socket.on("error", (error) => {
+                this.log.debug("One Pass media socket error: %s", error.message);
+            });
+        }
+    }
+
+    private sockets(): Socket[] {
+        return [
+            this.audio.socket, this.audio.rtcp,
+            this.video.socket, this.video.rtcp,
+            this.relaySocket,
+        ];
     }
 
     async start(): Promise<MonitorMedia> {
         this.relay = new RtpRelay(this.relaySocket);
-        this.video.on("message", (packet) => {
+        this.video.socket.on("message", (packet) => {
             if(isStun(packet) || isRtcp(packet)) return;
             this.relay?.forward(packet);
         });
         // Audio is negotiated but never consumed;
         // draining the socket keeps the kernel buffer from filling
         // and the port alive for the latch.
-        this.audio.on("message", () => undefined);
+        this.audio.socket.on("message", () => undefined);
 
-        const payloadType = await this.dial();
+        const media = await this.dial();
+        if(this.stopped) {
+            throw new Error("The One Pass live view was stopped while it was starting.");
+        }
         this.watchForStalls();
-        return {payloadType};
+        return media;
     }
 
-    private async dial(): Promise<string> {
-        const call = new MonitorCall(this.log, this.credentials);
-        await call.connect();
-        const answer = await call.invite(this.audioPort, this.videoPort);
-
-        const video = answer.media["video"];
-        const audio = answer.media["audio"];
-        // A zero port means the PBX declined the stream outright.
-        if(!video?.address || !video.port || !video.payloads.length) {
-            call.hangUp();
-            throw new Error("The One Pass PBX answered without a video stream.");
+    private async dial(): Promise<MonitorMedia> {
+        if(this.stopped) {
+            throw new Error("The One Pass live view was stopped before the call started.");
         }
-        this.log.debug("One Pass media: video %s:%d, audio %s:%d",
-            video.address, video.port, audio?.address, audio?.port);
+        const call = new MonitorCall(this.log, this.credentials, this.sipFingerprint);
+        this.openingCall = call;
+        try {
+            await call.connect();
+            this.ensureOpening(call);
+            const answer = await call.invite(this.audio.port, this.video.port);
+            this.ensureOpening(call);
 
-        this.call = call;
-        this.relay?.reset();
-        this.startMedia(answer);
-        return video.payloads[0];
+            const video = answer.media["video"];
+            const audio = answer.media["audio"];
+            // A zero port means the PBX declined the stream outright.
+            if(!video?.address || !video.port || !video.payloads.length) {
+                throw new Error("The One Pass PBX answered without a video stream.");
+            }
+            this.log.debug("One Pass media: video %s:%d, audio %s:%d",
+                video.address, video.port, audio?.address, audio?.port);
+
+            const packetsBefore = this.relay?.packets || 0;
+            this.relay?.reset();
+            // Consumers keep the payload type they were first told about,
+            // so a later leg answered with a different one is rewritten rather than reported.
+            // Its `fmtp` is left as the first leg's:
+            // an SDP already handed to ffmpeg cannot be revised,
+            // and H.264 repeats its parameter sets in band ahead of each keyframe anyway.
+            const answered = parseInt(video.payloads[0], 10);
+            const pinned = this.relay?.pinPayloadType(answered) ?? answered;
+            this.startMedia(answer);
+            this.call = call;
+            this.legStartedAt = Date.now();
+            await this.waitForFirstVideoPacket(packetsBefore);
+            this.ensureOpening(call);
+
+            // The codec parameters belong to the type the PBX answered with,
+            // even when consumers are told about the pinned one.
+            return {payloadType: String(pinned), fmtp: video.fmtp[video.payloads[0]]};
+        } catch(error) {
+            if(this.call === call) {
+                this.call = undefined;
+            }
+            this.stopMedia();
+            // The dialog did not become a usable media leg, so nothing else owns it.
+            call.hangUp();
+            throw error;
+        } finally {
+            if(this.openingCall === call) {
+                this.openingCall = undefined;
+            }
+        }
+    }
+
+    private ensureOpening(call: MonitorCall): void {
+        if(this.stopped || this.openingCall !== call) {
+            throw new Error("The One Pass live view was stopped while the call was opening.");
+        }
+    }
+
+    private waitForFirstVideoPacket(packetsBefore: number): Promise<void> {
+        if((this.relay?.packets || 0) > packetsBefore) {
+            return Promise.resolve();
+        }
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            const finish = (error?: Error) => {
+                if(settled) return;
+                settled = true;
+                clearTimeout(timer);
+                this.video.socket.removeListener("message", onMessage);
+                this.video.socket.removeListener("close", onClose);
+                error ? reject(error) : resolve();
+            };
+            const onMessage = (packet: Buffer) => {
+                if(isStun(packet) || isRtcp(packet)) return;
+                if((this.relay?.packets || 0) > packetsBefore) {
+                    finish();
+                }
+            };
+            const onClose = () => finish(new Error("The One Pass video socket closed before media arrived."));
+            const timer = setTimeout(() => finish(
+                new Error("The One Pass PBX call connected, but no video arrived in time.")), FIRST_PACKET_TIMEOUT_MS);
+            this.video.socket.on("message", onMessage);
+            this.video.socket.once("close", onClose);
+
+            // Do not miss a packet delivered between the check above and listener registration.
+            if((this.relay?.packets || 0) > packetsBefore) {
+                finish();
+            }
+        });
     }
 
     private startMedia(answer: SdpAnswer): void {
@@ -366,9 +624,9 @@ export class OnePassMonitorSession {
 
         const latch = () => {
             try {
-                this.video.send(stunBindingRequest(), video.port, video.address);
+                this.video.socket.send(stunBindingRequest(), video.port, video.address);
                 if(audio?.address) {
-                    this.audio.send(stunBindingRequest(), audio.port, audio.address);
+                    this.audio.socket.send(stunBindingRequest(), audio.port, audio.address);
                 }
             } catch {
                 // The socket may already be closing.
@@ -377,10 +635,10 @@ export class OnePassMonitorSession {
         latch();
         this.latchTimer = setInterval(latch, LATCH_INTERVAL_MS);
 
-        const videoSender = new RtpSender(this.video, video.address!, video.port, parseInt(video.payloads[0], 10));
+        const videoSender = new RtpSender(this.video.socket, video.address!, video.port, parseInt(video.payloads[0], 10));
         this.videoTimer = setInterval(() => videoSender.send(H264_FILLER, 3600), VIDEO_INTERVAL_MS);
         if(audio?.address && audio.payloads.length) {
-            const audioSender = new RtpSender(this.audio, audio.address, audio.port, parseInt(audio.payloads[0], 10));
+            const audioSender = new RtpSender(this.audio.socket, audio.address, audio.port, parseInt(audio.payloads[0], 10));
             this.audioTimer = setInterval(() => audioSender.send(PCMU_SILENCE, 160), AUDIO_INTERVAL_MS);
         }
     }
@@ -401,18 +659,27 @@ export class OnePassMonitorSession {
         this.stalledTimer = setInterval(async () => {
             if(this.stopped || this.reconnecting || !this.relay) return;
             if(Date.now() < this.retryAfter) return;
-            const since = Date.now() - this.relay.lastPacketAt;
-            if(this.relay.lastPacketAt === 0 || since < STALL_TIMEOUT_MS) return;
+            // A leg that has produced nothing yet is measured from when it came up,
+            // so a call the PBX answers but never sends media on
+            // - UDP blocked on the way back, or an SDP it did not honour -
+            // is caught as well.
+            // Waiting on `lastPacketAt` alone leaves that case at the previous leg's value,
+            // which every tick reads as a stream that is merely between packets.
+            const running = this.relay.lastPacketAt > this.legStartedAt;
+            const since = Date.now() - Math.max(this.relay.lastPacketAt, this.legStartedAt);
+            if(since < (running ? STALL_TIMEOUT_MS : FIRST_PACKET_TIMEOUT_MS)) return;
 
             this.reconnecting = true;
-            this.log.info("One Pass live view stalled for %ds, reconnecting.", Math.round(since / 1000));
+            this.log.info("One Pass live view %s for %ds, reconnecting.",
+                running ? "stalled" : "never started", Math.round(since / 1000));
             this.call?.hangUp();
             this.call = undefined;
             this.stopMedia();
             try {
-                await this.dial();
+                await this.redial();
                 this.retryAfter = 0;
             } catch(error) {
+                if(this.stopped) return;
                 // Back off so a busy line or a downed PBX is not hammered every stall tick.
                 this.retryAfter = Date.now() + RECONNECT_BACKOFF_MS;
                 this.log.warn("Could not reconnect the One Pass live view: %s", (error as Error)?.message);
@@ -422,12 +689,42 @@ export class OnePassMonitorSession {
         }, 2000);
     }
 
+    private async redial(): Promise<void> {
+        try {
+            await this.dial();
+        } catch(error) {
+            if(!(error instanceof OnePassSipAuthError) || this.stopped) {
+                throw error;
+            }
+            this.log.debug("The One Pass PBX rejected SIP credentials during reconnect; signing in again.");
+            const credentials = await this.refreshCredentials();
+            if(this.stopped) {
+                throw new Error("The One Pass live view was stopped while credentials were refreshing.");
+            }
+            this.credentials = credentials;
+            await this.dial();
+        }
+    }
+
     // Each HomeKit viewer gets its own loopback port; the relay fans every packet out.
+    // The lease activates only after ffmpeg has been spawned and given its SDP.
     addConsumer(port: number): void {
-        this.relay?.addDestination(port);
+        if(this.stopped || this.consumerTimers.has(port)) return;
+        const timer = setTimeout(() => {
+            this.consumerTimers.delete(port);
+            if(!this.stopped) {
+                this.relay?.addDestination(port);
+            }
+        }, CONSUMER_STARTUP_DELAY_MS);
+        this.consumerTimers.set(port, timer);
     }
 
     removeConsumer(port: number): void {
+        const timer = this.consumerTimers.get(port);
+        if(timer) {
+            clearTimeout(timer);
+            this.consumerTimers.delete(port);
+        }
         this.relay?.removeDestination(port);
     }
 
@@ -437,10 +734,25 @@ export class OnePassMonitorSession {
         this.stopMedia();
         if(this.stalledTimer) {
             clearInterval(this.stalledTimer);
+            this.stalledTimer = undefined;
         }
-        this.call?.hangUp();
+        for(const timer of this.consumerTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.consumerTimers.clear();
+        const calls = new Set<MonitorCall>();
+        if(this.openingCall) {
+            calls.add(this.openingCall);
+        }
+        if(this.call) {
+            calls.add(this.call);
+        }
+        for(const call of calls) {
+            call.hangUp();
+        }
+        this.openingCall = undefined;
         this.call = undefined;
-        for(const socket of [this.audio, this.video, this.relaySocket]) {
+        for(const socket of this.sockets()) {
             try {
                 socket.close();
             } catch {

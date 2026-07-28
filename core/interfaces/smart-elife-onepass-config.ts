@@ -17,6 +17,10 @@ export interface OnePassConfig {
     // Override the `*.uasis.com` host discovered from the complex list.
     host?: string
     port?: number
+    // SHA-256 fingerprint of the PBX's SIP certificate.
+    // The certificate is self-signed and shared by every CVNET PBX seen so far,
+    // so the built-in pin normally applies and this is left unset.
+    sipFingerprint?: string
     // Seconds to keep the call up after the last HomeKit viewer disconnects.
     lingerSeconds?: number
 }
