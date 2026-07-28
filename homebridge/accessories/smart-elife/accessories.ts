@@ -105,6 +105,9 @@ export default class Accessories<T extends AccessoryInterface> {
 
         const removals = [];
         for(const service of accessory.services) {
+            if(this.isMandatoryService(service)) {
+                continue;
+            }
             if(this.isSupportedService(service, accessory)) {
                 continue;
             }
@@ -120,6 +123,15 @@ export default class Accessories<T extends AccessoryInterface> {
 
     protected async identify(accessory: PlatformAccessory) {
         this.log.info("Identifying %s", accessory.displayName);
+    }
+
+    // Services HAP requires on every accessory, whatever a subclass considers supported.
+    // `AccessoryInformation` in particular is dereferenced unconditionally
+    // while the accessory cache is deserialized,
+    // so an accessory that lost it takes the whole bridge down on the *next* start -
+    // long after whatever removed it ran.
+    protected isMandatoryService(service: Service): boolean {
+        return service.UUID === this.api.hap.Service.AccessoryInformation.UUID;
     }
 
     protected isSupportedService(service: Service, _: PlatformAccessory): boolean {
