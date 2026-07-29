@@ -29,6 +29,7 @@ import readline from "readline";
 import {createSocket, Socket} from "dgram";
 import {setInterval} from "timers";
 import * as fs from "fs";
+import * as path from "path";
 import * as crypto from "crypto";
 import {CameraAccessoryInterfaceBase} from "./interfaces/camera";
 import {CameraConfig} from "./interfaces/config";
@@ -116,6 +117,16 @@ export interface LiveViewSource {
     onEnded(listener: () => void): void;
 }
 
+// The idle frames ship inside the package, next to `dist`.
+// They used to be fetched from the repository on every cold start,
+// which tied the placeholder to GitHub being reachable
+// and left no way to add a frame that is not on the default branch yet.
+const IDLE_IMAGE_DIRECTORY = path.join(__dirname, "..", "..", "assets");
+const IDLE_IMAGE_DEFAULT = "hksv_camera_idle.png";
+// Only a camera that has One Pass live view configured can fail to reach a door station,
+// so only that camera ever shows this one.
+const IDLE_IMAGE_LIVE_VIEW_UNAVAILABLE = "hksv_camera_live_view_unavailable.png";
+
 export interface LiveViewLease {
     media: {
         payloadType: string;
@@ -158,7 +169,10 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     readonly controller: CameraController;
 
     private snapshotPromise?: Promise<Buffer>;
-    private alternativeSnapshot?: Buffer;
+    private readonly alternativeSnapshots = new Map<string, Buffer>();
+    // Whether the last attempt to reach the door station over One Pass came back empty.
+    // Only ever set for a camera that has a live view to fail in the first place.
+    private liveViewUnavailable = false;
     private pendingSessions: Map<string, SessionInfo> = new Map();
     private ongoingSessions: Map<string, ActiveSession> = new Map();
     // Leases held between being acquired
@@ -239,14 +253,28 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     }
 
     private async createAlternativeSnapshot(): Promise<Buffer> {
-        if(!this.alternativeSnapshot) {
-            this.log.debug(`[${this.cameraName}] Creating alternative snapshot buffer`);
+        const filename = this.liveViewUnavailable
+            ? IDLE_IMAGE_LIVE_VIEW_UNAVAILABLE
+            : IDLE_IMAGE_DEFAULT;
+        const cached = this.alternativeSnapshots.get(filename);
+        if(cached) {
+            return cached;
+        }
+        this.log.debug(`[${this.cameraName}] Creating alternative snapshot buffer from ${filename}`);
+        let snapshot: Buffer;
+        try {
+            snapshot = await fs.promises.readFile(path.join(IDLE_IMAGE_DIRECTORY, filename));
+        } catch(error) {
+            // An install whose assets went missing still gets the published frame,
+            // which is what every install used before they shipped with the package.
+            this.log.debug(`[${this.cameraName}] Falling back to the published idle image: ${(error as Error)?.message || error}`);
             const response = await axios.get(Utils.HOMEKIT_SECURE_VIDEO_IDLE_URL, {
                 responseType: "arraybuffer"
             });
-            this.alternativeSnapshot = Buffer.from(response.data, "utf-8");
+            snapshot = Buffer.from(response.data);
         }
-        return this.alternativeSnapshot;
+        this.alternativeSnapshots.set(filename, snapshot);
+        return snapshot;
     }
 
     private determineResolution(request: SnapshotRequest | VideoInfo, isSnapshot: boolean): ResolutionInfo {
@@ -529,12 +557,15 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 }),
             ]);
             if(!lease) {
+                this.liveViewUnavailable = true;
                 this.log.warn(`[${this.cameraName}] Live view did not come up within ${LIVE_VIEW_ACQUIRE_TIMEOUT / 1000}s, falling back to snapshots.`);
                 return undefined;
             }
+            this.liveViewUnavailable = false;
             this.log.info(`[${this.cameraName}] Live view acquired.`);
             return lease;
         } catch(err) {
+            this.liveViewUnavailable = true;
             this.log.warn(`[${this.cameraName}] Live view unavailable, falling back to snapshots: ${(err as Error)?.message || err}`);
             return undefined;
         } finally {
