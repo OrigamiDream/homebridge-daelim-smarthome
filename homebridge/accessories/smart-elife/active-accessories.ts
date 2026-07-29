@@ -37,8 +37,21 @@ export default abstract class ActiveAccessories<T extends ActiveAccessoryInterfa
         return op;
     }
 
+    /**
+     * Whether the subclass drives `Active` itself. An accessory that gathers a whole
+     * gesture before it commands anything cannot let this class send a power command of
+     * its own halfway through, and two SET listeners on one characteristic both fire.
+     */
+    protected handlesActive(): boolean {
+        return false;
+    }
+
     configureAccessory(accessory: PlatformAccessory) {
         super.configureAccessory(accessory);
+
+        if(this.handlesActive()) {
+            return;
+        }
 
         this.getService(accessory, this.activeServiceType)
             .getCharacteristic(this.api.hap.Characteristic.Active)

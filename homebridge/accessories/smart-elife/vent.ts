@@ -26,6 +26,23 @@ enum Mode {
 const ROTATION_SPEED_STEP = 100 / 3.0;
 const VENT_OPERATION_TIMEOUT_MILLISECONDS = 3_000;
 
+/**
+ * How quiet the characteristic writes have to go before the gesture counts as finished.
+ *
+ * One gesture reaches the accessory as several writes. Turning a mode switch on also
+ * writes `TargetAirPurifierState`, because every mode but automatic reads as MANUAL
+ * there, and an automation that carries a speed adds a third. Acting on each as it
+ * arrives sends them in whatever order they land in, and the device resets `wind_speed`
+ * whenever the mode changes, so a speed that went out ahead of the mode is wiped by it.
+ * Gathering the writes first also settles their disagreements: MANUAL only says "not
+ * automatic", so it must not overrule the switch that named a mode.
+ *
+ * Two hundred milliseconds is what the light accessory measured against this WallPad,
+ * which answers a command in 115..217ms; it gathers a gesture without adding a delay
+ * worth noticing next to the round trip that follows.
+ */
+const COMMAND_WINDOW_MILLISECONDS = 200;
+
 // The device type as users know it. The server calls the device 환기, which is fine for
 // the accessory itself but too vague once the modes hang off it as separate tiles.
 const MODE_SWITCH_PREFIX = "전열교환기";
@@ -54,6 +71,23 @@ interface PendingVentConfirmation {
     complete: (confirmed: boolean) => void
 }
 
+/**
+ * The writes of one gesture, and the state it started from. What the device is asked for
+ * is decided once the writes stop, against the state at the start rather than against a
+ * state the gesture's own earlier commands have already moved.
+ */
+interface PendingGesture {
+    timer: NodeJS.Timeout
+    baseActive: boolean
+    baseMode: string
+    active?: boolean
+    /** A mode the user named, through a mode switch or by asking for automatic. */
+    namedMode?: string
+    /** `TargetAirPurifierState` went to MANUAL, which names no mode of its own. */
+    manualRequested?: boolean
+    rotationSpeed?: RotationSpeed
+}
+
 export default class VentAccessories extends ActiveAccessories<VentAccessoryInterface> {
     private readonly deviceOperationQueues = new Map<string, Promise<void>>();
     private readonly pendingConfirmations = new Map<string, PendingVentConfirmation>();
@@ -61,7 +95,16 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
     // restored from the accessory cache come back without their handlers, and the sync
     // runs on every device event, so both cases have to be told apart.
     private readonly configuredModeSwitches = new Map<string, Set<string>>();
+    private readonly gestures = new Map<string, PendingGesture>();
     private operationTimeoutMilliseconds = VENT_OPERATION_TIMEOUT_MILLISECONDS;
+    private commandWindowMilliseconds = COMMAND_WINDOW_MILLISECONDS;
+
+    protected handlesActive(): boolean {
+        // Power belongs to the gesture like everything else: a switch pressed while the
+        // vent is off carries the power-on with it, and the base class sending its own
+        // would put a command ahead of the mode.
+        return true;
+    }
 
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
         super(log, api, config, DeviceType.VENT,
@@ -213,38 +256,27 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         }
         configured.add(mode);
         service.getCharacteristic(this.api.hap.Characteristic.On)
-            .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
-                const device = this.findDevice(context.deviceId);
-                if(!device) {
-                    callback(new Error(`Unknown device: ${context.deviceId}`));
-                    return;
-                }
-                if(value) {
-                    const success = await this.selectMode(accessory, device, mode);
-                    if(!success) {
-                        callback(new Error("Failed to set the ventilation mode."));
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                this.recordGesture(accessory, (gesture) => {
+                    if(value) {
+                        // Naming a mode also starts the vent: the switch is meaningless
+                        // on a vent that is off, and the app starts it the same way.
+                        gesture.namedMode = mode;
+                        gesture.active = true;
                         return;
                     }
-                    callback(undefined);
-                    return;
-                }
-                if(!this.isModeSwitchOn(context, mode)) {
-                    // Clearing a switch that is already off changes nothing.
-                    this.applyAccessoryState(accessory);
-                    callback(undefined);
-                    return;
-                }
-                // There is no "no mode" state to fall back to, so clearing the active
-                // selection stops the vent. The mode itself is left alone and the device
-                // keeps reporting it, so switching the vent on resumes on it.
-                const success = await this.setDeviceState({
-                    ...device, op: { control: "off" },
+                    if(gesture.namedMode === mode) {
+                        // Cleared again inside the same gesture.
+                        gesture.namedMode = undefined;
+                        return;
+                    }
+                    // There is no "no mode" state to fall back to, so clearing the mode
+                    // the vent is running stops it. Clearing any other switch is already
+                    // true and asks for nothing.
+                    if(this.isModeSwitchOn(this.getAccessoryInterface(accessory), mode)) {
+                        gesture.active = false;
+                    }
                 });
-                if(!success) {
-                    callback(new Error("Failed to set the device state."));
-                    return;
-                }
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
@@ -256,34 +288,97 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         return context.active && context.mode === mode;
     }
 
+    // ---- gestures ------------------------------------------------------------
+
     /**
-     * Switches the vent to `mode`, starting it first when it is off. Selecting the mode
-     * it already runs in sends nothing: that guard is what keeps a mode command from
-     * being repeated, which is how #135 drove a vent into a beeping, wallpad-locked state.
+     * Records one characteristic write and restarts the quiet period. The gesture is
+     * carried out by `flushGesture()` once the writes stop.
      */
-    private async selectMode(accessory: PlatformAccessory, device: Device, mode: string): Promise<boolean> {
+    private recordGesture(accessory: PlatformAccessory, apply: (gesture: PendingGesture) => void) {
+        const context = this.getAccessoryInterface(accessory);
+        let gesture = this.gestures.get(context.deviceId);
+        if(!gesture) {
+            gesture = {
+                timer: undefined as unknown as NodeJS.Timeout,
+                baseActive: context.active,
+                baseMode: context.mode,
+            };
+            this.gestures.set(context.deviceId, gesture);
+        } else {
+            clearTimeout(gesture.timer);
+        }
+        apply(gesture);
+        gesture.timer = setTimeout(() => {
+            void this.flushGesture(accessory);
+        }, this.commandWindowMilliseconds);
+        gesture.timer.unref();
+    }
+
+    /**
+     * Turns the gathered writes into commands, in the order the device needs them:
+     * power first, because nothing else applies while it is off, then the mode, and the
+     * speed last because a mode change resets it.
+     */
+    private async flushGesture(accessory: PlatformAccessory) {
+        const context = this.getAccessoryInterface(accessory);
+        const gesture = this.gestures.get(context.deviceId);
+        if(!gesture) {
+            return;
+        }
+        clearTimeout(gesture.timer);
+        this.gestures.delete(context.deviceId);
+
+        const device = this.findDevice(context.deviceId);
+        if(!device) {
+            this.log.warn("Unknown device: %s", context.deviceId);
+            this.applyAccessoryState(accessory);
+            return;
+        }
+
+        // A named mode wins over MANUAL, which only says the vent is not on automatic
+        // and would otherwise undo the switch that was pressed in the same gesture.
+        const wantedMode = gesture.namedMode
+            || (gesture.manualRequested ? Mode.MANUAL : undefined);
+        const wantedActive = gesture.active !== undefined
+            ? gesture.active
+            : (gesture.baseActive || wantedMode !== undefined || gesture.rotationSpeed !== undefined);
+
         try {
-            return await this.enqueueDeviceOperation(device.deviceId, async () => {
-                let context = this.getAccessoryInterface(accessory);
-                if(!context.active) {
-                    this.log.debug(`Vent :: SET :: Automatically turned on Vent.`);
+            await this.enqueueDeviceOperation(device.deviceId, async () => {
+                if(!wantedActive) {
+                    if(this.getAccessoryInterface(accessory).active) {
+                        await this.sendDeviceStateAndWait({...device, op: {control: "off"}});
+                    }
+                    return true;
+                }
+                if(!this.getAccessoryInterface(accessory).active) {
                     const turnedOn = await this.sendDeviceStateAndWait({
                         ...device,
                         op: this.onSetActivityOp(true, {control: "on"}),
                     });
                     if(!turnedOn) return false;
-                    context = this.getAccessoryInterface(accessory);
                 }
-                if(context.mode === mode) return true;
-                return await this.sendDeviceStateAndWait({
-                    ...device,
-                    op: {mode: mode},
-                });
+                if(wantedMode && this.getAccessoryInterface(accessory).mode !== wantedMode) {
+                    const changed = await this.sendDeviceStateAndWait({...device, op: {mode: wantedMode}});
+                    if(!changed) return false;
+                }
+                const current = this.getAccessoryInterface(accessory);
+                if(gesture.rotationSpeed && gesture.rotationSpeed !== RotationSpeed.OFF
+                    && this.isFanSpeedControllableMode(current.mode)
+                    && current.rotationSpeed !== gesture.rotationSpeed) {
+                    await this.sendDeviceStateAndWait({
+                        ...device,
+                        op: {wind_speed: gesture.rotationSpeed.toString()},
+                    });
+                }
+                return true;
             });
         } catch(error: any) {
-            this.log.warn("Vent mode request failed: %s", error?.message || error);
-            return false;
+            this.log.warn("Vent control request failed: %s", error?.message || error);
         }
+        // Whatever the device settled on goes back onto the characteristics, which is
+        // also what restores a slider the user moved in a mode that has no speed.
+        this.applyAccessoryState(accessory);
     }
 
     // ---- state reflection ----------------------------------------------------
@@ -295,6 +390,9 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
      */
     private applyAccessoryState(accessory: PlatformAccessory) {
         const context = this.getAccessoryInterface(accessory);
+        if(this.gestures.has(context.deviceId)) {
+            return;
+        }
         const service = this.getService(accessory, this.api.hap.Service.AirPurifier);
         service.updateCharacteristic(this.api.hap.Characteristic.Active, context.active
             ? this.api.hap.Characteristic.Active.ACTIVE
@@ -449,32 +547,35 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 this.getAccessoryInterface(accessory).displayName);
         }
 
-        purifier.getCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState)
-            .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
-                // MANUAL carries no mode of its own - it only says "not automatic" - so
-                // it lands on plain ventilation. Picking bypass or cleaning is what the
-                // dedicated switches are for.
-                const requestedMode = value === this.api.hap.Characteristic.TargetAirPurifierState.AUTO
-                    ? Mode.AUTO_DRIVING
-                    : Mode.MANUAL;
-                if(requestedMode === context.mode) {
-                    callback(undefined);
-                    return;
-                }
-                const device = this.findDevice(context.deviceId);
-                if(!device) {
-                    callback(new Error(`Unknown device: ${context.deviceId}`));
-                    return;
-                }
-                const success = await this.setDeviceState({
-                    ...device,
-                    op: {mode: requestedMode},
+        purifier.getCharacteristic(this.api.hap.Characteristic.Active)
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                const active = value === this.api.hap.Characteristic.Active.ACTIVE;
+                this.recordGesture(accessory, (gesture) => {
+                    gesture.active = active;
                 });
-                if(!success) {
-                    callback(new Error("Failed to set the device state."));
-                    return;
-                }
+                callback(undefined);
+            })
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                callback(undefined, context.active
+                    ? this.api.hap.Characteristic.Active.ACTIVE
+                    : this.api.hap.Characteristic.Active.INACTIVE);
+            });
+        purifier.getCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState)
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                this.recordGesture(accessory, (gesture) => {
+                    if(value === this.api.hap.Characteristic.TargetAirPurifierState.AUTO) {
+                        gesture.namedMode = Mode.AUTO_DRIVING;
+                        gesture.manualRequested = false;
+                        return;
+                    }
+                    // MANUAL names no mode. It only rules automatic out, so it settles on
+                    // plain ventilation unless a switch in the same gesture named one.
+                    gesture.manualRequested = true;
+                    if(gesture.namedMode === Mode.AUTO_DRIVING) {
+                        gesture.namedMode = undefined;
+                    }
+                });
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
@@ -497,55 +598,25 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 maxValue: 100,
                 minStep: ROTATION_SPEED_STEP,
             })
-            .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const numeric = value as number;
-                const device = this.findDevice(context.deviceId);
-                if(!device) {
-                    callback(new Error(`Unknown device: ${context.deviceId}`));
-                    return;
-                }
-                const oldSpeed = context.rotationSpeed;
                 const newSpeed = this.homebridgeToRotationSpeed(numeric);
                 this.log.debug(`Vent :: SET :: RotationSpeed: ${numeric.toFixed(2)} (HomeKit) -> ${newSpeed.toString()}`);
-
-                // HomeKit represents off as 0%, while Smart e-Life exposes power as a
-                // separate control. Handle zero before auto-start so an off request can
-                // never turn an inactive vent back on or send the unsupported speed "off".
-                if(newSpeed === RotationSpeed.OFF) {
-                    if(!context.active) {
-                        callback(undefined);
+                this.recordGesture(accessory, (gesture) => {
+                    if(newSpeed === RotationSpeed.OFF) {
+                        // Zero is HomeKit's way of stopping a fan, not a speed. It stops
+                        // the vent even where a speed cannot be chosen, which is how the
+                        // slider behaves on the air conditioner too.
+                        gesture.active = false;
+                        gesture.rotationSpeed = undefined;
                         return;
                     }
-                    const turnedOff = await this.setDeviceState({
-                        ...device, op: { control: "off" },
-                    });
-                    if(!turnedOff) {
-                        callback(new Error("Failed to set the device state."));
-                        return;
+                    gesture.rotationSpeed = newSpeed;
+                    if(gesture.active === false) {
+                        // A drag that crossed zero on its way is not a request to stop.
+                        gesture.active = undefined;
                     }
-                    callback(undefined);
-                    return;
-                }
-
-                // Automatic driving and bypass run the fan themselves and report no
-                // speed at all. HomeKit cannot hide the slider, so the write is refused
-                // and the parked 100% is restored.
-                if(!this.isFanSpeedControllableMode(context.mode)) {
-                    callback(new Error("Fan speed is unavailable in the current ventilation mode."));
-                    return;
-                }
-
-                if(context.active && oldSpeed === newSpeed) {
-                    callback(undefined);
-                    return;
-                }
-
-                const speedSet = await this.setDeviceFanSpeed(accessory, newSpeed);
-                if(!speedSet) {
-                    callback(new Error("Failed to set the fan speed."));
-                    return;
-                }
+                });
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
@@ -561,43 +632,6 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             this.configureModeSwitch(accessory, service, service.subtype!, configured);
         }
         this.syncModeSwitches(accessory);
-    }
-
-    async setDeviceFanSpeed(accessory: PlatformAccessory, newSpeed: RotationSpeed) {
-        const initialContext = this.getAccessoryInterface(accessory);
-        if(!this.isFanSpeedControllableMode(initialContext.mode) || newSpeed === RotationSpeed.OFF) return false;
-
-        const device = this.findDevice(initialContext.deviceId);
-        if(!device) {
-            return false;
-        }
-        try {
-            return await this.enqueueDeviceOperation(device.deviceId, async () => {
-                let context = this.getAccessoryInterface(accessory);
-                if(!this.isFanSpeedControllableMode(context.mode)) return false;
-
-                if(!context.active) {
-                    this.log.debug(`Vent :: SET :: Automatically turned on Vent.`);
-                    const turnedOn = await this.sendDeviceStateAndWait({
-                        ...device,
-                        op: this.onSetActivityOp(true, {control: "on"}),
-                    });
-                    if(!turnedOn) return false;
-
-                    context = this.getAccessoryInterface(accessory);
-                    if(!context.active || !this.isFanSpeedControllableMode(context.mode)) return false;
-                }
-
-                if(context.rotationSpeed === newSpeed) return true;
-                return await this.sendDeviceStateAndWait({
-                    ...device,
-                    op: {wind_speed: newSpeed.toString()},
-                });
-            });
-        } catch(error: any) {
-            this.log.warn("Vent fan-speed request failed: %s", error?.message || error);
-            return false;
-        }
     }
 
     register() {
