@@ -640,6 +640,15 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 args.push("-f sdp");
                 args.push("-i pipe:");
             } else {
+                // A PNG pushed in frame by frame has nothing left to discover,
+                // yet the default probe spends close to five seconds establishing that.
+                // The viewer spends those seconds on whatever snapshot came before,
+                // which is the wrong one exactly when this frame is the one
+                // explaining why there is no video. The live view above keeps the
+                // default probe, since it does have to wait for the first keyframe
+                // to learn the size of what it is being given.
+                args.push("-analyzeduration 0");
+                args.push("-probesize 32");
                 args.push("-i pipe:");
             }
             args.push(this.cameraConfig.mapVideo ? `-map ${this.cameraConfig.mapVideo}` : "-an -sn -dn");
