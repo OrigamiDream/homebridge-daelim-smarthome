@@ -96,6 +96,27 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
     // runs on every device event, so both cases have to be told apart.
     private readonly configuredModeSwitches = new Map<string, Set<string>>();
     private readonly gestures = new Map<string, PendingGesture>();
+    /**
+     * Devices whose gathered gesture is being carried out right now.
+     *
+     * A gesture leaves as several commands, and the device reports the state after each
+     * one, so a run that ends at high is reported at low first and only then at high.
+     * Every one of those reports is true, and reflecting them as they arrive is what
+     * makes the slider visibly jump before it settles. Held back until the last command
+     * is answered, the accessory shows the result of the gesture rather than the route
+     * it took.
+     *
+     * This is deliberately not the light accessory's echo window. That one distrusts
+     * reports for a fixed two seconds because a thirty-second poll can return a page
+     * older than the command and leave a wrong state standing until the next poll. The
+     * vent has no such gap to cover: it pushes a report about every second, so a stale
+     * one is corrected almost at once, and each command here is confirmed against a
+     * device event before the next is sent. What is held back is only what arrives while
+     * this accessory's own commands are in flight, and only until they finish, so a
+     * change made at the WallPad during that second is applied as soon as they do rather
+     * than being discarded the way a fixed window would discard it.
+     */
+    private readonly runningGestures = new Set<string>();
     private operationTimeoutMilliseconds = VENT_OPERATION_TIMEOUT_MILLISECONDS;
     private commandWindowMilliseconds = COMMAND_WINDOW_MILLISECONDS;
 
@@ -327,10 +348,15 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         }
         clearTimeout(gesture.timer);
         this.gestures.delete(context.deviceId);
+        // Reflection stays off from the first write of the gesture right through to the
+        // last command it produces. Dropping it here, between the two, would let the
+        // states the device passes through on the way reach the characteristics.
+        this.runningGestures.add(context.deviceId);
 
         const device = this.findDevice(context.deviceId);
         if(!device) {
             this.log.warn("Unknown device: %s", context.deviceId);
+            this.runningGestures.delete(context.deviceId);
             this.applyAccessoryState(accessory);
             return;
         }
@@ -375,6 +401,10 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             });
         } catch(error: any) {
             this.log.warn("Vent control request failed: %s", error?.message || error);
+        } finally {
+            // Released before the state is put back, and in a `finally` so a command
+            // that threw cannot leave the accessory frozen on a state it has left.
+            this.runningGestures.delete(context.deviceId);
         }
         // Whatever the device settled on goes back onto the characteristics, which is
         // also what restores a slider the user moved in a mode that has no speed.
@@ -390,7 +420,11 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
      */
     private applyAccessoryState(accessory: PlatformAccessory) {
         const context = this.getAccessoryInterface(accessory);
-        if(this.gestures.has(context.deviceId)) {
+        // While a gesture is being gathered or carried out, the context still follows
+        // the device - only the characteristics wait. The report that arrives about
+        // every second would otherwise pull the slider out from under a finger, and the
+        // states passed through mid-gesture would show as a flicker before the result.
+        if(this.gestures.has(context.deviceId) || this.runningGestures.has(context.deviceId)) {
             return;
         }
         const service = this.getService(accessory, this.api.hap.Service.AirPurifier);
