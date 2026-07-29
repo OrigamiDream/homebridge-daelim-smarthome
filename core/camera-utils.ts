@@ -123,9 +123,9 @@ export interface LiveViewSource {
 // and left no way to add a frame that is not on the default branch yet.
 const IDLE_IMAGE_DIRECTORY = path.join(__dirname, "..", "..", "assets");
 const IDLE_IMAGE_DEFAULT = "hksv_camera_idle.png";
-// Only a camera that has One Pass live view configured can fail to reach a door station,
-// so only that camera ever shows this one.
-const IDLE_IMAGE_LIVE_VIEW_UNAVAILABLE = "hksv_camera_live_view_unavailable.png";
+// Only a camera with a live view has a door station that can fail to answer,
+// which `liveViewUnavailable` already encodes: it is set nowhere else.
+const IDLE_IMAGE_DOORBELL_UNAVAILABLE = "hksv_camera_doorbell_unavailable.png";
 
 export interface LiveViewLease {
     media: {
@@ -253,8 +253,10 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     }
 
     private async createAlternativeSnapshot(): Promise<Buffer> {
+        // A door station that did not answer is the only thing worth adding to the
+        // absence of a visitor image, and only a camera with a live view can say it.
         const filename = this.liveViewUnavailable
-            ? IDLE_IMAGE_LIVE_VIEW_UNAVAILABLE
+            ? IDLE_IMAGE_DOORBELL_UNAVAILABLE
             : IDLE_IMAGE_DEFAULT;
         const cached = this.alternativeSnapshots.get(filename);
         if(cached) {
@@ -533,6 +535,9 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
         if(!this.liveView?.enabled) {
             return undefined;
         }
+        // A fresh attempt is a call being placed again,
+        // so the placeholder goes back to saying so until this one settles.
+        this.liveViewUnavailable = false;
         let abandoned = false;
         let timer: NodeJS.Timeout | undefined;
         const pending = this.liveView.acquire();
@@ -840,6 +845,11 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
         // so dropping it here is the only signal `startStream()` gets
         // that the viewer went away while it was waiting on the live view.
         this.pendingSessions.delete(sessionId);
+        // A refusal describes the call that has just ended, not the next one.
+        // Carrying it over would greet the following viewer with a door station
+        // reported unreachable before anything had been asked of it, because
+        // the Home app fetches a snapshot before it ever requests a stream.
+        this.liveViewUnavailable = false;
         const unowned = this.unownedLeases.get(sessionId);
         if(unowned) {
             this.unownedLeases.delete(sessionId);
