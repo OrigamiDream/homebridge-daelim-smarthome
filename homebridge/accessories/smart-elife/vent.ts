@@ -1,13 +1,14 @@
-import {DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
+import {Device, DeviceType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {
     API,
     CharacteristicEventTypes,
     CharacteristicGetCallback, CharacteristicSetCallback, CharacteristicValue,
     Logging,
-    PlatformAccessory
+    PlatformAccessory, Service
 } from "homebridge";
 import {DeviceWithOp} from "./accessories";
 import ActiveAccessories, {ActiveAccessoryInterface} from "./active-accessories";
+import {VentMode} from "../../../core/smart-elife/parsers/vent-mode-parsers";
 
 enum RotationSpeed {
     OFF = "off",
@@ -25,8 +26,26 @@ enum Mode {
 const ROTATION_SPEED_STEP = 100 / 3.0;
 const VENT_OPERATION_TIMEOUT_MILLISECONDS = 3_000;
 
+// The device type as users know it. The server calls the device 환기, which is fine for
+// the accessory itself but too vague once the modes hang off it as separate tiles.
+const MODE_SWITCH_PREFIX = "전열교환기";
+// The plain ventilation mode is labelled 환기 by the server, which reads as the device
+// rather than as one mode among several once it sits next to 공기청정 and 바이패스.
+const PLAIN_VENTILATION_LABEL = "환기";
+const PLAIN_VENTILATION_DISPLAY_LABEL = "일반환기";
+// The label the server uses for automatic driving. `TargetAirPurifierState` already
+// represents that mode, so it never becomes a switch, and matching the label as well as
+// the value keeps a household that renamed it from growing a duplicate control.
+const AUTO_DRIVING_LABEL = "자동";
+
 interface VentAccessoryInterface extends ActiveAccessoryInterface {
     rotationSpeed: RotationSpeed
+    /**
+     * Speed to return to once a mode that supports one is selected again. Automatic
+     * driving and bypass report no `wind_speed` at all, so without this the selection
+     * is lost every time the vent passes through them.
+     */
+    lastRotationSpeed?: RotationSpeed
     mode: string
 }
 
@@ -38,10 +57,16 @@ interface PendingVentConfirmation {
 export default class VentAccessories extends ActiveAccessories<VentAccessoryInterface> {
     private readonly deviceOperationQueues = new Map<string, Promise<void>>();
     private readonly pendingConfirmations = new Map<string, PendingVentConfirmation>();
+    // Mode switches whose SET/GET handlers are already attached, per device. Services
+    // restored from the accessory cache come back without their handlers, and the sync
+    // runs on every device event, so both cases have to be told apart.
+    private readonly configuredModeSwitches = new Map<string, Set<string>>();
     private operationTimeoutMilliseconds = VENT_OPERATION_TIMEOUT_MILLISECONDS;
 
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
-        super(log, api, config, DeviceType.VENT, [api.hap.Service.AirPurifier, api.hap.Service.AirQualitySensor], api.hap.Service.AirPurifier);
+        super(log, api, config, DeviceType.VENT,
+            [api.hap.Service.AirPurifier, api.hap.Service.AirQualitySensor, api.hap.Service.Switch],
+            api.hap.Service.AirPurifier);
     }
 
     private homebridgeToRotationSpeed(value: number): RotationSpeed {
@@ -53,28 +78,35 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
 
     private rotationSpeedToHomebridge(rotationSpeed: RotationSpeed): number {
         switch (rotationSpeed) {
-            case RotationSpeed.OFF: return 0;
             case RotationSpeed.LOW: return ROTATION_SPEED_STEP;
             case RotationSpeed.MIDDLE: return ROTATION_SPEED_STEP * 2;
             case RotationSpeed.HIGH: return 100;
-            // HomeKit has no unknown-speed value; expose no manual speed until the next
-            // valid device update instead of pushing undefined into the characteristic.
             default: return 0;
         }
     }
 
-    private isHomeKitAutomaticMode(mode: string | undefined): boolean {
-        return !!mode && mode !== Mode.MANUAL;
+    /**
+     * What the slider reads. A mode without wind control parks it at full rather than at
+     * zero: the vent is running, it is only the choice of speed that is unavailable, and
+     * a zero would read as stopped. This matches how the air conditioner presents
+     * wallpad-managed wind since #179.
+     */
+    private homebridgeRotationSpeed(context: VentAccessoryInterface): number {
+        if(!context.active) return 0;
+        if(!this.isFanSpeedControllableMode(context.mode)) return 100;
+        return this.rotationSpeedToHomebridge(context.rotationSpeed);
     }
 
-    private isHomeKitControllableMode(mode: string | undefined): boolean {
-        return mode === Mode.MANUAL || mode === Mode.AUTO_DRIVING;
+    private isHomeKitAutomaticMode(mode: string | undefined): boolean {
+        // An allowlist: every other mode is a deliberate selection the user made, and
+        // reporting those as AUTO is what hid bypass and cleaning from HomeKit before.
+        return mode === Mode.AUTO_DRIVING;
     }
 
     private isFanSpeedControllableMode(mode: string | undefined): boolean {
-        // The native UI disables wind speed only for automatic driving and bypass.
-        // Cleaning, base ventilation, and future externally selected modes retain
-        // their independent low/middle/high control when wind_speed is available.
+        // The native UI disables wind speed for automatic driving and bypass, and those
+        // are also the two modes the device reports with no `wind_speed` field at all.
+        // Modes we have not seen keep their low/middle/high control.
         return !!mode && mode !== Mode.AUTO_DRIVING && mode !== Mode.BYPASS;
     }
 
@@ -97,7 +129,171 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         }
     }
 
-    private updateActivityCharacteristics(accessory: PlatformAccessory) {
+    // ---- mode switches -------------------------------------------------------
+
+    /** The modes that become switches: everything the vent supports except automatic. */
+    private switchableModes(deviceId: string): VentMode[] | undefined {
+        // `_client` rather than `client`, which throws before the provider has served.
+        const modes = this._client?.getVentModes(deviceId);
+        if(!modes) {
+            return undefined;
+        }
+        return modes.filter((mode) => !this.isAutoDrivingMode(mode));
+    }
+
+    private modeSwitchHandlerRegistry(deviceId: string): Set<string> {
+        let configured = this.configuredModeSwitches.get(deviceId);
+        if(!configured) {
+            configured = new Set<string>();
+            this.configuredModeSwitches.set(deviceId, configured);
+        }
+        return configured;
+    }
+
+    /** Every mode switch the accessory carries, whatever the device reports today. */
+    private modeSwitchServices(accessory: PlatformAccessory): Service[] {
+        return accessory.services.filter((service) =>
+            service.UUID === this.api.hap.Service.Switch.UUID && !!service.subtype);
+    }
+
+    private isAutoDrivingMode(mode: VentMode): boolean {
+        return mode.value === Mode.AUTO_DRIVING || mode.label === AUTO_DRIVING_LABEL;
+    }
+
+    private modeSwitchName(mode: VentMode): string {
+        const label = mode.label === PLAIN_VENTILATION_LABEL
+            ? PLAIN_VENTILATION_DISPLAY_LABEL
+            : (mode.label || mode.value);
+        return `${MODE_SWITCH_PREFIX} ${label} 모드`;
+    }
+
+    /**
+     * Brings the mode switches in line with what the vent supports, attaching handlers
+     * to services that were just created or restored from the accessory cache. Does
+     * nothing at all while the supported modes are unknown: an unreadable control page
+     * must not be mistaken for a vent that lost its modes.
+     */
+    private syncModeSwitches(accessory: PlatformAccessory) {
+        const context = this.getAccessoryInterface(accessory);
+        const modes = this.switchableModes(context.deviceId);
+        if(!modes) {
+            return;
+        }
+        const configured = this.modeSwitchHandlerRegistry(context.deviceId);
+        for(const mode of modes) {
+            const service = accessory.getServiceById(this.api.hap.Service.Switch, mode.value)
+                || accessory.addService(this.api.hap.Service.Switch, this.modeSwitchName(mode), mode.value);
+            // The Home app labels a service by `ConfiguredName` and falls back to the
+            // accessory name for every one of them without it. It is only ever written
+            // once: the characteristic is writable, so a later write would undo a rename
+            // the user made in the Home app.
+            if(!service.testCharacteristic(this.api.hap.Characteristic.ConfiguredName)) {
+                service.addOptionalCharacteristic(this.api.hap.Characteristic.ConfiguredName);
+                service.setCharacteristic(this.api.hap.Characteristic.ConfiguredName, this.modeSwitchName(mode));
+            }
+            this.configureModeSwitch(accessory, service, mode.value, configured);
+        }
+
+        // Drop switches for modes this vent no longer offers. Only reachable once the
+        // modes were read successfully, so a failed read never removes anything.
+        const supported = new Set(modes.map((mode) => mode.value));
+        const stale = this.modeSwitchServices(accessory)
+            .filter((service) => !supported.has(service.subtype!));
+        for(const service of stale) {
+            this.log.info("Removing the mode switch %s from %s: the device no longer offers it.",
+                service.subtype, context.displayName);
+            configured.delete(service.subtype!);
+            accessory.removeService(service);
+        }
+    }
+
+    private configureModeSwitch(accessory: PlatformAccessory, service: Service, mode: string, configured: Set<string>) {
+        if(configured.has(mode)) {
+            return;
+        }
+        configured.add(mode);
+        service.getCharacteristic(this.api.hap.Characteristic.On)
+            .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                const context = this.getAccessoryInterface(accessory);
+                const device = this.findDevice(context.deviceId);
+                if(!device) {
+                    callback(new Error(`Unknown device: ${context.deviceId}`));
+                    return;
+                }
+                if(value) {
+                    const success = await this.selectMode(accessory, device, mode);
+                    if(!success) {
+                        callback(new Error("Failed to set the ventilation mode."));
+                        return;
+                    }
+                    callback(undefined);
+                    return;
+                }
+                if(!this.isModeSwitchOn(context, mode)) {
+                    // Clearing a switch that is already off changes nothing.
+                    this.applyAccessoryState(accessory);
+                    callback(undefined);
+                    return;
+                }
+                // There is no "no mode" state to fall back to, so clearing the active
+                // selection stops the vent. The mode itself is left alone and the device
+                // keeps reporting it, so switching the vent on resumes on it.
+                const success = await this.setDeviceState({
+                    ...device, op: { control: "off" },
+                });
+                if(!success) {
+                    callback(new Error("Failed to set the device state."));
+                    return;
+                }
+                callback(undefined);
+            })
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                callback(undefined, this.isModeSwitchOn(this.getAccessoryInterface(accessory), mode));
+            });
+    }
+
+    private isModeSwitchOn(context: VentAccessoryInterface, mode: string): boolean {
+        return context.active && context.mode === mode;
+    }
+
+    /**
+     * Switches the vent to `mode`, starting it first when it is off. Selecting the mode
+     * it already runs in sends nothing: that guard is what keeps a mode command from
+     * being repeated, which is how #135 drove a vent into a beeping, wallpad-locked state.
+     */
+    private async selectMode(accessory: PlatformAccessory, device: Device, mode: string): Promise<boolean> {
+        try {
+            return await this.enqueueDeviceOperation(device.deviceId, async () => {
+                let context = this.getAccessoryInterface(accessory);
+                if(!context.active) {
+                    this.log.debug(`Vent :: SET :: Automatically turned on Vent.`);
+                    const turnedOn = await this.sendDeviceStateAndWait({
+                        ...device,
+                        op: this.onSetActivityOp(true, {control: "on"}),
+                    });
+                    if(!turnedOn) return false;
+                    context = this.getAccessoryInterface(accessory);
+                }
+                if(context.mode === mode) return true;
+                return await this.sendDeviceStateAndWait({
+                    ...device,
+                    op: {mode: mode},
+                });
+            });
+        } catch(error: any) {
+            this.log.warn("Vent mode request failed: %s", error?.message || error);
+            return false;
+        }
+    }
+
+    // ---- state reflection ----------------------------------------------------
+
+    /**
+     * The single place where device state reaches HomeKit. Every characteristic is
+     * written with `updateCharacteristic`, which does not run the SET handlers, so
+     * reflecting a state can never bounce a command back at the wallpad.
+     */
+    private applyAccessoryState(accessory: PlatformAccessory) {
         const context = this.getAccessoryInterface(accessory);
         const service = this.getService(accessory, this.api.hap.Service.AirPurifier);
         service.updateCharacteristic(this.api.hap.Characteristic.Active, context.active
@@ -106,6 +302,17 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         service.updateCharacteristic(this.api.hap.Characteristic.CurrentAirPurifierState, context.active
             ? this.api.hap.Characteristic.CurrentAirPurifierState.PURIFYING_AIR
             : this.api.hap.Characteristic.CurrentAirPurifierState.INACTIVE);
+        service.updateCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState,
+            this.isHomeKitAutomaticMode(context.mode)
+                ? this.api.hap.Characteristic.TargetAirPurifierState.AUTO
+                : this.api.hap.Characteristic.TargetAirPurifierState.MANUAL);
+        service.updateCharacteristic(this.api.hap.Characteristic.RotationSpeed,
+            this.homebridgeRotationSpeed(context));
+
+        for(const modeSwitch of this.modeSwitchServices(accessory)) {
+            modeSwitch.updateCharacteristic(this.api.hap.Characteristic.On,
+                this.isModeSwitchOn(context, modeSwitch.subtype!));
+        }
     }
 
     private operationMatchesContext(deviceId: string, operation: Record<string, any>): boolean {
@@ -231,30 +438,28 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
     configureAccessory(accessory: PlatformAccessory) {
         super.configureAccessory(accessory);
 
-        this.getService(accessory, this.api.hap.Service.AirPurifier)
-            .getCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState)
+        const purifier = this.getService(accessory, this.api.hap.Service.AirPurifier);
+        // Makes the vent itself the accessory's main control, so the mode switches read
+        // as belonging to it when the Home app groups them into one tile. They are
+        // deliberately not linked services: linking costs them their names.
+        purifier.setPrimaryService(true);
+        if(!purifier.testCharacteristic(this.api.hap.Characteristic.ConfiguredName)) {
+            purifier.addOptionalCharacteristic(this.api.hap.Characteristic.ConfiguredName);
+            purifier.setCharacteristic(this.api.hap.Characteristic.ConfiguredName,
+                this.getAccessoryInterface(accessory).displayName);
+        }
+
+        purifier.getCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                if(!context.active) {
-                    // Smart e-Life disables mode controls while the vent is off. Unlike a
-                    // nonzero RotationSpeed, TargetAirPurifierState has a separate HomeKit
-                    // Active control, so reject rather than claiming an unapplied mode.
-                    callback(new Error("Ventilation mode is unavailable while the vent is inactive."));
-                    return;
-                }
-                const requestedMode = value === this.api.hap.Characteristic.TargetAirPurifierState.MANUAL
-                    ? Mode.MANUAL
-                    : Mode.AUTO_DRIVING;
-                if(requestedMode === context.mode
-                    || (requestedMode === Mode.AUTO_DRIVING && this.isHomeKitAutomaticMode(context.mode))) {
+                // MANUAL carries no mode of its own - it only says "not automatic" - so
+                // it lands on plain ventilation. Picking bypass or cleaning is what the
+                // dedicated switches are for.
+                const requestedMode = value === this.api.hap.Characteristic.TargetAirPurifierState.AUTO
+                    ? Mode.AUTO_DRIVING
+                    : Mode.MANUAL;
+                if(requestedMode === context.mode) {
                     callback(undefined);
-                    return;
-                }
-                if(!this.isHomeKitControllableMode(context.mode)) {
-                    // HomeKit cannot name bypass, cleaning, base ventilation, or future
-                    // app-controlled modes. Preserve those modes instead of replacing them
-                    // with a superficially equivalent MANUAL/AUTO value.
-                    callback(new Error("Ventilation mode is controlled externally by Smart e-Life."));
                     return;
                 }
                 const device = this.findDevice(context.deviceId);
@@ -274,20 +479,18 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
-                callback(undefined, context.mode === Mode.MANUAL
-                    ? this.api.hap.Characteristic.TargetAirPurifierState.MANUAL
-                    : this.api.hap.Characteristic.TargetAirPurifierState.AUTO);
+                callback(undefined, this.isHomeKitAutomaticMode(context.mode)
+                    ? this.api.hap.Characteristic.TargetAirPurifierState.AUTO
+                    : this.api.hap.Characteristic.TargetAirPurifierState.MANUAL);
             });
-        this.getService(accessory, this.api.hap.Service.AirPurifier)
-            .getCharacteristic(this.api.hap.Characteristic.CurrentAirPurifierState)
+        purifier.getCharacteristic(this.api.hap.Characteristic.CurrentAirPurifierState)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
                 callback(undefined, context.active
                     ? this.api.hap.Characteristic.CurrentAirPurifierState.PURIFYING_AIR
                     : this.api.hap.Characteristic.CurrentAirPurifierState.INACTIVE);
             });
-        this.getService(accessory, this.api.hap.Service.AirPurifier)
-            .getCharacteristic(this.api.hap.Characteristic.RotationSpeed)
+        purifier.getCharacteristic(this.api.hap.Characteristic.RotationSpeed)
             .setProps({
                 format: this.api.hap.Formats.FLOAT,
                 minValue: 0,
@@ -311,7 +514,6 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 // never turn an inactive vent back on or send the unsupported speed "off".
                 if(newSpeed === RotationSpeed.OFF) {
                     if(!context.active) {
-                        context.rotationSpeed = RotationSpeed.OFF;
                         callback(undefined);
                         return;
                     }
@@ -326,9 +528,9 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                     return;
                 }
 
-                // The native UI disables wind-speed controls in auto and bypass modes.
-                // HomeKit cannot dynamically hide RotationSpeed, so reject writes in
-                // exactly those modes without changing the external selection.
+                // Automatic driving and bypass run the fan themselves and report no
+                // speed at all. HomeKit cannot hide the slider, so the write is refused
+                // and the parked 100% is restored.
                 if(!this.isFanSpeedControllableMode(context.mode)) {
                     callback(new Error("Fan speed is unavailable in the current ventilation mode."));
                     return;
@@ -347,9 +549,18 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 callback(undefined);
             })
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                const context = this.getAccessoryInterface(accessory);
-                callback(undefined, this.rotationSpeedToHomebridge(context.rotationSpeed));
+                callback(undefined, this.homebridgeRotationSpeed(this.getAccessoryInterface(accessory)));
             });
+
+        // Switches restored from the accessory cache are live in HomeKit from the moment
+        // the bridge publishes, which is before the supported modes have been read. Their
+        // subtype is the mode, so they can be wired up without that list and never sit
+        // there accepting writes that go nowhere.
+        const configured = this.modeSwitchHandlerRegistry(this.getAccessoryInterface(accessory).deviceId);
+        for(const service of this.modeSwitchServices(accessory)) {
+            this.configureModeSwitch(accessory, service, service.subtype!, configured);
+        }
+        this.syncModeSwitches(accessory);
     }
 
     async setDeviceFanSpeed(accessory: PlatformAccessory, newSpeed: RotationSpeed) {
@@ -404,8 +615,16 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                         ? false
                         : cachedContext?.active || false;
                 const mode = this.deviceMode(device.op["mode"], cachedContext?.mode);
+                const reported = this.deviceRotationSpeed(device.op["wind_speed"]);
+                // Modes without wind control omit the field entirely, so the last speed
+                // the device did report is what a mode that has one returns to.
+                const lastRotationSpeed = reported !== RotationSpeed.OFF
+                    ? reported
+                    : cachedContext?.lastRotationSpeed;
                 const rotationSpeed = active && this.isFanSpeedControllableMode(mode)
-                    ? this.deviceRotationSpeed(device.op["wind_speed"] || cachedContext?.rotationSpeed)
+                    ? (reported !== RotationSpeed.OFF
+                        ? reported
+                        : (lastRotationSpeed || RotationSpeed.OFF))
                     : RotationSpeed.OFF;
                 const accessory = this.addOrGetAccessory({
                     deviceId: device.deviceId,
@@ -414,6 +633,7 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                     init: true,
                     active,
                     rotationSpeed,
+                    lastRotationSpeed,
                     mode,
                 });
                 if(!accessory) {
@@ -421,14 +641,8 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                     continue;
                 }
 
-                const context = this.getAccessoryInterface(accessory);
-                const service = accessory.getService(this.api.hap.Service.AirPurifier);
-                this.updateActivityCharacteristics(accessory);
-                service?.updateCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState,
-                    context.mode === Mode.MANUAL
-                        ? this.api.hap.Characteristic.TargetAirPurifierState.MANUAL
-                        : this.api.hap.Characteristic.TargetAirPurifierState.AUTO);
-                service?.updateCharacteristic(this.api.hap.Characteristic.RotationSpeed, this.rotationSpeedToHomebridge(rotationSpeed));
+                this.syncModeSwitches(accessory);
+                this.applyAccessoryState(accessory);
                 this.confirmDeviceOperation(device);
             }
         });
