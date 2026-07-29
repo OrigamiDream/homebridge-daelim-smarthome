@@ -19,6 +19,7 @@ import WebSocketScheduler from "./ws-scheduler";
 import {parseWebSocketCredentials, WebSocketCredentials} from "./parsers/ws-creds-parsers";
 import {parseDeviceList} from "./parsers/device-parsers";
 import {HTMLCandidate, parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0} from "./parsers/version-parsers";
+import {parseVentModes, VentMode} from "./parsers/vent-mode-parsers";
 import {EXTERIOR_ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
 import {createElevatorStatusRequest} from "./elevator-protocol";
 import {setInterval} from "timers";
@@ -897,6 +898,10 @@ export default class SmartELifeClient {
 
         this.log.info(`Installed WallPad version is on CVNET ${this.config.wallpadVersion}.`);
 
+        // Ahead of any device state, so vent accessories are registered with their mode
+        // switches already in place instead of growing them seconds later.
+        await this.refreshVentModes();
+
         if(this.ws) {
             await this.ws.serve();
             await this.refreshDeviceStatus();
@@ -906,6 +911,55 @@ export default class SmartELifeClient {
             this.log.info("Polling device state");
             await this.refreshDeviceStatus(true);
         }, POLLING_INTERVAL_MILLISECONDS);
+    }
+
+    /**
+     * Supported operation modes per vent, keyed by device id. A device missing from the
+     * map is one whose modes could not be read; an empty array is a device that reports
+     * none. The two are not the same - callers must not offer mode controls for either,
+     * but only the latter is a statement about the device.
+     */
+    private readonly ventModes = new Map<string, VentMode[]>();
+
+    getVentModes(deviceId: string): VentMode[] | undefined {
+        return this.ventModes.get(deviceId);
+    }
+
+    /**
+     * Reads the mode buttons the control page renders for each configured vent. The
+     * page only names them when the request identifies the device, so this runs once
+     * per device rather than being scraped out of the shared `/main/home.do` payload.
+     */
+    private async refreshVentModes() {
+        const vents = (this.config.devices || [])
+            .filter((device) => device.deviceType === DeviceType.VENT && !device.disabled);
+        for(const vent of vents) {
+            let modes: VentMode[] | null = null;
+            try {
+                const html = await this.fetchWithJSessionId(`${this.baseUrl}/controls/vent.do`, {
+                    method: "POST",
+                    headers: {
+                        ...await this.createDocumentHeaters(),
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    body: `uid=${encodeURIComponent(vent.deviceId)}&device_type=${DeviceType.VENT.toString()}`,
+                }).then((response) => response.text());
+                modes = parseVentModes(html);
+            } catch(error: any) {
+                this.log.warn("Could not read the operation modes of %s: %s",
+                    vent.displayName, error?.message || error);
+            }
+            if(!modes) {
+                // Left out of the map on purpose: an unreadable page must not be taken
+                // for a vent without modes, and the accessory falls back to hiding the
+                // mode controls entirely.
+                this.log.warn("The operation modes of %s could not be determined.", vent.displayName);
+                continue;
+            }
+            this.ventModes.set(vent.deviceId, modes);
+            this.log.info("%s supports %d operation mode(s): %s", vent.displayName, modes.length,
+                modes.map((mode) => `${mode.label}(${mode.value})`).join(", ") || "none");
+        }
     }
 
     private async createDocumentHeaters(): Promise<Record<string, string>> {
