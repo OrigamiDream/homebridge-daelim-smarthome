@@ -343,17 +343,7 @@ class MonitorCall {
             // are carried in different headers in both directions,
             // and a PBX that asks with one ignores credentials sent in the other.
             const proxy = response.statusCode === 407;
-            this.toTag = parseTag(response.headers["to"]);
-            // A non-2xx ACK stays in the INVITE transaction: same branch, same request URI.
-            this.send(buildRequest(`ACK ${this.target} SIP/2.0`, [
-                `Via: SIP/2.0/TLS ${this.localAddress};rport;branch=${branch}`,
-                this.fromHeader,
-                this.toHeader(true),
-                `Call-ID: ${this.callId}`,
-                `CSeq: ${this.cseq} ACK`,
-                `Contact: <sip:${this.credentials.sipId}@${this.localAddress}>`,
-                "Max-Forwards: 70",
-            ]));
+            this.sendNonSuccessAck(branch, response);
 
             const challenge = parseChallenge(
                 response.headers[proxy ? "proxy-authenticate" : "www-authenticate"]);
@@ -369,6 +359,14 @@ class MonitorCall {
             this.send(this.buildInvite(branch, offer,
                 `${proxy ? "Proxy-Authorization" : "Authorization"}: ${credentials}`));
             response = await this.waitForFinal();
+        }
+
+        // RFC 3261 17.1.1.2: a final response of 300 or above belongs to the INVITE
+        // client transaction, which has to acknowledge it before it can terminate.
+        // This covers a second challenge, a refusal and a wallpad that never picked up alike.
+        // Skipping it leaves the PBX retransmitting that response until its own timer gives up.
+        if((response.statusCode || 0) >= 300) {
+            this.sendNonSuccessAck(branch, response);
         }
 
         // Still challenged after answering, or refused outright:
@@ -415,6 +413,22 @@ class MonitorCall {
             .catch(() => {
                 // Expected: the timeout simply means the PBX stopped retransmitting.
             });
+    }
+
+    // A non-2xx ACK stays inside the INVITE transaction it answers:
+    // the branch, the request URI and the CSeq number are the ones the INVITE carried,
+    // and the To tag comes from the response being acknowledged.
+    private sendNonSuccessAck(branch: string, response: SipMessage): void {
+        this.toTag = parseTag(response.headers["to"]);
+        this.send(buildRequest(`ACK ${this.target} SIP/2.0`, [
+            `Via: SIP/2.0/TLS ${this.localAddress};rport;branch=${branch}`,
+            this.fromHeader,
+            this.toHeader(true),
+            `Call-ID: ${this.callId}`,
+            `CSeq: ${this.cseq} ACK`,
+            `Contact: <sip:${this.credentials.sipId}@${this.localAddress}>`,
+            "Max-Forwards: 70",
+        ]));
     }
 
     private sendAck(): void {
