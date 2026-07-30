@@ -71,6 +71,14 @@ interface VentAccessoryInterface extends ActiveAccessoryInterface {
      * exist there - see `resolveWantedMode()`.
      */
     modeReported: boolean
+    /**
+     * Whether the latest report carried a `wind_speed` at all, which is the device's own
+     * account of whether the mode it is in has a speed to choose. Deliberately not sticky:
+     * `isFanSpeedControllableMode()` is a denylist and cannot know about a mode this plugin
+     * has never seen, so a mode that turns out to have no speed is recognised by the field
+     * being absent rather than by being on the list.
+     */
+    speedReported: boolean
 }
 
 interface PendingVentConfirmation {
@@ -94,6 +102,10 @@ interface PendingGesture {
     timer: NodeJS.Timeout
     baseActive: boolean
     baseMode: string
+    /** The speed the vent was running at when the gesture began. */
+    baseSpeed: RotationSpeed
+    /** Whether the device had reported a speed for the mode the gesture began in. */
+    baseSpeedReported: boolean
     /** Set by an explicit `Active` write and by nothing else. */
     active?: boolean
     /** The last mode named by a mode switch, as the protocol value the switch stands for. */
@@ -453,6 +465,8 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 timer: undefined as unknown as NodeJS.Timeout,
                 baseActive: context.active,
                 baseMode: context.mode,
+                baseSpeed: context.rotationSpeed,
+                baseSpeedReported: context.speedReported,
                 clearedModes: new Set<string>(),
             };
             this.gestures.set(context.deviceId, gesture);
@@ -492,9 +506,28 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             }
 
             const wantedMode = this.resolveWantedMode(accessory, gesture);
+            // A mode change resets the speed at the WallPad - measured: a vent at `middle`
+            // came back at `low` on nothing but `{mode: cleaning}` - so a gesture that named
+            // only a mode still has to say what speed it means, or the choice is lost every
+            // time a mode is picked. The speed the vent was running at carries across, and
+            // it does not matter who chose it: a change made at the WallPad arrives as a
+            // report and is already in the context this reads.
+            //
+            // Only from a mode that had a speed to begin with, and that is taken from the
+            // device having reported one rather than from `isFanSpeedControllableMode()`.
+            // That is a denylist of the two modes known to have no speed, so a mode this
+            // plugin has never seen is assumed to have one - and for a mode that turns out
+            // not to, the context holds the speed remembered from before it, which was never
+            // chosen there and must not be carried out of it. The absent `wind_speed` field
+            // says so without anything having to be on a list.
+            const carriedSpeed = wantedMode !== undefined
+                && gesture.baseSpeedReported
+                && gesture.baseSpeed !== RotationSpeed.OFF
+                ? gesture.baseSpeed
+                : undefined;
             const wantedSpeed = gesture.speedWrite && gesture.speedWrite !== RotationSpeed.OFF
                 ? gesture.speedWrite
-                : undefined;
+                : carriedSpeed;
             // What the gesture says about power, once every write it carries is in.
             // An explicit `Active` write and a drag that stopped on zero both say it
             // outright; clearing the mode the vent runs says it only because there is no
@@ -831,6 +864,11 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 // nothing either way and what was learned before stands.
                 const modeReported = (typeof device.op["mode"] === "string" && device.op["mode"].length > 0)
                     || !!cachedContext?.modeReported;
+                // The device's own account of whether this mode has a speed to choose. A mode
+                // without one omits the field, which is the only signal that covers a mode
+                // `isFanSpeedControllableMode()` has never heard of.
+                const speedReported = typeof device.op["wind_speed"] === "string"
+                    && device.op["wind_speed"].length > 0;
                 const reported = this.deviceRotationSpeed(device.op["wind_speed"]);
                 // Modes without wind control omit the field entirely, so the last speed
                 // the device did report is what a mode that has one returns to.
@@ -852,6 +890,7 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                     lastRotationSpeed,
                     mode,
                     modeReported,
+                    speedReported,
                 });
                 if(!accessory) {
                     this.confirmDeviceOperation(device);
