@@ -267,12 +267,12 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
                 context.motionDetected = false;
 
                 accessory.getService(this.api.hap.Service.MotionSensor)
-                    ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+                    ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
             }, (device.duration?.camera || CAMERA_TIMEOUT_DURATION) * 1000);
             context.motionDetected = true;
 
             accessory.getService(this.api.hap.Service.MotionSensor)
-                ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+                ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
         });
         setTimeout(() => {
             for(const cameraDevice of [EXTERIOR_FRONT_DOOR_CAMERA_DEVICE, EXTERIOR_COMMUNAL_DOOR_CAMERA_DEVICE]) {

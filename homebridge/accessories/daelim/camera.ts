@@ -146,7 +146,7 @@ export class CameraAccessories extends Accessories<CameraAccessoryInterface> {
 
     refreshSensors(accessory: PlatformAccessory) {
         this.findService(accessory, this.api.hap.Service.MotionSensor, (service) => {
-            service.setCharacteristic(this.api.hap.Characteristic.MotionDetected, this.getAccessoryInterface(accessory).motionDetected);
+            service.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, this.getAccessoryInterface(accessory).motionDetected);
         });
     }
 
