@@ -90,6 +90,37 @@ interface LightbulbGesture {
 /** Keeps a merged accessory's synthetic id from colliding with a real `uid`. */
 const LEVEL_GROUP_DEVICE_ID_PREFIX = "lightbulbs:";
 
+/**
+ * How many whole reports may disagree with an outstanding command
+ * before the room is believed over it.
+ *
+ * The WallPad answers a control request in about 200ms and then acts on it in its own time,
+ * switching one light at a time and reporting each. So the reports following a command
+ * describe, in order: the room before the command took effect, then the room part way
+ * through it, and only then the room the command asked for. Publishing each of those in turn
+ * walks the tile back to where it started before it arrives where it was sent - which is what
+ * a resident sees as the slider snapping back to its old value and then moving on.
+ *
+ * What has to be tolerated is the length of that procession, and the group's own size fixes it:
+ * one report for the command not yet applied, one for each light that switches on the way
+ * (`members.length - 1`, since the last one is the arrival itself), and one spare.
+ *
+ * Measured against the household this was written for - 침실1, two lights:
+ *
+ *   100 -> 0    reported level 2 (not yet applied), then level 1 (mid-change), then level 0
+ *   50  -> 100  reported level 1 (mid-change), then level 2
+ *
+ * Two disagreements at worst, which is `members.length`; the spare makes three.
+ *
+ * Erring long is the safe direction. The cap is only reached where the WallPad accepted a
+ * command and then never carried it out, and until then the tile shows what the resident just
+ * asked for - a better thing to be showing than the state they asked it to leave.
+ * A counter rather than a deadline, so that nothing here waits on a clock.
+ */
+function disagreementsTolerated(members: number): number {
+    return members + 1;
+}
+
 export default class LightbulbAccessories extends OnOffAccessories<LightbulbAccessoryInterface> {
     /**
      * Reports observed before this number cannot describe the command that set it.
@@ -109,6 +140,13 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
 
     /** Level the WallPad last reported, per accessory, to tell a rise from a collapse. */
     private readonly reportedLevels: Record<string, number> = {};
+
+    /**
+     * Whole reports that have disagreed with the outstanding command so far.
+     * Reset when a command is sent and when the room catches up with one.
+     * See {@link disagreementsTolerated}.
+     */
+    private readonly disagreements: Record<string, number> = {};
 
     /** Rooms already reported as looking like independent circuits. */
     private readonly reportedIndependentCircuits = new Set<string>();
@@ -466,6 +504,7 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
         // WallPad last said rather than over it, so a command that comes to nothing takes its
         // answer back with it.
         levels.intended = levels.members.map((_, index) => index < effective);
+        delete this.disagreements[key];
         this.publishLevel(accessory, effective);
 
         const sentAt = Date.now();
@@ -486,6 +525,7 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
         if(!success) {
             // The intent is gone, so the tile goes back to what the WallPad last said.
             delete levels.intended;
+            delete this.disagreements[key];
             this.publishReported(accessory);
         }
         // Believed, and then checked - by asking outright rather than by trusting whatever
@@ -723,8 +763,38 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
             levels.flags[update.index] = update.on;
         }
 
-        if(metadata.completeSnapshot) {
+        // A command is outstanding, and the WallPad has not necessarily acted on it yet.
+        // Its own reports arrive describing the room before the command, then part way
+        // through it, and only then where it was sent - so until one of them agrees with what
+        // was asked for, what was asked for is the better thing to be showing.
+        // See `disagreementsTolerated` for how long that patience lasts and why.
+        if(levels.intended) {
+            const intended = levels.intended;
+            if(levels.flags.every((flag, index) => flag === intended[index])) {
+                delete levels.intended;
+                delete this.disagreements[key];
+                this.publishReported(accessory);
+                return;
+            }
+            const seen = (this.disagreements[key] || 0) + 1;
+            this.disagreements[key] = seen;
+            if(seen <= disagreementsTolerated(levels.members.length)) {
+                this.log.debug("Lightbulb :: %s :: the room has not caught up with the command yet " +
+                    "(%d of %d), asking again", context.displayName, seen,
+                    disagreementsTolerated(levels.members.length));
+                void this.client.requestDeviceStatus([DeviceType.LIGHT]);
+                return;
+            }
+            // The WallPad took the command and never carried it out. Believe the room.
+            this.log.warn("%s did not reach the level it was set to; showing what the WallPad reports.",
+                context.displayName);
             delete levels.intended;
+            delete this.disagreements[key];
+            this.publishReported(accessory);
+            return;
+        }
+
+        if(metadata.completeSnapshot) {
             this.publishReported(accessory);
             return;
         }
