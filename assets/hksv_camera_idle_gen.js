@@ -8,7 +8,7 @@ const LINE_HEIGHT = 1.45;
 // Leave a margin so a long line never runs into the edge of the frame.
 const MAX_LINE_WIDTH = WIDTH * 0.86;
 
-// One image per state the camera can be in when it has no picture to show.
+// The frames a camera shows when it has no picture of its own.
 // Each states what is true at the moment it appears rather than what may follow,
 // because nothing here can promise an image that is not already in hand.
 //
@@ -17,19 +17,16 @@ const MAX_LINE_WIDTH = WIDTH * 0.86;
 // being set up, so a frame saying the door station is being called could only
 // ever be chosen before the call began - and would therefore also be showing
 // every time no call was being placed at all.
+//
+// Nor is there one for a door station that did not answer. Only a camera with a
+// live view can fail that way, and there the stream itself fails, which leaves
+// the Home app to report it in its own words rather than having a frame here
+// name a cause this end cannot always be sure of.
 const IDLE_IMAGES = [
     {
         // Nothing stored, and nothing being waited on beyond the next visitor.
         filepath: "./assets/hksv_camera_idle.png",
         lines: ["최근 방문자 없음"]
-    },
-    {
-        // The front door once a call to the door station has come back
-        // refused or unanswered. Nothing is said about the visitor image:
-        // a stored one would have been shown in place of this frame,
-        // so its absence is already on the screen.
-        filepath: "./assets/hksv_camera_doorbell_unavailable.png",
-        lines: ["초인종 응답 없음"]
     }
 ];
 

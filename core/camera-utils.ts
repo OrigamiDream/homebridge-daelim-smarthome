@@ -106,8 +106,9 @@ interface ActiveSession {
 }
 
 // Supplied by providers that can offer a real-time feed for the camera.
-// When it is absent, disabled, or fails to produce a lease,
-// the delegate falls back to the snapshot feed.
+// When it is absent or disabled the delegate serves the snapshot feed instead.
+// When it is present but cannot produce a lease the stream fails outright,
+// because a camera with a door station to call has nothing else worth showing.
 export interface LiveViewSource {
     readonly enabled: boolean;
     acquire(): Promise<LiveViewLease>;
@@ -117,15 +118,12 @@ export interface LiveViewSource {
     onEnded(listener: () => void): void;
 }
 
-// The idle frames ship inside the package, next to `dist`.
-// They used to be fetched from the repository on every cold start,
+// The idle frame ships inside the package, next to `dist`.
+// It used to be fetched from the repository on every cold start,
 // which tied the placeholder to GitHub being reachable
-// and left no way to add a frame that is not on the default branch yet.
+// and left no way to change it before the change had been merged there.
 const IDLE_IMAGE_DIRECTORY = path.join(__dirname, "..", "..", "assets");
 const IDLE_IMAGE_DEFAULT = "hksv_camera_idle.png";
-// Only a camera with a live view has a door station that can fail to answer,
-// which `liveViewUnavailable` already encodes: it is set nowhere else.
-const IDLE_IMAGE_DOORBELL_UNAVAILABLE = "hksv_camera_doorbell_unavailable.png";
 
 export interface LiveViewLease {
     media: {
@@ -136,6 +134,19 @@ export interface LiveViewLease {
     activate(): void;
     release(): void;
 }
+
+// What came of trying to open the real-time feed for one stream request.
+// It is returned rather than recorded on the delegate,
+// because the delegate outlives the session that produced it:
+// a session HomeKit has already stopped would otherwise leave its verdict behind
+// for the next viewer to read, and the snapshot request that opens a camera tile
+// carries no session of its own to tell one verdict from another.
+type LiveViewOutcome =
+    // No real-time feed is configured for this camera,
+    // which is the ordinary case for every camera but the household front door.
+    | {kind: "unsupported"}
+    | {kind: "acquired", lease: LiveViewLease}
+    | {kind: "unavailable", reason: string};
 
 interface StreamingProgress {
     written: number;
@@ -149,7 +160,7 @@ interface TransitionSnapshot {
 
 export const CAMERA_TIMEOUT_DURATION = 3 * 60; // 3 minutes
 export const CAMERA_TRANSITION_DURATION = 0.5; // 0.5 seconds
-// How long a live view may take before the stream falls back to snapshots.
+// How long a live view may take before the stream is given up on.
 // The door line is slow and remarkably consistent about it: four calls to the real
 // PBX took 7.32, 7.33, 7.35 and 7.38 seconds, almost all of it the PBX taking its
 // time over the INVITE - the sign-in before it is around 200ms, and the first video
@@ -169,10 +180,7 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     readonly controller: CameraController;
 
     private snapshotPromise?: Promise<Buffer>;
-    private readonly alternativeSnapshots = new Map<string, Buffer>();
-    // Whether the last attempt to reach the door station over One Pass came back empty.
-    // Only ever set for a camera that has a live view to fail in the first place.
-    private liveViewUnavailable = false;
+    private alternativeSnapshot?: Buffer;
     private pendingSessions: Map<string, SessionInfo> = new Map();
     private ongoingSessions: Map<string, ActiveSession> = new Map();
     // Leases held between being acquired
@@ -253,19 +261,13 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     }
 
     private async createAlternativeSnapshot(): Promise<Buffer> {
-        // A door station that did not answer is the only thing worth adding to the
-        // absence of a visitor image, and only a camera with a live view can say it.
-        const filename = this.liveViewUnavailable
-            ? IDLE_IMAGE_DOORBELL_UNAVAILABLE
-            : IDLE_IMAGE_DEFAULT;
-        const cached = this.alternativeSnapshots.get(filename);
-        if(cached) {
-            return cached;
+        if(this.alternativeSnapshot) {
+            return this.alternativeSnapshot;
         }
-        this.log.debug(`[${this.cameraName}] Creating alternative snapshot buffer from ${filename}`);
+        this.log.debug(`[${this.cameraName}] Creating alternative snapshot buffer from ${IDLE_IMAGE_DEFAULT}`);
         let snapshot: Buffer;
         try {
-            snapshot = await fs.promises.readFile(path.join(IDLE_IMAGE_DIRECTORY, filename));
+            snapshot = await fs.promises.readFile(path.join(IDLE_IMAGE_DIRECTORY, IDLE_IMAGE_DEFAULT));
         } catch(error) {
             // An install whose assets went missing still gets the published frame,
             // which is what every install used before they shipped with the package.
@@ -275,7 +277,7 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
             });
             snapshot = Buffer.from(response.data);
         }
-        this.alternativeSnapshots.set(filename, snapshot);
+        this.alternativeSnapshot = snapshot;
         return snapshot;
     }
 
@@ -521,23 +523,22 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     }
 
     // Opens the real-time feed when one is configured.
-    // Every failure - the door line being busy, One Pass not reachable, bad credentials -
-    // degrades to the snapshot feed rather than failing the HomeKit session.
     //
-    // Taking too long counts as a failure.
-    // The snapshot path sits behind this same await,
-    // and the timeouts underneath it - sign-in, TLS, INVITE, the first packet,
+    // Taking too long counts as failing.
+    // The timeouts underneath - sign-in, TLS, INVITE, the first packet,
     // and a retry over the lot of them - add up to minutes,
-    // far past the point where HomeKit gives up on the stream.
-    // A fallback that arrives after the viewer has gone is no fallback,
+    // far past the point where HomeKit gives up on the stream,
     // so the wait is bounded here rather than left to the sum of its parts.
-    private async acquireLiveView(): Promise<LiveViewLease | undefined> {
+    //
+    // The verdict leaves as a return value and is never recorded on the delegate.
+    // HomeKit can stop a session while this is still running,
+    // and anything written here would outlive the session that produced it:
+    // the next viewer opens a camera tile with a snapshot request,
+    // which would then be answered out of a call that viewer never asked for.
+    private async acquireLiveView(): Promise<LiveViewOutcome> {
         if(!this.liveView?.enabled) {
-            return undefined;
+            return {kind: "unsupported"};
         }
-        // A fresh attempt is a call being placed again,
-        // so the placeholder goes back to saying so until this one settles.
-        this.liveViewUnavailable = false;
         let abandoned = false;
         let timer: NodeJS.Timeout | undefined;
         const pending = this.liveView.acquire();
@@ -562,17 +563,16 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 }),
             ]);
             if(!lease) {
-                this.liveViewUnavailable = true;
-                this.log.warn(`[${this.cameraName}] Live view did not come up within ${LIVE_VIEW_ACQUIRE_TIMEOUT / 1000}s, falling back to snapshots.`);
-                return undefined;
+                const reason = `the door station did not answer within ${LIVE_VIEW_ACQUIRE_TIMEOUT / 1000}s`;
+                this.log.warn(`[${this.cameraName}] Live view unavailable: ${reason}.`);
+                return {kind: "unavailable", reason};
             }
-            this.liveViewUnavailable = false;
             this.log.info(`[${this.cameraName}] Live view acquired.`);
-            return lease;
+            return {kind: "acquired", lease};
         } catch(err) {
-            this.liveViewUnavailable = true;
-            this.log.warn(`[${this.cameraName}] Live view unavailable, falling back to snapshots: ${(err as Error)?.message || err}`);
-            return undefined;
+            const reason = (err as Error)?.message || String(err);
+            this.log.warn(`[${this.cameraName}] Live view unavailable: ${reason}`);
+            return {kind: "unavailable", reason};
         } finally {
             if(timer) {
                 clearTimeout(timer);
@@ -583,7 +583,7 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
     private async startStream(request: StartStreamRequest, callback: StreamRequestCallback): Promise<void> {
         const sessionInfo = this.pendingSessions.get(request.sessionID);
         if(sessionInfo) {
-            const liveLease = await this.acquireLiveView();
+            const outcome = await this.acquireLiveView();
             if(!this.pendingSessions.has(request.sessionID)) {
                 // HomeKit gave up while the call was being set up.
                 // Answering the request it abandoned is what closes it out.
@@ -591,10 +591,23 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
                 // for a camera nobody is looking at,
                 // and with no RTCP ever arriving
                 // there is no inactivity timer to end either of them.
-                liveLease?.release();
+                if(outcome.kind === "acquired") {
+                    outcome.lease.release();
+                }
                 callback(new Error("The video stream was stopped before it started"));
                 return;
             }
+            if(outcome.kind === "unavailable") {
+                // A camera with a door station to call has nothing else to offer.
+                // The snapshot feed would answer a request for live video
+                // with whatever the last visitor left behind,
+                // and would say nothing at all about the call that did not happen.
+                // HomeKit's own unavailable state claims less, and is therefore true.
+                this.pendingSessions.delete(request.sessionID);
+                callback(new Error(`Live view unavailable: ${outcome.reason}`));
+                return;
+            }
+            const liveLease = outcome.kind === "acquired" ? outcome.lease : undefined;
             if(liveLease) {
                 // Hand the lease somewhere `stopStream()` can reach
                 // until the session that owns it exists,
@@ -854,11 +867,6 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
         // so dropping it here is the only signal `startStream()` gets
         // that the viewer went away while it was waiting on the live view.
         this.pendingSessions.delete(sessionId);
-        // A refusal describes the call that has just ended, not the next one.
-        // Carrying it over would greet the following viewer with a door station
-        // reported unreachable before anything had been asked of it, because
-        // the Home app fetches a snapshot before it ever requests a stream.
-        this.liveViewUnavailable = false;
         const unowned = this.unownedLeases.get(sessionId);
         if(unowned) {
             this.unownedLeases.delete(sessionId);
