@@ -157,6 +157,9 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
     /** Rooms already reported as looking like independent circuits. */
     private readonly reportedIndependentCircuits = new Set<string>();
 
+    /** Groups already reported as no longer mergeable, so the reason is given once. */
+    private readonly reportedRefusedGroups = new Set<string>();
+
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
         super(log, api, config, DeviceType.LIGHT, [api.hap.Service.Lightbulb], api.hap.Service.Lightbulb);
     }
@@ -664,10 +667,8 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
      * which lights the wizard put in a group.
      */
     private isGroupMember(deviceId: string): boolean {
-        return this.configuredLights().some((device) =>
-            device.combineLightbulbGroup === true
-            && !!device.lightbulbGroup
-            && device.lightbulbGroup.members.indexOf(deviceId) >= 0);
+        return this.resolvedGroups()
+            .some(({ group }) => group.members.indexOf(deviceId) >= 0);
     }
 
     /**
@@ -679,52 +680,63 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
      * than making one - and the set of accessories no longer depends on which page happened
      * to arrive.
      */
-    private buildConfiguredAccessories() {
-        const groupedMembers = new Set<string>();
-        const wanted = new Set<string>();
-
+    /**
+     * The merges the configuration asks for and can still have.
+     *
+     * The single answer to "which lights are spoken for", read by everything that needs to
+     * know: what to build, what to keep, and whether a report belongs to a room rather than
+     * to a light. The wizard resolved these against the household it saw; between then and
+     * now the resident may have disabled one of the lights, which takes its step with it and
+     * leaves a sequence the room does not have.
+     */
+    private resolvedGroups(): { anchor: Device, group: LightbulbGroup, identity: string }[] {
+        const resolved = [];
         for(const anchor of this.configuredLights()) {
             const group = anchor.lightbulbGroup;
             if(anchor.combineLightbulbGroup !== true || !group || group.members.length < 2) {
                 continue;
             }
-            // The wizard resolved this against the household it saw. Between then and now the
-            // resident may have disabled one of the lights, which takes its step with it and
-            // leaves a sequence the room does not have.
             const missing = group.members
                 .map((deviceId) => ({ deviceId, device: this.findDevice(deviceId) }))
                 .filter((member) => !member.device || member.device.disabled);
             if(missing.length > 0) {
-                this.log.info("Not merging the lights of %s: %s is disabled or no longer configured. " +
-                    "Showing them one accessory each.",
-                    group.room, missing.map((member) => member.device?.displayName || member.deviceId).join(", "));
+                if(!this.reportedRefusedGroups.has(anchor.deviceId)) {
+                    this.reportedRefusedGroups.add(anchor.deviceId);
+                    this.log.info("Not merging the lights of %s: %s is disabled or no longer " +
+                        "configured. Showing them one accessory each.", group.room,
+                        missing.map((member) => member.device?.displayName || member.deviceId).join(", "));
+                }
                 continue;
             }
-            group.members.forEach((deviceId) => groupedMembers.add(deviceId));
-            wanted.add(this.addGroupAccessory(anchor, group));
+            resolved.push({ anchor, group, identity: `${LEVEL_GROUP_DEVICE_ID_PREFIX}${anchor.deviceId}` });
         }
+        return resolved;
+    }
 
-        for(const device of this.configuredLights()) {
-            if(!groupedMembers.has(device.deviceId)) {
-                wanted.add(device.deviceId);
-            }
+    private buildConfiguredAccessories() {
+        for(const { anchor, group } of this.resolvedGroups()) {
+            this.addGroupAccessory(anchor, group);
         }
-
-        // Retire what a previous configuration left in the accessory cache - the per-light
+        // What a previous configuration left in the accessory cache goes now - the per-light
         // accessories a group replaces, or a merged one whose opt-in has since been turned off.
-        // Homebridge restores those before this runs, and leaving them behind would show the
-        // same lights twice.
-        const stale = this.accessories.filter((accessory) =>
-            !wanted.has(this.getAccessoryInterface(accessory).deviceId));
-        for(const accessory of stale) {
-            this.log.info("Retiring light accessory: %s (the configuration no longer asks for it)",
-                accessory.displayName);
-            this.api.unregisterPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [accessory]);
-            const index = this.accessories.indexOf(accessory);
-            if(index >= 0) {
-                this.accessories.splice(index, 1);
-            }
-        }
+        // Leaving them behind would show the same lights twice.
+        this.retireUnwantedAccessories("the configuration no longer asks for it");
+    }
+
+    /**
+     * A merged room stands for several configured lights at once, under a synthetic id no
+     * device answers to, so the one-to-one answer the base class gives would retire every
+     * group and keep the very per-light accessories those groups replace.
+     */
+    protected wantedDeviceIds(): Set<string> {
+        const groups = this.resolvedGroups();
+        const grouped = new Set(groups.flatMap(({ group }) => group.members));
+        return new Set([
+            ...groups.map(({ identity }) => identity),
+            ...this.configuredLights()
+                .filter((device) => !grouped.has(device.deviceId))
+                .map((device) => device.deviceId),
+        ]);
     }
 
     private addGroupAccessory(anchor: Device, group: LightbulbGroup): string {
