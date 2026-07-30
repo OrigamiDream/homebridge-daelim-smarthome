@@ -83,6 +83,13 @@ interface LightbulbGesture {
     /** Level the room was headed for when the gesture began. */
     baseLevel: number
 
+    /**
+     * Where this gesture sits in the order they arrived.
+     * A drag is a run of requests rather than one, so by the time an early one reaches the
+     * front of the queue the finger has usually moved past it - see {@link LightbulbAccessories.applyLevel}.
+     */
+    seq: number
+
     power?: boolean
     level?: number
 }
@@ -134,6 +141,9 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
 
     /** Writes of the HAP request currently being collected, per accessory. */
     private readonly gestures: Record<string, LightbulbGesture> = {};
+
+    /** Gestures seen so far, per accessory, so a queued one can tell it has been overtaken. */
+    private readonly gestureSeq: Record<string, number> = {};
 
     /** Runs one accessory's commands one at a time. */
     private readonly operationQueues: Record<string, Promise<void>> = {};
@@ -386,7 +396,9 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
 
         let gesture = this.gestures[key];
         if(!gesture) {
-            gesture = { baseLevel: this.plannedLevel(context.levels!) };
+            const seq = (this.gestureSeq[key] || 0) + 1;
+            this.gestureSeq[key] = seq;
+            gesture = { baseLevel: this.plannedLevel(context.levels!), seq };
             this.gestures[key] = gesture;
             // One turn later the request is whole. Everything that has to happen in order -
             // saying where the room is going, then asking it to go - happens here, so that
@@ -475,6 +487,25 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
             return; // the group was replaced while this waited its turn
         }
         const key = context.deviceId;
+
+        // A newer gesture is already waiting, so this one is a place the finger passed through
+        // rather than anywhere it meant to leave the room.
+        //
+        // A drag is not one request but a run of them, and each carries the brightness the
+        // finger was at. Acting on every one takes the room through every level on the way -
+        // dragging a dark room to full switched one light on and then both, and the tile
+        // followed. Worse, the room really did sit at the middle level for a moment, so it was
+        // learned as the level a switch-on should return to, which is why the slider of the
+        // dark room afterwards sat at half rather than where it had been left.
+        //
+        // The queue already puts these in order; this is only asking whether anything newer is
+        // behind us. Nothing is timed - a slow, deliberate drag has no successor waiting when
+        // its turn comes, and every step of it is still commanded.
+        if(gesture.seq < (this.gestureSeq[key] || 0)) {
+            this.log.debug("Lightbulb :: %s :: a newer gesture is waiting, so level %s is passed over",
+                context.displayName, String(gesture.level));
+            return;
+        }
 
         // Judge against where the room is now, not where the gesture found it. A command waits
         // for whatever the queue is already carrying, and an earlier command may have raised the
