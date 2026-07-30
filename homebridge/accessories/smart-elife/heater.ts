@@ -48,10 +48,13 @@ export default class HeaterAccessories extends ActiveAccessories<HeaterAccessory
         // TargetHeaterCoolerState
         this.getService(accessory, this.api.hap.Service.HeaterCooler)
             .getCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState)
-            .setValue(this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT)
+            // Props before the value throughout: a value written first is clamped to the
+            // range HAP gives the characteristic by default, which is narrower than the
+            // one being installed right after it.
             .setProps({
                 validValues: [this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT],
             })
+            .updateValue(this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 callback(undefined, this.api.hap.Characteristic.TargetHeaterCoolerState.HEAT);
             });
@@ -59,12 +62,12 @@ export default class HeaterAccessories extends ActiveAccessories<HeaterAccessory
         // HeatingThresholdTemperature
         this.getService(accessory, this.api.hap.Service.HeaterCooler)
             .getCharacteristic(this.api.hap.Characteristic.HeatingThresholdTemperature)
-            .setValue(this.getThresholdTemperature(accessory))
             .setProps({
                 minValue: MIN_TEMPERATURE,
                 maxValue: MAX_TEMPERATURE,
                 minStep: 1,
             })
+            .updateValue(this.getThresholdTemperature(accessory))
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const context = this.getAccessoryInterface(accessory);
                 if(context.desiredTemperature === value || !context.active) {
@@ -98,7 +101,7 @@ export default class HeaterAccessories extends ActiveAccessories<HeaterAccessory
         // CurrentTemperature
         this.getService(accessory, this.api.hap.Service.HeaterCooler)
             .getCharacteristic(this.api.hap.Characteristic.CurrentTemperature)
-            .setValue(this.getCurrentTemperature(accessory))
+            .updateValue(this.getCurrentTemperature(accessory))
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 callback(undefined, this.getCurrentTemperature(accessory));
             });
@@ -151,12 +154,12 @@ export default class HeaterAccessories extends ActiveAccessories<HeaterAccessory
 
                 const context = this.getAccessoryInterface(accessory);
                 accessory.getService(this.api.hap.Service.HeaterCooler)
-                    ?.setCharacteristic(this.api.hap.Characteristic.Active, context.active
+                    ?.updateCharacteristic(this.api.hap.Characteristic.Active, context.active
                         ? this.api.hap.Characteristic.Active.ACTIVE
                         : this.api.hap.Characteristic.Active.INACTIVE)
-                    .setCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState, this.getCurrentState(accessory))
-                    .setCharacteristic(this.api.hap.Characteristic.HeatingThresholdTemperature, this.getThresholdTemperature(accessory))
-                    .setCharacteristic(this.api.hap.Characteristic.CurrentTemperature, this.getCurrentTemperature(accessory));
+                    .updateCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState, this.getCurrentState(accessory))
+                    .updateCharacteristic(this.api.hap.Characteristic.HeatingThresholdTemperature, this.getThresholdTemperature(accessory))
+                    .updateCharacteristic(this.api.hap.Characteristic.CurrentTemperature, this.getCurrentTemperature(accessory));
             }
         });
     }

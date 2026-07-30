@@ -56,7 +56,7 @@ export class VehicleAccessories extends Accessories<VehicleAccessoryInterface> {
 
     refreshSensors(accessory: PlatformAccessory) {
         this.findService(accessory, this.api.hap.Service.MotionSensor, (service) => {
-            service.setCharacteristic(this.api.hap.Characteristic.MotionDetected, accessory.context.vehicleGettingIn);
+            service.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, accessory.context.vehicleGettingIn);
         });
     }
 

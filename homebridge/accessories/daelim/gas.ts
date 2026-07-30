@@ -129,8 +129,8 @@ export class GasAccessories extends Accessories<GasAccessoryInterface> {
                 accessory.context.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.LockMechanism, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.LockCurrentState, accessory.context.on ? this.api.hap.Characteristic.LockCurrentState.UNSECURED : this.api.hap.Characteristic.LockCurrentState.SECURED);
-                        service.setCharacteristic(this.api.hap.Characteristic.LockTargetState, accessory.context.on ? this.api.hap.Characteristic.LockCurrentState.UNSECURED : this.api.hap.Characteristic.LockCurrentState.SECURED);
+                        service.updateCharacteristic(this.api.hap.Characteristic.LockCurrentState, accessory.context.on ? this.api.hap.Characteristic.LockCurrentState.UNSECURED : this.api.hap.Characteristic.LockCurrentState.SECURED);
+                        service.updateCharacteristic(this.api.hap.Characteristic.LockTargetState, accessory.context.on ? this.api.hap.Characteristic.LockCurrentState.UNSECURED : this.api.hap.Characteristic.LockCurrentState.SECURED);
                     })
                 }
             }

@@ -238,7 +238,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                 ctx.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.On, ctx.on);
+                        service.updateCharacteristic(this.api.hap.Characteristic.On, ctx.on);
                     });
                 }
 
@@ -273,7 +273,7 @@ export class LightbulbAccessories extends Accessories<LightbulbAccessoryInterfac
                         if(force) {
                             this.findService(accessory, this.api.hap.Service.Lightbulb, (service) => {
                                 const brightness = settings.getBrightness(Math.min(ctx.maxBrightness, ctx.brightness), settings)
-                                service.setCharacteristic(this.api.hap.Characteristic.Brightness, brightness);
+                                service.updateCharacteristic(this.api.hap.Characteristic.Brightness, brightness);
                             });
                         }
                     }

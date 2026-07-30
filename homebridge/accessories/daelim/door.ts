@@ -78,7 +78,7 @@ export class DoorAccessories extends Accessories<DoorAccessoryInterface> {
 
     refreshSensors(accessory: PlatformAccessory) {
         this.findService(accessory, this.api.hap.Service.MotionSensor, (service) => {
-            service.setCharacteristic(this.api.hap.Characteristic.MotionDetected, accessory.context.changesDetected);
+            service.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, accessory.context.changesDetected);
         });
     }
 

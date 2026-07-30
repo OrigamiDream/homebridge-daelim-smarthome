@@ -102,7 +102,7 @@ export class OutletAccessories extends Accessories<OutletAccessoryInterface> {
                 accessory.context.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.Outlet, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
+                        service.updateCharacteristic(this.api.hap.Characteristic.On, accessory.context.on);
                     });
                 }
             }

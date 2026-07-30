@@ -81,11 +81,14 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
                 callback(undefined, this.getCurrentHeaterCoolerState(accessory));
             });
 
+        // Props before the value throughout: a value written first is clamped to the
+        // range HAP gives the characteristic by default, which is narrower than the
+        // one being installed right after it.
         service.getCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState)
-            .setValue(this.getTargetHeaterCoolerState())
             .setProps({
                 validValues: this.getAvailableTargetHeaterCoolerStates(),
             })
+            .updateValue(this.getTargetHeaterCoolerState())
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 // NOTE: No need to update heater state
                 callback(undefined);
@@ -98,12 +101,12 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
             });
 
         service.getCharacteristic(this.getThresholdTemperatureCharacteristic())
-            .setValue(this.getThresholdTemperature(accessory))
             .setProps({
                 minValue: this.minimumTemperature,
                 maxValue: this.maximumTemperature,
                 minStep: 1
             })
+            .updateValue(this.getThresholdTemperature(accessory))
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 if(accessory.context.desiredTemperature === value || !accessory.context.active) {
                     // Temperature slider is disabled when the accessory is not active
@@ -138,7 +141,7 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
             });
 
         service.getCharacteristic(this.api.hap.Characteristic.CurrentTemperature)
-            .setValue(this.getCurrentTemperature(accessory))
+            .updateValue(this.getCurrentTemperature(accessory))
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 if(!this.checkAccessoryAvailability(accessory, callback)) {
                     return;
@@ -166,11 +169,11 @@ export abstract class HeaterCoolerAccessories extends Accessories<HeaterCoolerAc
                 accessory.context.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.HeaterCooler, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.CurrentTemperature, this.getCurrentTemperature(accessory));
-                        service.setCharacteristic(this.api.hap.Characteristic.Active, accessory.context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
-                        service.setCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState, this.getCurrentHeaterCoolerState(accessory));
-                        service.setCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState, this.getTargetHeaterCoolerState());
-                        service.setCharacteristic(this.getThresholdTemperatureCharacteristic(), this.getThresholdTemperature(accessory));
+                        service.updateCharacteristic(this.api.hap.Characteristic.CurrentTemperature, this.getCurrentTemperature(accessory));
+                        service.updateCharacteristic(this.api.hap.Characteristic.Active, accessory.context.active ? this.api.hap.Characteristic.Active.ACTIVE : this.api.hap.Characteristic.Active.INACTIVE);
+                        service.updateCharacteristic(this.api.hap.Characteristic.CurrentHeaterCoolerState, this.getCurrentHeaterCoolerState(accessory));
+                        service.updateCharacteristic(this.api.hap.Characteristic.TargetHeaterCoolerState, this.getTargetHeaterCoolerState());
+                        service.updateCharacteristic(this.getThresholdTemperatureCharacteristic(), this.getThresholdTemperature(accessory));
                     });
                 }
             }

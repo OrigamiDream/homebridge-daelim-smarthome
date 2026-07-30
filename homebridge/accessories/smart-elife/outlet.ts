@@ -27,7 +27,7 @@ export default class OutletAccessories extends OnOffAccessories<OutletAccessoryI
 
                 const context = this.getAccessoryInterface(accessory);
                 const service = accessory.getService(this.api.hap.Service.Outlet);
-                service?.setCharacteristic(this.api.hap.Characteristic.On, context.on);
+                service?.updateCharacteristic(this.api.hap.Characteristic.On, context.on);
             }
         });
     }

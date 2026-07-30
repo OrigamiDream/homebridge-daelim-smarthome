@@ -66,11 +66,11 @@ export default class VehicleAccessories extends Accessories<VehicleAccessoryInte
                 context.motionDetected = false;
 
                 accessory.getService(this.api.hap.Service.MotionSensor)
-                    ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+                    ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
             }, (device.duration?.vehicle || VEHICLE_TIMEOUT_DURATION_SECONDS) * 1000);
 
             accessory.getService(this.api.hap.Service.MotionSensor)
-                ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+                ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
         });
     }
 
