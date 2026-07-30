@@ -914,10 +914,11 @@ export default class SmartELifeClient {
     }
 
     /**
-     * Supported operation modes per vent, keyed by device id. A device missing from the
-     * map is one whose modes could not be read; an empty array is a device that reports
-     * none. The two are not the same - callers must not offer mode controls for either,
-     * but only the latter is a statement about the device.
+     * Supported operation modes per vent, keyed by device id. A vent missing from the map
+     * is one whose modes could not be read, and callers must not offer mode controls for
+     * it. There is no entry meaning "this vent has no modes": a page that rendered no mode
+     * buttons cannot be told apart from one the server rendered for nobody in particular,
+     * and either way there are no controls to offer.
      */
     private readonly ventModes = new Map<string, VentMode[]>();
 
@@ -926,28 +927,23 @@ export default class SmartELifeClient {
     }
 
     /**
-     * Reads the mode buttons the control page renders for each configured vent. The
-     * page only names them when the request identifies the device, so this runs once
-     * per device rather than being scraped out of the shared `/main/home.do` payload.
+     * Reads the mode buttons the control page renders for each configured vent.
+     *
+     * Runs once per device rather than being scraped out of the shared `/main/home.do`
+     * payload, because the buttons are only rendered when the request names the `uid`.
+     * Retried a few times per vent: this is the only chance to learn the modes - the
+     * WallPad does not answer for which modes a vent supports, so there is nothing to fall
+     * back on the way a declined page falls back on `requestDeviceStatus()` - and a vent
+     * whose read fails has no mode switches for the lifetime of the process.
      */
     private async refreshVentModes() {
+        const attempts = 3;
         const vents = (this.config.devices || [])
             .filter((device) => device.deviceType === DeviceType.VENT && !device.disabled);
         for(const vent of vents) {
             let modes: VentMode[] | null = null;
-            try {
-                const html = await this.fetchWithJSessionId(`${this.baseUrl}/controls/vent.do`, {
-                    method: "POST",
-                    headers: {
-                        ...await this.createDocumentHeaters(),
-                        "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                    body: `uid=${encodeURIComponent(vent.deviceId)}&device_type=${DeviceType.VENT.toString()}`,
-                }).then((response) => response.text());
-                modes = parseVentModes(html);
-            } catch(error: any) {
-                this.log.warn("Could not read the operation modes of %s: %s",
-                    vent.displayName, error?.message || error);
+            for(let attempt = 1; attempt <= attempts && !modes; attempt++) {
+                modes = await this.fetchVentModes(vent, attempt);
             }
             if(!modes) {
                 // Left out of the map on purpose: an unreadable page must not be taken
@@ -958,8 +954,56 @@ export default class SmartELifeClient {
             }
             this.ventModes.set(vent.deviceId, modes);
             this.log.info("%s supports %d operation mode(s): %s", vent.displayName, modes.length,
-                modes.map((mode) => `${mode.label}(${mode.value})`).join(", ") || "none");
+                modes.map((mode) => `${mode.label}(${mode.value})`).join(", "));
         }
+    }
+
+    /**
+     * Fetches one vent's control page and keeps it only if it is about that vent.
+     *
+     * The same shape as `fetchRenderedPage()`, and there for the same reason - this is a
+     * second page the server renders for us, so it needs its own gate rather than reaching
+     * a parser that would have to judge identity itself. The evidence here is better than
+     * the majority the device list is held against: the request names one `uid`, so a page
+     * about that vent says so. Measured on 2026-07-30, a page fetched with the `uid` names
+     * it seven times over - in the `controlDevice()` calls and in the payload the page
+     * would send - and a page fetched without it names no device at all.
+     *
+     * Ten consecutive fetches came back byte for byte identical, so unlike `/main/home.do`
+     * there is no sign that this page answers for the wrong household. The gate is here
+     * because the accessory acts on what it reads, not because it was seen to be needed.
+     */
+    private async fetchVentModes(vent: Device, attempt: number): Promise<VentMode[] | null> {
+        // Drawn before the request leaves, for the same reason the rendered page draws it
+        // there: what a report may be believed against is when it was asked for.
+        const observedSeq = this.takeObservedSeq();
+        let html: string;
+        try {
+            html = await this.fetchWithJSessionId(`${this.baseUrl}/controls/vent.do`, {
+                method: "POST",
+                headers: {
+                    ...await this.createDocumentHeaters(),
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: `uid=${encodeURIComponent(vent.deviceId)}&device_type=${DeviceType.VENT.toString()}`,
+            }).then((response) => response.text());
+        } catch(error: any) {
+            this.log.warn("Could not read the operation modes of %s (attempt %d): %s",
+                vent.displayName, attempt, error?.message || error);
+            return null;
+        }
+        if(html.indexOf(vent.deviceId) === -1) {
+            this.declinedForeignReports += 1;
+            this.log.debug("Ignoring a vent control page that does not name %s " +
+                "(%d report(s) declined so far).", vent.deviceId, this.declinedForeignReports);
+            return null;
+        }
+        const modes = parseVentModes(html);
+        if(!modes) {
+            this.log.debug("The control page of %s carried no mode buttons this could read " +
+                "(attempt %d, seq %d).", vent.deviceId, attempt, observedSeq);
+        }
+        return modes;
     }
 
     private async createDocumentHeaters(): Promise<Record<string, string>> {
