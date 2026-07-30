@@ -94,6 +94,7 @@ interface RenderedPage {
 }
 
 const POLLING_INTERVAL_MILLISECONDS = 30 * 1000;
+const DEVICE_CONTROL_ALL_TIMEOUT_MILLISECONDS = 30 * 1000;
 
 export default class SmartELifeClient {
 
@@ -148,6 +149,9 @@ export default class SmartELifeClient {
 
     /** Whether the log has already said that there is nothing to hold a report against. */
     private reportedUncomparableDeviceList = false;
+
+    /** See `lightDetails()`. Refilled by every `fetchDevices()`. */
+    private renderedLightDetails: { deviceId: string, name: string, room: string, value: string }[] = [];
 
     private readonly ws?: WebSocketScheduler;
     private readonly listeners: ListenerInfo[] = [];
@@ -1177,7 +1181,21 @@ export default class SmartELifeClient {
         await this.sendJson(createElevatorStatusRequest(this.getWebSocketCredentials()));
     }
 
+    /**
+     * What the last `fetchDevices()` read about this household's lights,
+     * beyond what a `Device` carries.
+     *
+     * The rendered list gives each device's `operation` beside its name, which is the only
+     * reason the settings wizard can tell a level flag from a light that dims on its own -
+     * and it can do so without a WebSocket, which the wizard has none of. Kept beside the
+     * devices rather than on them, because none of it belongs in the configuration.
+     */
+    lightDetails(): { deviceId: string, name: string, room: string, value: string }[] {
+        return this.renderedLightDetails;
+    }
+
     async fetchDevices(): Promise<Device[]> {
+        this.renderedLightDetails = [];
         const page = await this.fetchRenderedPage();
         if(!page.ownHousehold || !page.deviceList) {
             // A wizard signing in for the first time has nothing to hold a page against,
@@ -1205,12 +1223,19 @@ export default class SmartELifeClient {
                 if(deviceType === DeviceType.GAS && device["options"] === "gas_02") {
                     name = "쿡탑";
                 }
-                const displayName = `${device["location_name"]} ${name}`;
+                const room = device["location_name"];
+                const displayName = `${room} ${name}`;
                 fetchedDevices.push({
                     displayName, name, deviceType,
                     deviceId: device["uid"],
                     disabled: false,
                 });
+                if(deviceType === DeviceType.LIGHT) {
+                    this.renderedLightDetails.push({
+                        deviceId: device["uid"], name, room,
+                        value: device["operation"]?.["value"] || "",
+                    });
+                }
             }
         }
         return fetchedDevices;
@@ -1291,6 +1316,53 @@ export default class SmartELifeClient {
             }),
         });
         return response["result"] as boolean;
+    }
+
+    /**
+     * Drives several devices of one type with a single request,
+     * the way the official app controls a whole room: `uid` carries a comma separated list.
+     * `is_control_all` is the app's flag for its "전체" card, which addresses every device of
+     * the type regardless of the list, so room level control keeps it off.
+     *
+     * It carries a deadline of its own. The retry ladder inside `fetchJson()` runs for the
+     * better part of twenty seconds, and a socket that never answers at all would otherwise
+     * hold a per-accessory queue shut for the life of the process.
+     */
+    async sendDeviceControlAll(deviceType: DeviceType, deviceIds: string[], control: string): Promise<boolean> {
+        const controller = new AbortController();
+        let deadline: ReturnType<typeof setTimeout> | undefined;
+        const timedOut = new Promise<never>((_, reject) => {
+            deadline = setTimeout(() => {
+                reject(new Error(`Controlling ${deviceType.toString()} timed out after ${DEVICE_CONTROL_ALL_TIMEOUT_MILLISECONDS}ms.`));
+                controller.abort();
+            }, DEVICE_CONTROL_ALL_TIMEOUT_MILLISECONDS);
+            deadline.unref();
+        });
+        try {
+            const request = (async () => {
+                const response = await this.fetchJson(`${this.baseUrl}/device/control/all.ajax`, {
+                    method: "POST",
+                    headers: {
+                        ...this.httpHeaders,
+                        "_csrf": await this.getCsrfToken(),
+                        "daelim_elife": this.accessToken,
+                    },
+                    body: JSON.stringify({
+                        type: deviceType.toString(),
+                        uid: deviceIds.join(","),
+                        control,
+                        is_control_all: "N",
+                    }),
+                    signal: controller.signal,
+                });
+                return response["result"] as boolean;
+            })();
+            return await Promise.race([request, timedOut]);
+        } finally {
+            if(deadline) {
+                clearTimeout(deadline);
+            }
+        }
     }
 
     async sendDeviceControlOp(device: Device, op: any): Promise<boolean> {

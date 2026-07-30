@@ -829,7 +829,18 @@ class CompletePane extends Pane {
                 if(!equiv || !equiv.length) {
                     availableDevices.push(device);
                 } else {
-                    availableDevices.push(equiv[0]);
+                    // The saved entry wins, which is how a renamed accessory, a disabled one and
+                    // every per-device setting survive a refresh - including the resident's
+                    // choice to merge a light group. `lightbulbGroup` is the exception: it was
+                    // resolved from the server's list, so it is taken afresh, and taken away
+                    // where the family no longer forms a group at all.
+                    const merged = Object.assign({}, equiv[0]);
+                    if(device.lightbulbGroup !== undefined) {
+                        merged.lightbulbGroup = device.lightbulbGroup;
+                    } else {
+                        delete merged.lightbulbGroup;
+                    }
+                    availableDevices.push(merged);
                 }
             }
 

@@ -9,6 +9,13 @@ export interface AccessoryInterface {
     deviceId: string
     deviceType: string
     init: boolean
+
+    /**
+     * Stable UUID input for an accessory whose display name is not its identity.
+     * The default key folds the name in, so renaming a merged light group would
+     * replace the accessory and drop it out of every scene it belongs to.
+     */
+    uuidSeed?: string
 }
 
 export interface DeviceWithOp extends Device {
@@ -75,7 +82,8 @@ export default class Accessories<T extends AccessoryInterface> {
         } else {
             this.log.info("Adding new accessory: %s (%s :: %s)", context.displayName, context.deviceId, this.deviceType.toString());
 
-            const key = `${context.deviceId}${context.displayName}${context.deviceType.toString()}`;
+            const key = context.uuidSeed
+                || `${context.deviceId}${context.displayName}${context.deviceType.toString()}`;
             const uuid = this.api.hap.uuid.generate(key);
 
             const accessory = new this.api.platformAccessory(context.displayName, uuid);
