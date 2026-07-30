@@ -821,9 +821,10 @@ class CompletePane extends Pane {
                 return;
             }
 
+            const savedDevices = this.config.devices || [];
             const availableDevices = [];
             for(const device of devices) {
-                const equiv = (this.config.devices || [])
+                const equiv = savedDevices
                     .filter(oldDevice => this.devicesEquals(oldDevice, device));
                 if(!equiv || !equiv.length) {
                     availableDevices.push(device);
@@ -831,6 +832,25 @@ class CompletePane extends Pane {
                     availableDevices.push(equiv[0]);
                 }
             }
+
+            // Say what this refresh takes away, before it is saved.
+            // A saved entry the new list still names survives, and one it does not is dropped
+            // without a word - while `/main/home.do` intermittently answers with another
+            // household's page. So a refresh can quietly remove devices the resident still has,
+            // and the runtime then judges every later page against what is left.
+            // Naming the losses is what makes saving the list a decision rather than an assumption.
+            const removed = savedDevices.filter(oldDevice =>
+                !availableDevices.some(device => this.devicesEquals(oldDevice, device)));
+            if(savedDevices.length && removed.length) {
+                const shown = removed.slice(0, 5)
+                    .map(device => device.displayName || device.deviceId).join(", ");
+                const rest = removed.length > shown.split(", ").length ? ` 외 ${removed.length - 5}개` : "";
+                window.homebridge.toast.warning(
+                    `${shown}${rest}. 이 세대의 기기가 맞다면 '재설정'으로 다시 조회해주세요.`,
+                    `기기 ${removed.length}개가 목록에서 빠졌습니다`);
+            }
+            console.log(`Devices: ${savedDevices.length} saved, ${availableDevices.length} after refresh, ${removed.length} dropped`);
+
             this.config.devices = availableDevices;
             await this.updatePluginConfig();
             await this.savePluginConfig();
