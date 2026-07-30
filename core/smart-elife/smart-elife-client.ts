@@ -32,6 +32,7 @@ export interface ListenerError {
 }
 
 export interface ListenerMetadata {
+    /** WebSocket action name, e.g. `elevate_call`. Absent on a polled report. */
     action?: string
 }
 
@@ -49,6 +50,25 @@ interface ListenerInfo {
 interface PushListenerInfo {
     pushType: PushType
     listener: PushListener
+}
+
+/**
+ * A `/main/home.do` that was held against the configuration and kept.
+ * The stamp rides with the markup rather than being taken where it is parsed:
+ * the polled page is already seconds old by then,
+ * and what decides whether a report may be believed
+ * is when it was asked for, not when it was read.
+ */
+interface RenderedPage {
+    html: string
+    deviceList: any[] | undefined
+
+    /**
+     * Whether the devices this page listed are this household's.
+     * The session keys it carries are ours either way - measured - so the credentials
+     * parser reads the page regardless, while everything about the devices does not.
+     */
+    ownHousehold: boolean
 }
 
 const POLLING_INTERVAL_MILLISECONDS = 30 * 1000;
@@ -84,7 +104,20 @@ export default class SmartELifeClient {
 
     // WallPad authorization temporary keys
     private wsCredentials?: WebSocketCredentials;
-    private serverSideRenderedHTML?: string;
+    private renderedPage?: RenderedPage;
+
+    /**
+     * Device types the last accepted page carried.
+     * Learned rather than listed, so that a household whose WallPad answers for
+     * something this plugin has never seen is asked about it all the same.
+     */
+    private renderedDeviceTypes: DeviceType[] = [];
+
+    /** How many reports were declined as another household's, for the debug log. */
+    private declinedForeignReports = 0;
+
+    /** Whether the log has already said that there is nothing to hold a report against. */
+    private reportedUncomparableDeviceList = false;
 
     private readonly ws?: WebSocketScheduler;
     private readonly listeners: ListenerInfo[] = [];
@@ -487,7 +520,13 @@ export default class SmartELifeClient {
     }
 
     private async attemptsParsingWebSocketCredentials() {
-        let { userKey, roomKey, accessToken } = parseWebSocketCredentials(await this.fetchServerSideRenderedHTML());
+        // Reads the page whichever household its device list belonged to.
+        // Measured over a day: every page carried this session's own room and user keys,
+        // including the ones whose device list was somebody else's - the server misresolves
+        // the household for the list, not for the session. Declining here would leave a
+        // working session without the credentials it needs.
+        const { html } = await this.fetchRenderedPage();
+        let { userKey, roomKey, accessToken } = parseWebSocketCredentials(html);
 
         userKey = userKey || this.config.userKey || "";
         roomKey = roomKey || this.config.roomKey || "";
@@ -869,23 +908,146 @@ export default class SmartELifeClient {
         return r.version;
     }
 
-    private async fetchServerSideRenderedHTML(forceFetch: boolean = false) {
-        if(!!this.serverSideRenderedHTML && !forceFetch) {
-            return this.serverSideRenderedHTML;
+    /**
+     * Fetches `/main/home.do` and keeps it only if it is this household's.
+     *
+     * The single gate. `/main/home.do` answers with another resident's page often enough
+     * to matter - measured at 18 to 42 per cent of polls over a day - and it does so with a
+     * plain 200 rather than with anything that reads as an error. Everything downstream reads
+     * this page: the device list, the room names, the WebSocket credentials. Holding the page
+     * itself is the only place where one judgement covers all of them.
+     */
+    private async fetchRenderedPage(forceFetch: boolean = false): Promise<RenderedPage> {
+        if(!!this.renderedPage && !forceFetch) {
+            return this.renderedPage;
         }
         const html = await this.fetchWithJSessionId(`${this.baseUrl}/main/home.do`, {
             method: "GET",
             headers: await this.createDocumentHeaters(),
         }).then((response) => response.text());
-        this.serverSideRenderedHTML = html;
-        return html;
+
+        // A page whose markup gave the parser nothing says nothing about which household
+        // answered either, so it is carried rather than declined - the credentials parser
+        // reads the same page for something the device list has no bearing on.
+        const deviceList = parseDeviceList(html) || undefined;
+        const ownHousehold = !deviceList || this.isOwnHouseholdDeviceList(deviceList);
+        const page: RenderedPage = { html, deviceList, ownHousehold };
+        if(!ownHousehold) {
+            this.declinedForeignReports += 1;
+            this.log.debug("Ignoring a rendered page that is not this household's " +
+                "(%d report(s) declined so far).", this.declinedForeignReports);
+            // Deliberately not cached. Serving it again would make one bad answer
+            // the household for as long as nobody forces a fetch.
+            return page;
+        }
+        this.renderedPage = page;
+        if(deviceList) {
+            this.renderedDeviceTypes = deviceList
+                .map((deviceGroup: any) => deviceGroup["type"] as DeviceType)
+                .filter((deviceType: DeviceType) => !!deviceType);
+        }
+        return page;
+    }
+
+    /**
+     * Whether a device list is this household's.
+     *
+     * WallPad `uid`s are only unique inside one household, so a stranger's list does not
+     * merely miss ours - it collides with a few of them, and `parseDevices()` matches on
+     * `uid` and type alone. That is how a light of ours picks up somebody else's on/off.
+     *
+     * Measured against a live household over a day: this account's own page names all but one
+     * of the devices it lists in the configuration, while the pages of strangers name at most a
+     * fifth of theirs. A majority sits between the two with room to spare on both sides.
+     */
+    private isOwnHouseholdDeviceList(deviceList: any[]): boolean {
+        const configured = new Set((this.config.devices || []).map((device) => device.deviceId));
+        // Nothing to hold the list against.
+        // The settings wizard signs in precisely to find out what this household has,
+        // and the resident then reads that list on screen and saves it -
+        // which is the confirmation this judgement would otherwise be standing in for.
+        if(configured.size === 0) {
+            if(!this.reportedUncomparableDeviceList) {
+                this.reportedUncomparableDeviceList = true;
+                this.log.debug("Nothing configured to hold a device list against; " +
+                    "accepting it as this household's.");
+            }
+            return true;
+        }
+        let listed = 0;
+        let ours = 0;
+        for(const deviceGroup of deviceList) {
+            for(const device of deviceGroup?.["devices"] || []) {
+                const deviceId = device?.["uid"];
+                if(typeof deviceId !== "string" || deviceId.trim().length === 0) {
+                    continue;
+                }
+                listed += 1;
+                if(configured.has(deviceId)) {
+                    ours += 1;
+                }
+            }
+        }
+        // A list that named nobody carries no state to mistake for ours,
+        // so there is nothing to protect against and something to lose by refusing:
+        // a household part-way through setup would never get past this.
+        if(listed === 0) {
+            return true;
+        }
+        return ours * 2 > listed;
+    }
+
+    /**
+     * Device types worth asking the WallPad about.
+     *
+     * What the last accepted page carried, where there has been one - that is the server's own
+     * account of which types it answers for. Before then the configuration stands in, because
+     * the first page after a sign-in is sometimes the one that gets declined, and a start that
+     * declines its first page would otherwise ask about nothing at all and sit blind until a
+     * page happens to come back ours. A type the query cannot answer for costs one entry in a
+     * JSON array and is ignored.
+     */
+    private deviceTypesToAskAbout(): DeviceType[] {
+        if(this.renderedDeviceTypes.length > 0) {
+            return this.renderedDeviceTypes;
+        }
+        return [...new Set((this.config.devices || []).map((device) => device.deviceType))];
+    }
+
+    /**
+     * Asks the WallPad for the state of whole device types,
+     * the same query the app's own pages run when they open.
+     * The answer arrives through the usual listeners, marked as a complete snapshot.
+     *
+     * This is what a declined page falls back on. The rendered page is the only thing
+     * the server gets wrong; the socket answers for the session.
+     */
+    async requestDeviceStatus(deviceTypes: DeviceType[] = this.deviceTypesToAskAbout()) {
+        if(!this.ws || deviceTypes.length === 0) {
+            return;
+        }
+        await this.sendJson({
+            "roomKey": this.wsCredentials?.roomKey,
+            "userKey": this.wsCredentials?.userKey,
+            "accessToken": this.wsCredentials?.accessToken,
+            "data": deviceTypes.map((deviceType) => ({ type: deviceType.toString() })),
+        });
     }
 
     private async refreshDeviceStatus(forceFetch: boolean = false) {
         if(!this.ws) {
             return;
         }
-        const deviceList: any[] = parseDeviceList(await this.fetchServerSideRenderedHTML(forceFetch));
+        const page = await this.fetchRenderedPage(forceFetch);
+        if(!page.ownHousehold || !page.deviceList) {
+            // Nothing of this page reaches the accessories, and none of it is echoed back
+            // to the socket either - asking the server about a stranger's devices is how
+            // their answers came back as ours. The WallPad is asked instead, so that
+            // declining a page costs freshness rather than sight.
+            await this.requestDeviceStatus();
+            return;
+        }
+        const deviceList = page.deviceList;
         await this.sendJson({
             "roomKey": this.wsCredentials?.roomKey,
             "userKey": this.wsCredentials?.userKey,
@@ -911,7 +1073,18 @@ export default class SmartELifeClient {
     }
 
     async fetchDevices(): Promise<Device[]> {
-        const deviceList: any[] = parseDeviceList(await this.fetchServerSideRenderedHTML());
+        const page = await this.fetchRenderedPage();
+        if(!page.ownHousehold || !page.deviceList) {
+            // A wizard signing in for the first time has nothing to hold a page against,
+            // so it never reaches this - the judgement is skipped and the resident reads
+            // the list on screen instead. Getting here means a saved configuration exists
+            // and the page did not match it, which is worth saying rather than answering
+            // with an empty household.
+            this.log.warn("The rendered device list was not this household's, so no devices were read. " +
+                "Try again in a moment.");
+            return [];
+        }
+        const deviceList = page.deviceList;
         const fetchedDevices: Device[] = [];
         for(const deviceGroup of deviceList) {
             const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
