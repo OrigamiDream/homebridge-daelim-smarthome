@@ -651,6 +651,26 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
     }
 
     /**
+     * Whether the configuration has this light standing for part of a merged room.
+     *
+     * Asked of the configuration rather than of the accessories, because the two can disagree
+     * and only one of them is authoritative. A report arriving for a member whose merged
+     * accessory could not be found in the list used to be answered by giving that light an
+     * accessory of its own - so the room appeared twice in HomeKit, once merged and once as
+     * its separate lights, and no later pass took the extras away because by then they were
+     * exactly what the accessory list said should be there.
+     *
+     * The configuration cannot drift that way: it is read once at startup and says plainly
+     * which lights the wizard put in a group.
+     */
+    private isGroupMember(deviceId: string): boolean {
+        return this.configuredLights().some((device) =>
+            device.combineLightbulbGroup === true
+            && !!device.lightbulbGroup
+            && device.lightbulbGroup.members.indexOf(deviceId) >= 0);
+    }
+
+    /**
      * Creates the merged accessories the configuration asks for, and retires whatever a
      * previous configuration left behind. Runs once, at registration.
      *
@@ -848,6 +868,11 @@ export default class LightbulbAccessories extends OnOffAccessories<LightbulbAcce
             for(const device of devices) {
                 const accessory = this.findGroupAccessory(device.deviceId);
                 if(!accessory) {
+                    // A light the configuration put in a group never gets one of its own,
+                    // whatever the accessory list currently holds - see `isGroupMember`.
+                    if(this.isGroupMember(device.deviceId)) {
+                        continue;
+                    }
                     this.syncAccessory(device);
                     continue;
                 }
