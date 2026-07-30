@@ -167,11 +167,13 @@ export default class SmartELifeClient {
 
                 let status = "000";
                 let deviceTypeString, message;
+                let completeSnapshot = false;
                 if(!!header) {
                     deviceTypeString = header["type"];
                     if(header["command"] === "control_response")
                         return;
 
+                    completeSnapshot = true;
                     if(json["result"]) {
                         status = json["result"]["status"];
                         message = json["result"]["message"];
@@ -190,6 +192,15 @@ export default class SmartELifeClient {
                 const deviceType = deviceTypeString as DeviceType || DeviceType.UNKNOWN;
                 if(deviceType === DeviceType.UNKNOWN)
                     client.log.warn("Unknown device type: %s", deviceTypeString);
+
+                // The socket carries the same misattribution the rendered page does.
+                // A day of measurement found 91 answers that listed another household's devices.
+                if(!client.isOwnHouseholdFrame(json["data"], completeSnapshot, deviceType)) {
+                    client.declinedForeignReports += 1;
+                    client.log.debug("Ignoring a %s frame that is not this household's " +
+                        "(%d report(s) declined so far).", deviceTypeString, client.declinedForeignReports);
+                    return;
+                }
 
                 for(const info of client.listeners) {
                     if(info.deviceType === deviceType) {
@@ -995,6 +1006,43 @@ export default class SmartELifeClient {
             return true;
         }
         return ours * 2 > listed;
+    }
+
+    /**
+     * Whether a WebSocket frame is this household's.
+     *
+     * The two shapes have to be judged differently. A query answers with every device of its
+     * type, which can be held against the configuration exactly as a page is - 91 of these
+     * arrived from other households in a day of measurement. A push carries one device, where
+     * a majority means nothing, but it does carry the room key, which the elevator frames
+     * already rely on. A frame naming neither is let through: `elevator_call_request` carries
+     * no room key at all.
+     */
+    private isOwnHouseholdFrame(data: any, completeSnapshot: boolean, deviceType: DeviceType): boolean {
+        // Not every frame carries devices at all - the indoor air list answers with a bare
+        // header - and a frame that names nothing cannot be attributed to anybody.
+        if(!data || typeof data !== "object") {
+            return true;
+        }
+        if(completeSnapshot) {
+            // A whole page pools every type, so a handful of devices this household never
+            // configured is lost in the majority. One type on its own has no such cushion:
+            // where the configuration holds none of that type at all, every answer about it
+            // names nobody we know and would read as somebody else's. The all-off switch is
+            // exactly that - `fetchDevices()` never writes it down - and its own answers were
+            // being refused. Judge only what there is something to judge against.
+            const comparable = (this.config.devices || [])
+                .some((device) => device.deviceType === deviceType);
+            if(!comparable) {
+                return true;
+            }
+            return this.isOwnHouseholdDeviceList([data]);
+        }
+        const roomKey = data["roomkey"];
+        if(typeof roomKey !== "string" || roomKey.length === 0) {
+            return true;
+        }
+        return !this.wsCredentials?.roomKey || roomKey === this.wsCredentials.roomKey;
     }
 
     /**
