@@ -34,9 +34,28 @@ export interface ListenerError {
 export interface ListenerMetadata {
     /** WebSocket action name, e.g. `elevate_call`. Absent on a polled report. */
     action?: string
+
+    /**
+     * Number drawn from the client's observation counter
+     * at the moment this observation was *requested*.
+     * Commands draw from the same counter,
+     * so a report numbered below a command cannot say anything about that command -
+     * the poll it came from was already in the air when the command was sent.
+     */
+    observedSeq: number
+
+    /**
+     * Whether this report is the whole of its device type rather than a single device.
+     * A polled page and the answer to a query both are;
+     * an `event_*` push carries the one device that changed.
+     */
+    completeSnapshot: boolean
+
+    /** Wall clock at the same instant. For the log, and never compared - see `observedSeq`. */
+    observedAt: number
 }
 
-export type Listener = (data: any | undefined, error: ListenerError, metadata?: ListenerMetadata) => void;
+export type Listener = (data: any | undefined, error: ListenerError, metadata: ListenerMetadata) => void;
 // A listener may run asynchronously - the camera one fetches the visitor snapshot
 // over the network - so the return type has to admit a promise
 // for the dispatcher to be able to catch its rejection.
@@ -69,6 +88,9 @@ interface RenderedPage {
      * parser reads the page regardless, while everything about the devices does not.
      */
     ownHousehold: boolean
+
+    observedSeq: number
+    observedAt: number
 }
 
 const POLLING_INTERVAL_MILLISECONDS = 30 * 1000;
@@ -105,6 +127,14 @@ export default class SmartELifeClient {
     // WallPad authorization temporary keys
     private wsCredentials?: WebSocketCredentials;
     private renderedPage?: RenderedPage;
+
+    /**
+     * Draws the numbers that order observations against commands.
+     * A wall clock cannot: a Raspberry Pi has no RTC and steps its clock
+     * once the network comes up, and two events inside one millisecond
+     * are indistinguishable by it either way.
+     */
+    private observationCounter = 0;
 
     /**
      * Device types the last accepted page carried.
@@ -162,11 +192,18 @@ export default class SmartELifeClient {
                 await client.requestElevatorStatus();
             },
             async onMessage(client: SmartELifeClient, json: any) {
+                // Stamped where the frame is received. Everything below is parsing.
+                const observedSeq = client.takeObservedSeq();
+                const observedAt = Date.now();
+
                 const header = json["header"];
                 const action = json["action"];
 
                 let status = "000";
                 let deviceTypeString, message;
+                // A query answers with every device of the type it was asked about.
+                // An `event_*` push carries the one device that changed,
+                // and publishing from it would mix what just arrived with what is still stale.
                 let completeSnapshot = false;
                 if(!!header) {
                     deviceTypeString = header["type"];
@@ -204,7 +241,8 @@ export default class SmartELifeClient {
 
                 for(const info of client.listeners) {
                     if(info.deviceType === deviceType) {
-                        info.listener(json["data"], { code: Number(status), message }, { action });
+                        info.listener(json["data"], { code: Number(status), message },
+                            { action, observedSeq, observedAt, completeSnapshot });
                     }
                 }
             }
@@ -920,6 +958,16 @@ export default class SmartELifeClient {
     }
 
     /**
+     * Next number from the observation counter.
+     * Observations and commands draw from the same one,
+     * which is the only thing that establishes their order -
+     * see `ListenerMetadata.observedSeq`.
+     */
+    takeObservedSeq(): number {
+        return ++this.observationCounter;
+    }
+
+    /**
      * Fetches `/main/home.do` and keeps it only if it is this household's.
      *
      * The single gate. `/main/home.do` answers with another resident's page often enough
@@ -932,6 +980,11 @@ export default class SmartELifeClient {
         if(!!this.renderedPage && !forceFetch) {
             return this.renderedPage;
         }
+        // Stamped before the request leaves rather than after the markup is read.
+        // A polled page is seconds old by the time it is parsed,
+        // and a command sent in that gap must not be judged against it.
+        const observedSeq = this.takeObservedSeq();
+        const observedAt = Date.now();
         const html = await this.fetchWithJSessionId(`${this.baseUrl}/main/home.do`, {
             method: "GET",
             headers: await this.createDocumentHeaters(),
@@ -942,7 +995,7 @@ export default class SmartELifeClient {
         // reads the same page for something the device list has no bearing on.
         const deviceList = parseDeviceList(html) || undefined;
         const ownHousehold = !deviceList || this.isOwnHouseholdDeviceList(deviceList);
-        const page: RenderedPage = { html, deviceList, ownHousehold };
+        const page: RenderedPage = { html, deviceList, ownHousehold, observedSeq, observedAt };
         if(!ownHousehold) {
             this.declinedForeignReports += 1;
             this.log.debug("Ignoring a rendered page that is not this household's " +
@@ -1111,7 +1164,11 @@ export default class SmartELifeClient {
             for(const listener of this.listeners) {
                 if(listener.deviceType !== deviceType)
                     continue;
-                listener.listener(deviceGroup, { code: Number("000"), message: undefined });
+                listener.listener(deviceGroup, { code: Number("000"), message: undefined }, {
+                    observedSeq: page.observedSeq,
+                    observedAt: page.observedAt,
+                    completeSnapshot: true,
+                });
             }
         }
     }
