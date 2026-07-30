@@ -64,6 +64,13 @@ interface VentAccessoryInterface extends ActiveAccessoryInterface {
      */
     lastRotationSpeed?: RotationSpeed
     mode: string
+    /**
+     * Whether the device has ever reported a `mode` of its own, rather than `mode`
+     * being the automatic driving this class falls back to. A vent that reports none
+     * has no modes to name, so a mode command to it names something that does not
+     * exist there - see `resolveWantedMode()`.
+     */
+    modeReported: boolean
 }
 
 interface PendingVentConfirmation {
@@ -75,17 +82,34 @@ interface PendingVentConfirmation {
  * The writes of one gesture, and the state it started from. What the device is asked for
  * is decided once the writes stop, against the state at the start rather than against a
  * state the gesture's own earlier commands have already moved.
+ *
+ * Every field here records what HomeKit wrote rather than what it should mean. The writes
+ * of one gesture arrive in no particular order - HAP starts every characteristic write of
+ * one request at once - so a handler that decided on the spot would reach a different
+ * answer depending on which write happened to land first. Turning a mode switch off means
+ * "stop" only if nothing else named a mode, and a zero speed means "stop" only if it was
+ * the last thing the drag said; neither is knowable until the writes have all landed.
  */
 interface PendingGesture {
     timer: NodeJS.Timeout
     baseActive: boolean
     baseMode: string
+    /** Set by an explicit `Active` write and by nothing else. */
     active?: boolean
-    /** A mode the user named, through a mode switch or by asking for automatic. */
+    /** The last mode named by a mode switch, as the protocol value the switch stands for. */
     namedMode?: string
+    /** Mode switches turned off in this gesture. */
+    clearedModes: Set<string>
+    /** `TargetAirPurifierState` went to AUTO, which names automatic driving. */
+    autoRequested?: boolean
     /** `TargetAirPurifierState` went to MANUAL, which names no mode of its own. */
     manualRequested?: boolean
-    rotationSpeed?: RotationSpeed
+    /**
+     * The last speed HomeKit wrote, `OFF` included. A drag reaches the accessory as one
+     * write per step, so the last of them is the one the finger stopped on: passing over
+     * zero on the way to a speed is not a request to stop, and stopping on zero is.
+     */
+    speedWrite?: RotationSpeed
 }
 
 export default class VentAccessories extends ActiveAccessories<VentAccessoryInterface> {
@@ -97,7 +121,7 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
     private readonly configuredModeSwitches = new Map<string, Set<string>>();
     private readonly gestures = new Map<string, PendingGesture>();
     /**
-     * Devices whose gathered gesture is being carried out right now.
+     * How many gathered gestures are being carried out on each device right now.
      *
      * A gesture leaves as several commands, and the device reports the state after each
      * one, so a run that ends at high is reported at low first and only then at high.
@@ -105,6 +129,11 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
      * makes the slider visibly jump before it settles. Held back until the last command
      * is answered, the accessory shows the result of the gesture rather than the route
      * it took.
+     *
+     * A count rather than a flag. Two gestures overlap easily - changing a mode and then
+     * reaching for the speed is enough - and the second is queued behind the first rather
+     * than replacing it. Sharing one entry, the first to finish would release the hold
+     * while the second was still commanding, which is exactly the case this exists for.
      *
      * This is deliberately not the light accessory's echo window. That one distrusts
      * reports for a fixed two seconds because a thirty-second poll can return a page
@@ -116,7 +145,7 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
      * change made at the WallPad during that second is applied as soon as they do rather
      * than being discarded the way a fixed window would discard it.
      */
-    private readonly runningGestures = new Set<string>();
+    private readonly runningGestures = new Map<string, number>();
     private operationTimeoutMilliseconds = VENT_OPERATION_TIMEOUT_MILLISECONDS;
     private commandWindowMilliseconds = COMMAND_WINDOW_MILLISECONDS;
 
@@ -174,9 +203,19 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         return !!mode && mode !== Mode.AUTO_DRIVING && mode !== Mode.BYPASS;
     }
 
+    private isHomeKitNameableMode(mode: string | undefined): boolean {
+        // Whether `TargetAirPurifierState` can name the mode the vent is on. It carries
+        // automatic and manual and nothing else, so bypass, cleaning and anything else
+        // chosen in the app are modes it cannot express - and writing to it while one of
+        // those is running would replace it with a superficially equivalent value.
+        return mode === Mode.MANUAL || mode === Mode.AUTO_DRIVING;
+    }
+
     private deviceMode(value: unknown, fallback: string = Mode.AUTO_DRIVING): string {
-        // Preserve app-controlled modes that HomeKit cannot represent. Every non-manual
-        // mode is exposed as HomeKit AUTO without discarding its native behavior.
+        // Whatever the device called it, kept as it came. A push carries only what
+        // changed, so a report without `mode` leaves the last one standing rather than
+        // meaning the vent has none. The final fallback is automatic driving, which is a
+        // guess and is why `modeReported` records that it was one.
         return typeof value === "string" && value.length > 0
             ? value
             : fallback;
@@ -280,22 +319,17 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 this.recordGesture(accessory, (gesture) => {
                     if(value) {
-                        // Naming a mode also starts the vent: the switch is meaningless
-                        // on a vent that is off, and the app starts it the same way.
                         gesture.namedMode = mode;
-                        gesture.active = true;
+                        gesture.clearedModes.delete(mode);
                         return;
                     }
+                    // Only recorded. Clearing the mode the vent runs stops it, because
+                    // there is no "no mode" state to fall back to - but only when nothing
+                    // else in the gesture named a mode, and a switch that names one may
+                    // not have been written yet. `flushGesture()` decides.
+                    gesture.clearedModes.add(mode);
                     if(gesture.namedMode === mode) {
-                        // Cleared again inside the same gesture.
                         gesture.namedMode = undefined;
-                        return;
-                    }
-                    // There is no "no mode" state to fall back to, so clearing the mode
-                    // the vent is running stops it. Clearing any other switch is already
-                    // true and asks for nothing.
-                    if(this.isModeSwitchOn(this.getAccessoryInterface(accessory), mode)) {
-                        gesture.active = false;
                     }
                 });
                 callback(undefined);
@@ -307,6 +341,102 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
 
     private isModeSwitchOn(context: VentAccessoryInterface, mode: string): boolean {
         return context.active && context.mode === mode;
+    }
+
+    /**
+     * The modes the accessory already carries a switch for.
+     *
+     * Stands in for `getVentModes()` while the supported modes are unknown. A switch only
+     * ever exists because a successful read created it, and the accessory cache keeps it
+     * across restarts, so its subtype is something the server once said this vent has
+     * rather than something guessed here. Reading the modes is a single fetch at sign-in
+     * with nothing to fall back on - the WallPad does not answer for which modes a vent
+     * supports - so without this a start that failed to read them would leave the
+     * switches sitting there doing nothing until the next restart.
+     *
+     * Safe across devices: the switches hang off one accessory, and the accessory's UUID
+     * is derived from the device id, so a switch cached under one vent cannot authorise a
+     * command to another.
+     */
+    private modeSwitchAllowlist(accessory: PlatformAccessory): Set<string> {
+        return new Set(this.modeSwitchServices(accessory).map((service) => service.subtype!));
+    }
+
+    /**
+     * The mode a gesture asks the device for, or `undefined` when it asks for none.
+     *
+     * Nothing leaves here that the vent has not been said to support. Issue #135 was a
+     * vent driven into a beeping, wallpad-locked state by repeated mode commands, which
+     * is why `~/hb-testkit/vent-mode-capture.py` reads mode values off the wire instead of
+     * guessing them; a command naming a value this vent has no button for is that same
+     * guess made at runtime. Where the supported modes cannot be established, this refuses
+     * rather than approximating - the behaviour that shipped before the mode switches.
+     */
+    private resolveWantedMode(accessory: PlatformAccessory, gesture: PendingGesture): string | undefined {
+        const context = this.getAccessoryInterface(accessory);
+        // `_client` rather than `client`, which throws before the provider has served.
+        const modes = this._client?.getVentModes(context.deviceId);
+        const refuse = (wanted: string) => {
+            this.log.warn("Not asking %s for the %s mode: the device is not known to support it.",
+                context.displayName, wanted);
+            return undefined;
+        };
+
+        // A mode named by a switch wins over the AUTO/MANUAL toggle. MANUAL names no mode
+        // of its own and would otherwise undo the switch pressed in the same gesture, and
+        // AUTO reaches here only from a scene that asks for both at once.
+        if(gesture.namedMode !== undefined) {
+            const named = gesture.namedMode;
+            const supported = modes
+                ? modes.some((mode) => mode.value === named)
+                : this.modeSwitchAllowlist(accessory).has(named);
+            return supported ? named : refuse(named);
+        }
+
+        if(gesture.autoRequested) {
+            if(modes) {
+                const auto = modes.find((mode) => this.isAutoDrivingMode(mode));
+                // The value rather than the constant: a household could label automatic
+                // driving `자동` while calling it something else on the wire.
+                return auto ? auto.value : refuse(Mode.AUTO_DRIVING);
+            }
+            return this.canNameModeBlindly(context, gesture)
+                ? Mode.AUTO_DRIVING
+                : refuse(Mode.AUTO_DRIVING);
+        }
+
+        if(gesture.manualRequested) {
+            // MANUAL only rules automatic out, so a vent already running anything else
+            // satisfies it and needs no command at all.
+            if(!this.isHomeKitAutomaticMode(gesture.baseMode)) {
+                return undefined;
+            }
+            if(modes) {
+                const switchable = modes.filter((mode) => !this.isAutoDrivingMode(mode));
+                // Plain ventilation is what the app leaves a vent on when it is not
+                // driving itself, so it is what "not automatic" settles on where it
+                // exists; otherwise the first mode the vent offers besides automatic.
+                const plain = switchable.find((mode) => mode.label === PLAIN_VENTILATION_LABEL);
+                const chosen = plain || switchable[0];
+                return chosen ? chosen.value : refuse(Mode.MANUAL);
+            }
+            return this.canNameModeBlindly(context, gesture)
+                ? Mode.MANUAL
+                : refuse(Mode.MANUAL);
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Whether an AUTO/MANUAL write may be sent as the literal value while the supported
+     * modes are unknown. This is the guard that shipped before the mode switches: it
+     * preserves a mode HomeKit cannot express instead of replacing it, and it also
+     * declines a vent that has never reported a mode, whose `mode` is the automatic
+     * driving this class falls back to rather than anything the device said.
+     */
+    private canNameModeBlindly(context: VentAccessoryInterface, gesture: PendingGesture): boolean {
+        return context.modeReported && this.isHomeKitNameableMode(gesture.baseMode);
     }
 
     // ---- gestures ------------------------------------------------------------
@@ -323,6 +453,7 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 timer: undefined as unknown as NodeJS.Timeout,
                 baseActive: context.active,
                 baseMode: context.mode,
+                clearedModes: new Set<string>(),
             };
             this.gestures.set(context.deviceId, gesture);
         } else {
@@ -351,25 +482,32 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         // Reflection stays off from the first write of the gesture right through to the
         // last command it produces. Dropping it here, between the two, would let the
         // states the device passes through on the way reach the characteristics.
-        this.runningGestures.add(context.deviceId);
-
-        const device = this.findDevice(context.deviceId);
-        if(!device) {
-            this.log.warn("Unknown device: %s", context.deviceId);
-            this.runningGestures.delete(context.deviceId);
-            this.applyAccessoryState(accessory);
-            return;
-        }
-
-        // A named mode wins over MANUAL, which only says the vent is not on automatic
-        // and would otherwise undo the switch that was pressed in the same gesture.
-        const wantedMode = gesture.namedMode
-            || (gesture.manualRequested ? Mode.MANUAL : undefined);
-        const wantedActive = gesture.active !== undefined
-            ? gesture.active
-            : (gesture.baseActive || wantedMode !== undefined || gesture.rotationSpeed !== undefined);
+        this.beginGesture(context.deviceId);
 
         try {
+            const device = this.findDevice(context.deviceId);
+            if(!device) {
+                this.log.warn("Unknown device: %s", context.deviceId);
+                return;
+            }
+
+            const wantedMode = this.resolveWantedMode(accessory, gesture);
+            const wantedSpeed = gesture.speedWrite && gesture.speedWrite !== RotationSpeed.OFF
+                ? gesture.speedWrite
+                : undefined;
+            // What the gesture says about power, once every write it carries is in.
+            // An explicit `Active` write and a drag that stopped on zero both say it
+            // outright; clearing the mode the vent runs says it only because there is no
+            // "no mode" state to fall back into, which a mode named elsewhere in the same
+            // gesture answers. Naming a mode or a speed on a stopped vent starts it,
+            // which is how the app behaves too.
+            const stopRequested = gesture.active === false
+                || gesture.speedWrite === RotationSpeed.OFF
+                || (wantedMode === undefined && gesture.clearedModes.has(gesture.baseMode));
+            const wantedActive = !stopRequested
+                && (gesture.active === true || gesture.baseActive
+                    || wantedMode !== undefined || wantedSpeed !== undefined);
+
             await this.enqueueDeviceOperation(device.deviceId, async () => {
                 if(!wantedActive) {
                     if(this.getAccessoryInterface(accessory).active) {
@@ -389,12 +527,11 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                     if(!changed) return false;
                 }
                 const current = this.getAccessoryInterface(accessory);
-                if(gesture.rotationSpeed && gesture.rotationSpeed !== RotationSpeed.OFF
-                    && this.isFanSpeedControllableMode(current.mode)
-                    && current.rotationSpeed !== gesture.rotationSpeed) {
+                if(wantedSpeed && this.isFanSpeedControllableMode(current.mode)
+                    && current.rotationSpeed !== wantedSpeed) {
                     await this.sendDeviceStateAndWait({
                         ...device,
-                        op: {wind_speed: gesture.rotationSpeed.toString()},
+                        op: {wind_speed: wantedSpeed.toString()},
                     });
                 }
                 return true;
@@ -404,11 +541,25 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         } finally {
             // Released before the state is put back, and in a `finally` so a command
             // that threw cannot leave the accessory frozen on a state it has left.
-            this.runningGestures.delete(context.deviceId);
+            this.endGesture(context.deviceId);
         }
         // Whatever the device settled on goes back onto the characteristics, which is
-        // also what restores a slider the user moved in a mode that has no speed.
+        // also what restores a slider the user moved in a mode that has no speed. It
+        // does nothing while another gesture on this device is still commanding.
         this.applyAccessoryState(accessory);
+    }
+
+    private beginGesture(deviceId: string) {
+        this.runningGestures.set(deviceId, (this.runningGestures.get(deviceId) || 0) + 1);
+    }
+
+    private endGesture(deviceId: string) {
+        const running = (this.runningGestures.get(deviceId) || 0) - 1;
+        if(running > 0) {
+            this.runningGestures.set(deviceId, running);
+        } else {
+            this.runningGestures.delete(deviceId);
+        }
     }
 
     // ---- state reflection ----------------------------------------------------
@@ -598,17 +749,17 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         purifier.getCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 this.recordGesture(accessory, (gesture) => {
+                    // Recorded as which of the two was asked for rather than as a mode.
+                    // AUTO names automatic driving but not the value this vent calls it
+                    // by, and MANUAL names no mode at all - it only rules automatic out.
+                    // `resolveWantedMode()` turns either into a value the device supports.
                     if(value === this.api.hap.Characteristic.TargetAirPurifierState.AUTO) {
-                        gesture.namedMode = Mode.AUTO_DRIVING;
+                        gesture.autoRequested = true;
                         gesture.manualRequested = false;
                         return;
                     }
-                    // MANUAL names no mode. It only rules automatic out, so it settles on
-                    // plain ventilation unless a switch in the same gesture named one.
                     gesture.manualRequested = true;
-                    if(gesture.namedMode === Mode.AUTO_DRIVING) {
-                        gesture.namedMode = undefined;
-                    }
+                    gesture.autoRequested = false;
                 });
                 callback(undefined);
             })
@@ -637,19 +788,12 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 const newSpeed = this.homebridgeToRotationSpeed(numeric);
                 this.log.debug(`Vent :: SET :: RotationSpeed: ${numeric.toFixed(2)} (HomeKit) -> ${newSpeed.toString()}`);
                 this.recordGesture(accessory, (gesture) => {
-                    if(newSpeed === RotationSpeed.OFF) {
-                        // Zero is HomeKit's way of stopping a fan, not a speed. It stops
-                        // the vent even where a speed cannot be chosen, which is how the
-                        // slider behaves on the air conditioner too.
-                        gesture.active = false;
-                        gesture.rotationSpeed = undefined;
-                        return;
-                    }
-                    gesture.rotationSpeed = newSpeed;
-                    if(gesture.active === false) {
-                        // A drag that crossed zero on its way is not a request to stop.
-                        gesture.active = undefined;
-                    }
+                    // Only recorded, zero included. Zero is HomeKit's way of stopping a
+                    // fan rather than a speed, and it stops the vent even where a speed
+                    // cannot be chosen - which is how the slider behaves on the air
+                    // conditioner too - but only when the drag ended there. What decides
+                    // that is which write came last, so the answer waits for the gesture.
+                    gesture.speedWrite = newSpeed;
                 });
                 callback(undefined);
             })
@@ -683,6 +827,10 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                         ? false
                         : cachedContext?.active || false;
                 const mode = this.deviceMode(device.op["mode"], cachedContext?.mode);
+                // A push carries only what changed, so a report without `mode` says
+                // nothing either way and what was learned before stands.
+                const modeReported = (typeof device.op["mode"] === "string" && device.op["mode"].length > 0)
+                    || !!cachedContext?.modeReported;
                 const reported = this.deviceRotationSpeed(device.op["wind_speed"]);
                 // Modes without wind control omit the field entirely, so the last speed
                 // the device did report is what a mode that has one returns to.
@@ -703,6 +851,7 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                     rotationSpeed,
                     lastRotationSpeed,
                     mode,
+                    modeReported,
                 });
                 if(!accessory) {
                     this.confirmDeviceOperation(device);
