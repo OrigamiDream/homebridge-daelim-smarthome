@@ -127,6 +127,17 @@ interface PendingGesture {
 export default class VentAccessories extends ActiveAccessories<VentAccessoryInterface> {
     private readonly deviceOperationQueues = new Map<string, Promise<void>>();
     private readonly pendingConfirmations = new Map<string, PendingVentConfirmation>();
+    /**
+     * Reports observed before this number cannot describe the command that set it.
+     *
+     * Drawn from the client's observation counter as each command goes out and again as
+     * it settles, the way the light accessory keeps it. A websocket push is stamped when
+     * it is received, so it always passes; only a poll that was already in the air when
+     * the command was sent falls below - and that is exactly the report whose shape can
+     * still match the pending op and confirm it falsely, or rewrite the context with the
+     * state the command was sent to leave.
+     */
+    private readonly staleBefore = new Map<string, number>();
     // Mode switches whose SET/GET handlers are already attached, per device. Services
     // restored from the accessory cache come back without their handlers, and the sync
     // runs on every device event, so both cases have to be told apart.
@@ -748,6 +759,8 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         // Install the waiter before the HTTP request so a fast websocket event cannot
         // arrive between request acceptance and confirmation registration.
         const confirmation = this.createDeviceConfirmation(device.deviceId, device.op);
+        // Anything observed before now was observed before this command existed.
+        this.staleBefore.set(device.deviceId, this.client.takeObservedSeq());
         const sentAt = Date.now();
         try {
             const accepted = await super.setDeviceState(device);
@@ -765,6 +778,11 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         } catch(error) {
             confirmation.cancel();
             throw error;
+        } finally {
+            // A poll that was already in the air when this op settled cannot describe
+            // its outcome either - the WallPad may not have applied the command when
+            // that page was asked for.
+            this.staleBefore.set(device.deviceId, this.client.takeObservedSeq());
         }
     }
 
@@ -900,8 +918,19 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
     register() {
         super.register();
 
-        this.addDeviceListener((devices) => {
+        this.addDeviceListener((devices, metadata) => {
             for(const device of devices) {
+                const staleBefore = this.staleBefore.get(device.deviceId);
+                if(staleBefore !== undefined && metadata.observedSeq < staleBefore) {
+                    // Dropped before it touches anything. Applied, it would rewrite the
+                    // context with the state the command in flight was sent to leave -
+                    // and its shape can even match the pending op, confirming a command
+                    // the device has not answered. The vent is polled every thirty
+                    // seconds, so a poll straddling a command is a matter of time.
+                    this.log.debug("Vent :: %s :: ignoring a report observed before the command in flight",
+                        device.displayName);
+                    continue;
+                }
                 const cachedAccessory = this.findAccessory(device.deviceId);
                 const cachedContext = cachedAccessory
                     ? this.getAccessoryInterface(cachedAccessory)
