@@ -329,6 +329,8 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         configured.add(mode);
         service.getCharacteristic(this.api.hap.Characteristic.On)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                this.log.debug("Vent :: %s :: SET :: mode switch %s -> %s",
+                    this.getAccessoryInterface(accessory).displayName, mode, value ? "on" : "off");
                 this.recordGesture(accessory, (gesture) => {
                     if(value) {
                         gesture.namedMode = mode;
@@ -541,6 +543,11 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 && (gesture.active === true || gesture.baseActive
                     || wantedMode !== undefined || wantedSpeed !== undefined);
 
+            this.log.debug("Vent :: %s :: gesture [%s] asks active=%s mode=%s speed=%s (from active=%s mode=%s speed=%s)",
+                context.displayName, this.describeGesture(gesture),
+                wantedActive ? "on" : "off", wantedMode || "-", wantedSpeed || "-",
+                gesture.baseActive ? "on" : "off", gesture.baseMode, gesture.baseSpeed);
+
             await this.enqueueDeviceOperation(device.deviceId, async () => {
                 if(!wantedActive) {
                     if(this.getAccessoryInterface(accessory).active) {
@@ -580,6 +587,18 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         // also what restores a slider the user moved in a mode that has no speed. It
         // does nothing while another gesture on this device is still commanding.
         this.applyAccessoryState(accessory);
+    }
+
+    /** One line saying what the gesture carried, for the log. */
+    private describeGesture(gesture: PendingGesture): string {
+        const writes = [];
+        if(gesture.active !== undefined) writes.push(`active=${gesture.active ? "on" : "off"}`);
+        if(gesture.namedMode !== undefined) writes.push(`mode=${gesture.namedMode}`);
+        if(gesture.clearedModes.size > 0) writes.push(`cleared=${[...gesture.clearedModes].join("+")}`);
+        if(gesture.autoRequested) writes.push("AUTO");
+        if(gesture.manualRequested) writes.push("MANUAL");
+        if(gesture.speedWrite !== undefined) writes.push(`speed=${gesture.speedWrite}`);
+        return writes.join(" ") || "nothing";
     }
 
     private beginGesture(deviceId: string) {
@@ -704,18 +723,27 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
     }
 
     private async sendDeviceStateAndWait(device: DeviceWithOp): Promise<boolean> {
-        if(this.operationMatchesContext(device.deviceId, device.op)) return true;
+        if(this.operationMatchesContext(device.deviceId, device.op)) {
+            this.log.debug("Vent :: %s :: %s is already satisfied", device.displayName, JSON.stringify(device.op));
+            return true;
+        }
 
         // Install the waiter before the HTTP request so a fast websocket event cannot
         // arrive between request acceptance and confirmation registration.
         const confirmation = this.createDeviceConfirmation(device.deviceId, device.op);
+        const sentAt = Date.now();
         try {
             const accepted = await super.setDeviceState(device);
             if(!accepted) {
                 confirmation.cancel();
                 return false;
             }
-            return await confirmation.promise;
+            const confirmed = await confirmation.promise;
+            if(confirmed) {
+                this.log.debug("Vent :: %s :: %s confirmed in %dms",
+                    device.displayName, JSON.stringify(device.op), Date.now() - sentAt);
+            }
+            return confirmed;
         } catch(error) {
             confirmation.cancel();
             throw error;
@@ -768,6 +796,8 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         purifier.getCharacteristic(this.api.hap.Characteristic.Active)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const active = value === this.api.hap.Characteristic.Active.ACTIVE;
+                this.log.debug("Vent :: %s :: SET :: Active -> %s",
+                    this.getAccessoryInterface(accessory).displayName, active ? "on" : "off");
                 this.recordGesture(accessory, (gesture) => {
                     gesture.active = active;
                 });
@@ -781,6 +811,9 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             });
         purifier.getCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                this.log.debug("Vent :: %s :: SET :: TargetAirPurifierState -> %s",
+                    this.getAccessoryInterface(accessory).displayName,
+                    value === this.api.hap.Characteristic.TargetAirPurifierState.AUTO ? "AUTO" : "MANUAL");
                 this.recordGesture(accessory, (gesture) => {
                     // Recorded as which of the two was asked for rather than as a mode.
                     // AUTO names automatic driving but not the value this vent calls it
@@ -819,7 +852,8 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 const numeric = value as number;
                 const newSpeed = this.homebridgeToRotationSpeed(numeric);
-                this.log.debug(`Vent :: SET :: RotationSpeed: ${numeric.toFixed(2)} (HomeKit) -> ${newSpeed.toString()}`);
+                this.log.debug("Vent :: %s :: SET :: RotationSpeed %s -> %s",
+                    this.getAccessoryInterface(accessory).displayName, numeric.toFixed(2), newSpeed.toString());
                 this.recordGesture(accessory, (gesture) => {
                     // Only recorded, zero included. Zero is HomeKit's way of stopping a
                     // fan rather than a speed, and it stops the vent even where a speed
