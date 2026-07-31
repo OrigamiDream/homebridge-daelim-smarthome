@@ -556,15 +556,15 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                     return true;
                 }
                 if(!this.getAccessoryInterface(accessory).active) {
-                    const turnedOn = await this.sendDeviceStateAndWait({
+                    const accepted = await this.sendDeviceStateAndWait({
                         ...device,
                         op: this.onSetActivityOp(true, {control: "on"}),
                     });
-                    if(!turnedOn) return false;
+                    if(!accepted) return false;
                 }
                 if(wantedMode && this.getAccessoryInterface(accessory).mode !== wantedMode) {
-                    const changed = await this.sendDeviceStateAndWait({...device, op: {mode: wantedMode}});
-                    if(!changed) return false;
+                    const accepted = await this.sendDeviceStateAndWait({...device, op: {mode: wantedMode}});
+                    if(!accepted) return false;
                 }
                 const current = this.getAccessoryInterface(accessory);
                 if(wantedSpeed && this.isFanSpeedControllableMode(current.mode)
@@ -690,29 +690,35 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
     }
 
     private createDeviceConfirmation(deviceId: string, operation: Record<string, any>) {
+        let completed = false;
+        let timer: NodeJS.Timeout | undefined;
         let complete: (confirmed: boolean) => void = () => undefined;
         const promise = new Promise<boolean>((resolve) => {
-            let completed = false;
-            const timer = setTimeout(() => {
-                if(completed) return;
-                completed = true;
-                this.pendingConfirmations.delete(deviceId);
-                this.log.warn("Vent operation was not confirmed by a device event: %s", JSON.stringify(operation));
-                resolve(false);
-            }, this.operationTimeoutMilliseconds);
-            timer.unref();
-
             complete = (confirmed: boolean) => {
                 if(completed) return;
                 completed = true;
-                clearTimeout(timer);
+                if(timer) clearTimeout(timer);
                 this.pendingConfirmations.delete(deviceId);
                 resolve(confirmed);
             };
         });
 
+        // The budget opens when the server accepts the command, not when the request
+        // leaves. On 2026-07-31 the control endpoint took 3..7 seconds per call, so a
+        // clock started at send time was spent before the device had been asked at all -
+        // the waiter is still installed before the request, because the event can
+        // outrun the HTTP response, but the deadline only makes sense from acceptance.
+        const arm = () => {
+            if(completed || timer) return;
+            timer = setTimeout(() => {
+                this.log.warn("Vent operation was not confirmed by a device event: %s", JSON.stringify(operation));
+                complete(false);
+            }, this.operationTimeoutMilliseconds);
+            timer.unref();
+        };
+
         this.pendingConfirmations.set(deviceId, {operation, complete});
-        return {promise, cancel: () => complete(false)};
+        return {promise, arm, cancel: () => complete(false)};
     }
 
     private confirmDeviceOperation(device: DeviceWithOp) {
@@ -722,6 +728,17 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
         }
     }
 
+    /**
+     * Sends one op and waits for a device event to answer it.
+     *
+     * Resolves false only when the server refused the command outright; a network
+     * failure still throws. A confirmation that never arrives resolves true once the
+     * budget runs out, because unconfirmed is not failed: every op that went
+     * unconfirmed in the 2026-07-31 field log had in fact been applied - the event was
+     * late, not absent - and reading the silence as failure is what dropped the rest of
+     * the gesture there, leaving the vent running plain ventilation instead of the mode
+     * that was asked for.
+     */
     private async sendDeviceStateAndWait(device: DeviceWithOp): Promise<boolean> {
         if(this.operationMatchesContext(device.deviceId, device.op)) {
             this.log.debug("Vent :: %s :: %s is already satisfied", device.displayName, JSON.stringify(device.op));
@@ -738,12 +755,13 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
                 confirmation.cancel();
                 return false;
             }
+            confirmation.arm();
             const confirmed = await confirmation.promise;
             if(confirmed) {
                 this.log.debug("Vent :: %s :: %s confirmed in %dms",
                     device.displayName, JSON.stringify(device.op), Date.now() - sentAt);
             }
-            return confirmed;
+            return true;
         } catch(error) {
             confirmation.cancel();
             throw error;
