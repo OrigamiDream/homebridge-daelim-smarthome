@@ -576,6 +576,9 @@ class AuthorizationPane extends Pane {
                 complex: this.config.complex,
                 username: this.usernameElement.value,
                 password: this.passwordElement.value,
+                // The saved device list rides along as the yardstick the server holds
+                // fetched pages against. Empty on a first-time setup, and ignored by daelim.
+                devices: this.config.devices || [],
             });
         });
         this.addHomebridgeListener("authorization-failed", (event) => {
@@ -685,6 +688,8 @@ class WallpadPasscodePane extends Pane {
                 username: this.config.username,
                 password: this.config.password,
                 passcode: this.passcodeElement.value,
+                // Rides through to the sign-in this passcode completes - see AuthorizationPane.
+                devices: this.config.devices || [],
             });
         });
         this.addHomebridgeListener("invalid-wallpad-passcode", async () => {
@@ -718,6 +723,32 @@ class WallpadPasscodePane extends Pane {
 
 const DEVICE_REFRESH_FAILED_MESSAGE = "기기 목록을 갱신하지 못했습니다. 저장된 목록으로 설정을 편집합니다.";
 const WALLPAD_REAUTHORIZATION_MESSAGE = "월패드 재인증이 필요합니다. 기기 목록을 갱신하려면 '재설정'으로 다시 로그인해주세요.";
+const DEVICE_REFRESH_KEPT_MESSAGE = "기기 목록을 조회하지 못했습니다. 저장된 설정은 그대로 유지됩니다.";
+
+const DEVICE_TYPE_LABELS = {
+    "light": "조명",
+    "heat": "난방",
+    "wallsocket": "콘센트",
+    "vent": "환기",
+    "gas": "가스",
+    "aircon": "에어컨",
+    "aircon2": "에어컨",
+    "alloffswitch": "일괄소등",
+    "indoorair": "공기질",
+    "elevator": "엘리베이터",
+    "door": "현관",
+    "smartdoor": "도어락",
+    "vehicle": "주차",
+    "camera": "초인종 카메라",
+};
+
+function escapeHtml(text) {
+    return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
 
 class CompletePane extends Pane {
     constructor(element, config) {
@@ -729,18 +760,30 @@ class CompletePane extends Pane {
         this._refreshed = false;
         this._advancedFormOpened = false;
 
+        // What the last fetch reported, held until the resident explicitly saves it.
+        // The config keeps its saved list all the while - that list is also the yardstick
+        // the server judges fetched pages against, so replacing it must be a decision.
+        this._pendingDevices = null;
+        this._pendingAdded = [];
+        this._pendingRemoved = [];
+        // Which confirmation screen is showing: "first", "first-failed", "diff", or null.
+        this._confirmMode = null;
+
         this.pane = document.createElement("div");
         this.pane.classList.add("hidden");
         this.pane.id = "done";
         this.pane.innerHTML = `
-            <div class="text-center">
+            <div class="text-center" id="done-main">
                 <h2>설정이 완료되었습니다.</h2>
                 <p>이제 <span class="brand-name">DL E&C</span> 아파트의 가구를 애플 기기에서 제어할 수 있습니다.</p>
                 <button type="button" id="advanced-button" class="btn btn-secondary" disabled>고급</button>
                 <button type="button" id="reset-button" class="btn btn-primary">재설정</button>
                 <button type="button" id="done-button" class="btn btn-primary">닫기</button>
             </div>
+            <div class="hidden" id="device-confirm"></div>
         `;
+        this.doneMain = this.pane.querySelector("#done-main");
+        this.confirmContainer = this.pane.querySelector("#device-confirm");
         this.advancedButton = this.pane.querySelector("#advanced-button");
         this.resetButton = this.pane.querySelector("#reset-button");
         this.doneButton = this.pane.querySelector("#done-button");
@@ -782,32 +825,233 @@ class CompletePane extends Pane {
         }
     }
 
+    _deviceRow(device, badge) {
+        const label = badge === "removed"
+            ? `<span class="badge badge-danger ml-2">빠짐</span>`
+            : badge === "added"
+                ? `<span class="badge badge-success ml-2">추가</span>`
+                : "";
+        const strike = badge === "removed" ? ` style="text-decoration: line-through;"` : "";
+        return `<li class="list-group-item d-flex justify-content-between align-items-center py-1 px-3">
+            <span${strike}>${escapeHtml(device.displayName || device.deviceId)}${label}</span>
+            <small class="text-muted">${escapeHtml(device.deviceType)}</small>
+        </li>`;
+    }
+
+    _deviceGroupHeader(title) {
+        return `<li class="list-group-item py-1 px-3 bg-light">
+            <small class="font-weight-bold text-muted">${escapeHtml(title)}</small>
+        </li>`;
+    }
+
+    // The whole fetched list, grouped by device type in order of first appearance.
+    _deviceListRows(devices) {
+        const groups = new Map();
+        for(const device of devices) {
+            const label = DEVICE_TYPE_LABELS[device.deviceType] || device.deviceType;
+            if(!groups.has(label)) {
+                groups.set(label, []);
+            }
+            groups.get(label).push(device);
+        }
+        const rows = [];
+        for(const [label, members] of groups) {
+            rows.push(this._deviceGroupHeader(label));
+            for(const device of members) {
+                rows.push(this._deviceRow(device));
+            }
+        }
+        return rows.join("");
+    }
+
+    _confirmScreenHtml() {
+        if(this._confirmMode === "first-failed") {
+            return `
+                <div class="text-center">
+                    <h4>기기 목록을 조회하지 못했습니다.</h4>
+                    <p class="small text-muted mb-3">잠시 후 '다시 조회'를 눌러주세요.</p>
+                    <button type="button" id="refetch-button" class="btn btn-secondary">다시 조회</button>
+                </div>
+            `;
+        }
+        if(this._confirmMode === "first") {
+            return `
+                <div class="text-center">
+                    <h4>기기 목록을 확인해주세요.</h4>
+                    <p class="small text-muted mb-2">${this._pendingDevices.length}개의 기기가 조회되었습니다. 아래 목록이 맞는지 확인해주세요.</p>
+                </div>
+                <ul class="list-group mb-3 text-left" style="max-height: 220px; overflow-y: auto; font-size: 14px;">
+                    ${this._deviceListRows(this._pendingDevices)}
+                </ul>
+                <div class="text-center">
+                    <button type="button" id="refetch-button" class="btn btn-secondary">다시 조회</button>
+                    <button type="button" id="confirm-save-button" class="btn btn-primary">확인하고 저장</button>
+                </div>
+            `;
+        }
+        // "diff": what an explicit save would add and take away, against the saved list.
+        const keptCount = this._pendingDevices.length - this._pendingAdded.length;
+        const rows = [this._deviceGroupHeader("변경")];
+        for(const device of this._pendingAdded) {
+            rows.push(this._deviceRow(device, "added"));
+        }
+        for(const device of this._pendingRemoved) {
+            rows.push(this._deviceRow(device, "removed"));
+        }
+        rows.push(`<li class="list-group-item py-1 px-3 text-center">
+            <small class="text-muted">외 ${keptCount}개 유지</small>
+        </li>`);
+        return `
+            <div class="text-center">
+                <h4>기기 목록에 달라진 내용이 있습니다.</h4>
+                <p class="small text-muted mb-2">달라진 내용이 사실이 아니라면 '다시 조회'를 눌러주세요.<br>
+                '확인하고 저장'을 누르기 전까지 기존 설정은 그대로 유지됩니다.</p>
+            </div>
+            <ul class="list-group mb-3 text-left" style="max-height: 200px; overflow-y: auto; font-size: 14px;">
+                ${rows.join("")}
+            </ul>
+            <div class="text-center">
+                <button type="button" id="refetch-button" class="btn btn-secondary">다시 조회</button>
+                <button type="button" id="confirm-save-button" class="btn btn-primary">확인하고 저장</button>
+            </div>
+        `;
+    }
+
+    _showConfirm(mode) {
+        this._confirmMode = mode;
+        this.confirmContainer.innerHTML = this._confirmScreenHtml();
+        this.doneMain.classList.add("hidden");
+        this.confirmContainer.classList.remove("hidden");
+
+        const refetchButton = this.confirmContainer.querySelector("#refetch-button");
+        if(refetchButton) {
+            this.addListener(refetchButton, "click", async () => {
+                refetchButton.disabled = true;
+                await this._requestRefresh(true);
+                refetchButton.disabled = false;
+            });
+        }
+        const confirmButton = this.confirmContainer.querySelector("#confirm-save-button");
+        if(confirmButton) {
+            this.addListener(confirmButton, "click", async () => {
+                confirmButton.disabled = true;
+                await this._confirmSave();
+            });
+        }
+    }
+
+    _showDone() {
+        this._confirmMode = null;
+        this.confirmContainer.classList.add("hidden");
+        this.confirmContainer.innerHTML = "";
+        this.doneMain.classList.remove("hidden");
+    }
+
+    async _confirmSave() {
+        const mode = this._confirmMode;
+        this.config.devices = this._pendingDevices;
+        await this.updatePluginConfig();
+        await this.savePluginConfig();
+        this._pendingDevices = null;
+        this._pendingAdded = [];
+        this._pendingRemoved = [];
+        this._showDone();
+        this._settle();
+        if(mode === "diff") {
+            // The resident was on their way to the editor - continue there.
+            await this._openAdvancedForm();
+        }
+    }
+
+    async _requestRefresh(force) {
+        window.homebridge.showSpinner();
+        try {
+            await window.homebridge.request(`/${this.config.provider}/fetch-devices`, {
+                region: this.config.region,
+                complex: this.config.complex,
+                username: this.config.username,
+                password: this.config.password,
+                // The saved device list rides along as the yardstick the server holds
+                // fetched pages against. Empty on a first-time setup, and ignored by daelim.
+                devices: this.config.devices || [],
+                force: !!force,
+            });
+        } catch(error) {
+            console.error("Refreshing devices failed:", error);
+            if(this.config.provider === "smart-elife") {
+                this._handleRefreshFailure();
+            } else {
+                // daelim keeps its original terminal state: the saved list stays editable.
+                this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
+            }
+        } finally {
+            window.homebridge.hideSpinner();
+        }
+    }
+
+    _handleRefreshFailure() {
+        this._refreshed = true;
+        if(this._advancedFormOpened) {
+            return;
+        }
+        if(this._confirmMode === "first" || this._confirmMode === "diff") {
+            // A re-fetch from a confirmation screen came back empty-handed.
+            // The candidate on screen is left exactly as it was.
+            window.homebridge.toast.warning(DEVICE_REFRESH_KEPT_MESSAGE);
+            return;
+        }
+        if((this.config.devices || []).length === 0) {
+            // First-time setup with nothing fetched - there is nothing to edit yet,
+            // so the only way forward is asking again.
+            this._showConfirm("first-failed");
+            return;
+        }
+        // A refresh for an existing configuration failed. The advanced editor stays
+        // locked - the fetched list it would edit does not exist - and nothing is saved.
+        // Closing and reopening the settings retries, because a failure never
+        // replaces the server's device cache.
+        window.homebridge.toast.warning(DEVICE_REFRESH_KEPT_MESSAGE);
+        this._settled = true;
+    }
+
+    async _openAdvancedForm() {
+        this._advancedFormOpened = true;
+
+        document.getElementById("setupForm").classList.add("hidden");
+        document.getElementById("footer").classList.add("hidden");
+        document.getElementById("advancedForm").classList.remove("hidden");
+
+        await this.updatePluginConfig();
+
+        const configSchema = await window.homebridge.getPluginConfigSchema();
+        const configForm = window.homebridge.createForm(configSchema, this.config);
+        configForm.onChange((change) => {
+            Object.assign(this.config, change);
+            this.updatePluginConfig();
+        });
+    }
+
     register() {
         this.ensureAttached();
         refreshTrademark(this.config);
         setTimeout(async () => {
-            try {
-                await window.homebridge.request(`/${this.config.provider}/fetch-devices`, {
-                    region: this.config.region,
-                    complex: this.config.complex,
-                    username: this.config.username,
-                    password: this.config.password,
-                });
-                if(this.config.provider === "smart-elife" && !this._refreshed) {
-                    // The handler awaits the whole sign-in,
-                    // so returning without having reported any device means the query gave up quietly.
-                    this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
-                }
-            } catch(error) {
-                console.error("Could not refresh the device list:", error);
-                this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
+            await this._requestRefresh(false);
+            if(this.config.provider === "smart-elife" && !this._refreshed) {
+                // The handler awaits the whole sign-in,
+                // so returning without having reported any device means the query gave up quietly.
+                this._handleRefreshFailure();
             }
         }, 0);
+
         this.addHomebridgeListener("authorization-failed", () => {
             this._settle(DEVICE_REFRESH_FAILED_MESSAGE);
         });
+        // Wallpad certification expired; the resident has to sign in again to refresh.
         this.addHomebridgeListener("require-wallpad-passcode", () => {
             this._settle(WALLPAD_REAUTHORIZATION_MESSAGE);
+        });
+        this.addHomebridgeListener("device-refresh-failed", () => {
+            this._handleRefreshFailure();
         });
         this.addHomebridgeListener("devices-fetched", async (event) => {
             const devices = event["data"].devices;
@@ -833,28 +1077,49 @@ class CompletePane extends Pane {
                 }
             }
 
-            // Say what this refresh takes away, before it is saved.
-            // A saved entry the new list still names survives, and one it does not is dropped
-            // without a word - while `/main/home.do` intermittently answers with another
-            // household's page. So a refresh can quietly remove devices the resident still has,
-            // and the runtime then judges every later page against what is left.
-            // Naming the losses is what makes saving the list a decision rather than an assumption.
-            const removed = savedDevices.filter(oldDevice =>
-                !availableDevices.some(device => this.devicesEquals(oldDevice, device)));
-            if(savedDevices.length && removed.length) {
-                const shown = removed.slice(0, 5)
-                    .map(device => device.displayName || device.deviceId).join(", ");
-                const rest = removed.length > shown.split(", ").length ? ` 외 ${removed.length - 5}개` : "";
-                window.homebridge.toast.warning(
-                    `${shown}${rest}. 이 세대의 기기가 맞다면 '재설정'으로 다시 조회해주세요.`,
-                    `기기 ${removed.length}개가 목록에서 빠졌습니다`);
+            if(this.config.provider !== "smart-elife") {
+                // daelim: the per-complex server answers for this household alone,
+                // so the fetched list needs no confirmation.
+                this.config.devices = availableDevices;
+                await this.updatePluginConfig();
+                await this.savePluginConfig();
+                this._settle();
+                return;
             }
-            console.log(`Devices: ${savedDevices.length} saved, ${availableDevices.length} after refresh, ${removed.length} dropped`);
 
-            this.config.devices = availableDevices;
-            await this.updatePluginConfig();
-            await this.savePluginConfig();
+            // smart-elife: nothing is saved here. The fetched list is a candidate until
+            // the resident presses '확인하고 저장' - that press is the confirmation the
+            // household judgement stands on ever after.
+            this._pendingDevices = availableDevices;
+            this._pendingAdded = devices.filter(device =>
+                !savedDevices.some(oldDevice => this.devicesEquals(oldDevice, device)));
+            this._pendingRemoved = savedDevices.filter(oldDevice =>
+                !availableDevices.some(device => this.devicesEquals(oldDevice, device)));
 
+            if(savedDevices.length === 0) {
+                // First-time setup: the list itself is the screen.
+                this._showConfirm("first");
+                return;
+            }
+            if(this._pendingAdded.length === 0 && this._pendingRemoved.length === 0) {
+                // Nothing changed - saving would be a no-op, so there is nothing to confirm.
+                this._pendingDevices = null;
+                const wasRetryFromDiff = this._confirmMode === "diff";
+                this._showDone();
+                this._settle();
+                if(wasRetryFromDiff) {
+                    // The re-fetch converged with the saved list;
+                    // continue to the editor the resident was headed for.
+                    await this._openAdvancedForm();
+                }
+                return;
+            }
+            if(this._confirmMode === "diff") {
+                // A re-fetch changed the picture - redraw it against the saved list.
+                this._showConfirm("diff");
+                return;
+            }
+            // The confirmation waits until the resident actually goes for the editor.
             this._settle();
         });
         this.addListener(this.resetButton, "click", async () => {
@@ -867,20 +1132,14 @@ class CompletePane extends Pane {
         });
 
         this.addListener(this.advancedButton, "click", async () => {
-            this._advancedFormOpened = true;
-
-            document.getElementById("setupForm").classList.add("hidden");
-            document.getElementById("footer").classList.add("hidden");
-            document.getElementById("advancedForm").classList.remove("hidden");
-
-            await this.updatePluginConfig();
-
-            const configSchema = await window.homebridge.getPluginConfigSchema();
-            const configForm = window.homebridge.createForm(configSchema, this.config);
-            configForm.onChange((change) => {
-                Object.assign(this.config, change);
-                this.updatePluginConfig();
-            });
+            if(this.config.provider === "smart-elife" && this._pendingDevices
+                && (this._pendingAdded.length > 0 || this._pendingRemoved.length > 0)) {
+                // The fetched list differs from the saved one - show what saving would
+                // change before the editor built on that list opens.
+                this._showConfirm("diff");
+                return;
+            }
+            await this._openAdvancedForm();
         });
     }
 
