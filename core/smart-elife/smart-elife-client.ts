@@ -41,6 +41,11 @@ export interface ListenerMetadata {
      * Commands draw from the same counter,
      * so a report numbered below a command cannot say anything about that command -
      * the poll it came from was already in the air when the command was sent.
+     *
+     * Where "requested" is, per path: a polled page draws its number before the HTTP
+     * request leaves; the answer to a WebSocket status query wears the number drawn
+     * when that query was sent (`sendStatusQuery`); an asynchronous `event_*` push is
+     * never requested, so its number is drawn at frame receipt.
      */
     observedSeq: number
 
@@ -72,6 +77,30 @@ interface PushListenerInfo {
 }
 
 /**
+ * Which household a device report belongs to.
+ *
+ * `OWN` and `FOREIGN` are the two answers; the other two say the question
+ * could not be answered. `UNKNOWN` means there was nothing to hold the list
+ * against - a first-time setup - and `INVALID` means the markup gave the
+ * parser nothing, so the question could not even be posed.
+ *
+ * String-valued so the wizard can carry it to the frontend as an event reason.
+ */
+export enum HouseholdAttribution {
+    OWN = "own",
+    FOREIGN = "foreign",
+    UNKNOWN = "unknown",
+    INVALID = "invalid",
+}
+
+/** What `fetchDevices()` found, and whose household it judged the list to be. */
+export interface DeviceFetchResult {
+    household: HouseholdAttribution
+    /** Empty when the attribution is `FOREIGN` or `INVALID` - failure is not an empty household. */
+    devices: Device[]
+}
+
+/**
  * A `/main/home.do` that was held against the configuration and kept.
  * The stamp rides with the markup rather than being taken where it is parsed:
  * the polled page is already seconds old by then,
@@ -83,11 +112,11 @@ interface RenderedPage {
     deviceList: any[] | undefined
 
     /**
-     * Whether the devices this page listed are this household's.
+     * Whose household the devices this page listed belong to.
      * The session keys it carries are ours either way - measured - so the credentials
      * parser reads the page regardless, while everything about the devices does not.
      */
-    ownHousehold: boolean
+    household: HouseholdAttribution
 
     observedSeq: number
     observedAt: number
@@ -144,6 +173,14 @@ export default class SmartELifeClient {
      */
     private renderedDeviceTypes: DeviceType[] = [];
 
+    /**
+     * Numbers drawn for status queries whose answers have not arrived yet, per type.
+     * FIFO: the socket answers queries of one type in the order they were sent,
+     * so the head of the queue always belongs to the next answer.
+     * Cleared on reconnect - see `onOpen`.
+     */
+    private readonly pendingStatusQueries = new Map<DeviceType, number[]>();
+
     /** How many reports were declined as another household's, for the debug log. */
     private declinedForeignReports = 0;
 
@@ -193,11 +230,15 @@ export default class SmartELifeClient {
                 return ClientResponseCode.SUCCESS;
             },
             async onOpen(client: SmartELifeClient) {
+                // Queries in flight on the previous connection will never be answered here,
+                // and their numbers must not attach to this connection's answers.
+                client.pendingStatusQueries.clear();
                 await client.requestElevatorStatus();
             },
             async onMessage(client: SmartELifeClient, json: any) {
-                // Stamped where the frame is received. Everything below is parsing.
-                const observedSeq = client.takeObservedSeq();
+                // Stamped where the frame is received - the fallback for everything
+                // that is not the answer to a query this client sent.
+                let observedSeq = client.takeObservedSeq();
                 const observedAt = Date.now();
 
                 const header = json["header"];
@@ -233,6 +274,18 @@ export default class SmartELifeClient {
                 const deviceType = deviceTypeString as DeviceType || DeviceType.UNKNOWN;
                 if(deviceType === DeviceType.UNKNOWN)
                     client.log.warn("Unknown device type: %s", deviceTypeString);
+
+                if(completeSnapshot) {
+                    // The answer to a query wears the number drawn when that query left,
+                    // not the receive stamp - a command sent while the query was in flight
+                    // must rank above the answer, or a stale report slips past the filters
+                    // built on this ordering. Consumed even when the frame is declined
+                    // below, so the per-type FIFO stays aligned with the answers.
+                    const queued = client.pendingStatusQueries.get(deviceType)?.shift();
+                    if(queued !== undefined) {
+                        observedSeq = queued;
+                    }
+                }
 
                 // The socket carries the same misattribution the rendered page does.
                 // A day of measurement found 91 answers that listed another household's devices.
@@ -994,13 +1047,12 @@ export default class SmartELifeClient {
             headers: await this.createDocumentHeaters(),
         }).then((response) => response.text());
 
-        // A page whose markup gave the parser nothing says nothing about which household
-        // answered either, so it is carried rather than declined - the credentials parser
-        // reads the same page for something the device list has no bearing on.
         const deviceList = parseDeviceList(html) || undefined;
-        const ownHousehold = !deviceList || this.isOwnHouseholdDeviceList(deviceList);
-        const page: RenderedPage = { html, deviceList, ownHousehold, observedSeq, observedAt };
-        if(!ownHousehold) {
+        const household = !deviceList
+            ? HouseholdAttribution.INVALID
+            : this.attributeDeviceList(deviceList);
+        const page: RenderedPage = { html, deviceList, household, observedSeq, observedAt };
+        if(household === HouseholdAttribution.FOREIGN) {
             this.declinedForeignReports += 1;
             this.log.debug("Ignoring a rendered page that is not this household's " +
                 "(%d report(s) declined so far).", this.declinedForeignReports);
@@ -1008,8 +1060,22 @@ export default class SmartELifeClient {
             // the household for as long as nobody forces a fetch.
             return page;
         }
+        if(household === HouseholdAttribution.INVALID) {
+            // A page the parser could not read is not cached either - unlike a foreign page
+            // it says nothing about any household, but serving it again would pin every
+            // downstream reader to markup that already failed once. The caller still gets
+            // the page itself: the credentials parser reads it for something the device
+            // list has no bearing on.
+            this.log.debug("The rendered page carried no readable device list.");
+            return page;
+        }
+        // OWN and UNKNOWN are both kept. An UNKNOWN page is the candidate a first-time
+        // setup shows the resident, and it has to stay one page - refetching between the
+        // credentials parse and the device read could swap in a different household's.
         this.renderedPage = page;
-        if(deviceList) {
+        if(household === HouseholdAttribution.OWN && deviceList) {
+            // Learned only from a page that proved itself ours - an unproven page must not
+            // decide which device types the WallPad gets asked about.
             this.renderedDeviceTypes = deviceList
                 .map((deviceGroup: any) => deviceGroup["type"] as DeviceType)
                 .filter((deviceType: DeviceType) => !!deviceType);
@@ -1018,7 +1084,7 @@ export default class SmartELifeClient {
     }
 
     /**
-     * Whether a device list is this household's.
+     * Whose household a device list is.
      *
      * WallPad `uid`s are only unique inside one household, so a stranger's list does not
      * merely miss ours - it collides with a few of them, and `parseDevices()` matches on
@@ -1027,20 +1093,20 @@ export default class SmartELifeClient {
      * Measured against a live household over a day: this account's own page names all but one
      * of the devices it lists in the configuration, while the pages of strangers name at most a
      * fifth of theirs. A majority sits between the two with room to spare on both sides.
+     *
+     * Where there is nothing to compare against, the answer is `UNKNOWN` rather than a pass:
+     * the settings wizard shows such a list to the resident,
+     * and only what they explicitly save becomes the yardstick for every later judgement.
      */
-    private isOwnHouseholdDeviceList(deviceList: any[]): boolean {
+    private attributeDeviceList(deviceList: any[]): HouseholdAttribution {
         const configured = new Set((this.config.devices || []).map((device) => device.deviceId));
         // Nothing to hold the list against.
-        // The settings wizard signs in precisely to find out what this household has,
-        // and the resident then reads that list on screen and saves it -
-        // which is the confirmation this judgement would otherwise be standing in for.
         if(configured.size === 0) {
             if(!this.reportedUncomparableDeviceList) {
                 this.reportedUncomparableDeviceList = true;
-                this.log.debug("Nothing configured to hold a device list against; " +
-                    "accepting it as this household's.");
+                this.log.debug("Nothing configured to hold a device list against.");
             }
-            return true;
+            return HouseholdAttribution.UNKNOWN;
         }
         let listed = 0;
         let ours = 0;
@@ -1057,12 +1123,11 @@ export default class SmartELifeClient {
             }
         }
         // A list that named nobody carries no state to mistake for ours,
-        // so there is nothing to protect against and something to lose by refusing:
-        // a household part-way through setup would never get past this.
+        // and no evidence about whose it is either.
         if(listed === 0) {
-            return true;
+            return HouseholdAttribution.UNKNOWN;
         }
-        return ours * 2 > listed;
+        return ours * 2 > listed ? HouseholdAttribution.OWN : HouseholdAttribution.FOREIGN;
     }
 
     /**
@@ -1093,7 +1158,9 @@ export default class SmartELifeClient {
             if(!comparable) {
                 return true;
             }
-            return this.isOwnHouseholdDeviceList([data]);
+            // Only a positive FOREIGN verdict declines a frame. UNKNOWN passes as before -
+            // with nothing configured there are no accessories listening anyway.
+            return this.attributeDeviceList([data]) !== HouseholdAttribution.FOREIGN;
         }
         const roomKey = data["roomkey"];
         if(typeof roomKey !== "string" || roomKey.length === 0) {
@@ -1131,11 +1198,28 @@ export default class SmartELifeClient {
         if(!this.ws || deviceTypes.length === 0) {
             return;
         }
+        await this.sendStatusQuery(
+            deviceTypes.map((deviceType) => ({ type: deviceType.toString() })),
+            deviceTypes);
+    }
+
+    /**
+     * Sends a status query and records, per device type, the number drawn as it leaves.
+     * The answers arrive through `onMessage` as complete snapshots and pick these numbers
+     * back up in order - see `ListenerMetadata.observedSeq` for why the send is the moment
+     * that counts.
+     */
+    private async sendStatusQuery(data: any[], deviceTypes: DeviceType[]) {
+        for(const deviceType of deviceTypes) {
+            const queue = this.pendingStatusQueries.get(deviceType) || [];
+            queue.push(this.takeObservedSeq());
+            this.pendingStatusQueries.set(deviceType, queue);
+        }
         await this.sendJson({
             "roomKey": this.wsCredentials?.roomKey,
             "userKey": this.wsCredentials?.userKey,
             "accessToken": this.wsCredentials?.accessToken,
-            "data": deviceTypes.map((deviceType) => ({ type: deviceType.toString() })),
+            "data": data,
         });
     }
 
@@ -1144,21 +1228,20 @@ export default class SmartELifeClient {
             return;
         }
         const page = await this.fetchRenderedPage(forceFetch);
-        if(!page.ownHousehold || !page.deviceList) {
+        if(page.household === HouseholdAttribution.FOREIGN || !page.deviceList) {
             // Nothing of this page reaches the accessories, and none of it is echoed back
             // to the socket either - asking the server about a stranger's devices is how
             // their answers came back as ours. The WallPad is asked instead, so that
             // declining a page costs freshness rather than sight.
+            // An UNKNOWN page passes: with nothing configured there are no accessories
+            // listening, so publishing it is a no-op rather than a leak.
             await this.requestDeviceStatus();
             return;
         }
         const deviceList = page.deviceList;
-        await this.sendJson({
-            "roomKey": this.wsCredentials?.roomKey,
-            "userKey": this.wsCredentials?.userKey,
-            "accessToken": this.wsCredentials?.accessToken,
-            "data": deviceList,
-        });
+        await this.sendStatusQuery(deviceList, deviceList
+            .map((deviceGroup: any) => deviceGroup["type"] as DeviceType)
+            .filter((deviceType: DeviceType) => !!deviceType));
 
         for(const deviceGroup of deviceList) {
             const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
@@ -1194,18 +1277,20 @@ export default class SmartELifeClient {
         return this.renderedLightDetails;
     }
 
-    async fetchDevices(): Promise<Device[]> {
+    async fetchDevices(): Promise<DeviceFetchResult> {
         this.renderedLightDetails = [];
         const page = await this.fetchRenderedPage();
-        if(!page.ownHousehold || !page.deviceList) {
-            // A wizard signing in for the first time has nothing to hold a page against,
-            // so it never reaches this - the judgement is skipped and the resident reads
-            // the list on screen instead. Getting here means a saved configuration exists
-            // and the page did not match it, which is worth saying rather than answering
-            // with an empty household.
-            this.log.warn("The rendered device list was not this household's, so no devices were read. " +
-                "Try again in a moment.");
-            return [];
+        if(page.household === HouseholdAttribution.FOREIGN || !page.deviceList) {
+            // Failure is reported as what it is rather than as an empty household -
+            // the wizard decides what to do with it, and must not mistake it for
+            // a home that owns no devices.
+            if(page.household === HouseholdAttribution.FOREIGN) {
+                this.log.warn("The rendered device list was not this household's, so no devices were read. " +
+                    "Try again in a moment.");
+            } else {
+                this.log.warn("The rendered page carried no readable device list, so no devices were read.");
+            }
+            return { household: page.household, devices: [] };
         }
         const deviceList = page.deviceList;
         const fetchedDevices: Device[] = [];
@@ -1238,7 +1323,7 @@ export default class SmartELifeClient {
                 }
             }
         }
-        return fetchedDevices;
+        return { household: page.household, devices: fetchedDevices };
     }
 
     private async fetchComplex() {
