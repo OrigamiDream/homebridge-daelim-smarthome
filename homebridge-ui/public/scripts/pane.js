@@ -576,6 +576,9 @@ class AuthorizationPane extends Pane {
                 complex: this.config.complex,
                 username: this.usernameElement.value,
                 password: this.passwordElement.value,
+                // The saved device list rides along as the yardstick the server holds
+                // fetched pages against. Empty on a first-time setup, and ignored by daelim.
+                devices: this.config.devices || [],
             });
         });
         this.addHomebridgeListener("authorization-failed", (event) => {
@@ -685,6 +688,8 @@ class WallpadPasscodePane extends Pane {
                 username: this.config.username,
                 password: this.config.password,
                 passcode: this.passcodeElement.value,
+                // Rides through to the sign-in this passcode completes - see AuthorizationPane.
+                devices: this.config.devices || [],
             });
         });
         this.addHomebridgeListener("invalid-wallpad-passcode", async () => {
@@ -792,6 +797,9 @@ class CompletePane extends Pane {
                     complex: this.config.complex,
                     username: this.config.username,
                     password: this.config.password,
+                    // The saved device list rides along as the yardstick the server holds
+                    // fetched pages against. Empty on a first-time setup, and ignored by daelim.
+                    devices: this.config.devices || [],
                 });
                 if(this.config.provider === "smart-elife" && !this._refreshed) {
                     // The handler awaits the whole sign-in,

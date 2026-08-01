@@ -1,7 +1,7 @@
 import AbstractUiProvider from "./ui-provider";
 import {HomebridgePluginUiServer} from "@homebridge/plugin-ui-utils";
 import {LoggerBase, Semaphore, Utils} from "../../core/utils";
-import SmartELifeClient from "../../core/smart-elife/smart-elife-client";
+import SmartELifeClient, {HouseholdAttribution} from "../../core/smart-elife/smart-elife-client";
 import {Device, DeviceType, SmartELifeConfig} from "../../core/interfaces/smart-elife-config";
 import {ClientResponseCode} from "../../core/smart-elife/responses";
 import {Logging} from "homebridge";
@@ -24,6 +24,8 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
 
     private devices: Device[] = [];
     private devicesFetched: boolean = false;
+    /** How the last kept list was attributed, replayed with the cache. */
+    private household: HouseholdAttribution = HouseholdAttribution.UNKNOWN;
 
     constructor(server: HomebridgePluginUiServer, log: LoggerBase | Logging) {
         super(server, log);
@@ -49,9 +51,13 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
     }
 
     async onRequestDevices(p: any) {
-        if(this.devicesFetched && this.devices) {
+        // `force` bypasses the cache. The frontend's re-fetch button needs it -
+        // without it, reopening the settings replays whatever this process fetched first,
+        // and the only way to actually query again was a full reset.
+        if(!p?.force && this.devicesFetched && this.devices) {
             this.server.pushEvent("devices-fetched", {
                 devices: this.devices,
+                household: this.household,
             });
         } else {
             await this.signIn(p);
@@ -85,7 +91,10 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
             username, password, uuid,
             wallpadVersion: WALLPAD_VERSION_3_0,
             version: Utils.currentSemanticVersion(),
-            devices: this.devices,
+            // The saved list the frontend sent along is the yardstick the client holds
+            // rendered pages against. Without it every page passes as UNKNOWN -
+            // the first sign-in of this process has no cache to fall back on.
+            devices: Array.isArray(p.devices) ? p.devices : this.devices,
         };
         this.client = SmartELifeClient.createForUI(this.log, config);
 
@@ -127,20 +136,31 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         const version = await this.client.parseWallPadVersion();
 
         // Set up devices
-        const { devices: fetchedDevices } = await this.client.fetchDevices();
+        const result = await this.client.fetchDevices();
+        if(result.household === HouseholdAttribution.FOREIGN
+            || result.household === HouseholdAttribution.INVALID) {
+            // The cache is left alone - a failed refresh must not become the list the next
+            // request replays. `complete` still goes out: the session credentials are this
+            // household's regardless of whose device list the page carried (measured),
+            // and the runtime cannot start without them.
+            this.server.pushEvent("device-refresh-failed", { reason: result.household });
+            this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
+            return;
+        }
 
         const devices = await this.configureInitialDevices();
-        for(const device of fetchedDevices) {
+        for(const device of result.devices) {
             devices.push(device);
         }
         this.devices = devices;
         this.devicesFetched = true;
+        this.household = result.household;
 
         // On success
         // `devices-fetched` is pushed before `complete`,
         // so that a pane waiting only for the device list settles before the wizard moves on.
         // Without it, a sign-in triggered by `/fetch-devices` would report nothing the caller listens for.
-        this.server.pushEvent("devices-fetched", { devices });
+        this.server.pushEvent("devices-fetched", { devices, household: result.household });
         this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
     }
 
