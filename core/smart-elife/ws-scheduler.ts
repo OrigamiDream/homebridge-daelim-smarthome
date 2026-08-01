@@ -128,21 +128,35 @@ export default class WebSocketScheduler {
         });
     }
 
-    public async wsSendJson(payload: any): Promise<void> {
+    /**
+     * Returns whether the socket accepted the frame. The drop paths used to be
+     * silent, which left callers unable to tell a sent query from a discarded one -
+     * and the status-query FIFO records an entry per sent query,
+     * so a discard mistaken for a send misaligns every answer after it.
+     *
+     * `beforeSend` runs synchronously as the frame is handed to the socket - after any
+     * reconnect this call rode through, in the same turn as the send itself. That is
+     * the only moment a caller can record bookkeeping that must exist before the
+     * answer can possibly arrive and must not exist if the frame is never attempted:
+     * the answer to a frame can be dispatched before the frame's own send callback
+     * when the event loop was busy across the round trip.
+     */
+    public async wsSendJson(payload: any, beforeSend?: () => void): Promise<boolean> {
         try {
             await this.connectWebSocket();
             const ws = this.ws;
             if(!ws) {
-                return;
+                return false;
             }
             await this.waitForWebSocketOpen(ws, 10_000);
             if(ws.readyState !== WebSocket.OPEN) {
                 this.scheduleWebSocketReconnect("send while not open");
-                return;
+                return false;
             }
 
             await new Promise<void>((resolve, reject) => {
                 this.log.debug(`[WebSocket] :: Send :: ${JSON.stringify(payload)}`);
+                beforeSend?.();
                 ws.send(JSON.stringify(payload), (err?: Error) => {
                     if(err) {
                         reject(err);
@@ -151,11 +165,12 @@ export default class WebSocketScheduler {
                     }
                 });
             });
+            return true;
         } catch (err) {
             if(this.isSocketClosedDuringSendError(err)) {
                 this.log.warn(`[WebSocket] send skipped due to socket close race: ${(err as any)?.message || err}`);
                 this.scheduleWebSocketReconnect("send on closed socket");
-                return;
+                return false;
             }
             throw err;
         }
@@ -209,9 +224,17 @@ export default class WebSocketScheduler {
                 const url = this.getWebSocketUrl();
                 const headers = this.getWebSocketHeaders();
 
-                // Close any previous instance (best-effort) before replacing.
+                // Close any previous instance (best-effort) before replacing. Its frames
+                // must not reach handlers that now describe the new connection - a late
+                // answer would consume the new FIFO's head - and its close must not
+                // schedule a reconnect over the connect in progress. `error` and `open`
+                // stay attached, so a late socket error cannot crash as an unhandled
+                // 'error' event.
+                const previous = this.ws;
+                previous?.removeAllListeners("message");
+                previous?.removeAllListeners("close");
                 try {
-                    this.ws?.close();
+                    previous?.close();
                 } catch {
                     // ignore
                 }

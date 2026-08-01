@@ -132,6 +132,40 @@ interface RenderedPage {
 
 const POLLING_INTERVAL_MILLISECONDS = 30 * 1000;
 
+/**
+ * How many recorded status queries one device type may have in flight.
+ *
+ * A healthy queue is zero or one deep - answers arrive in under a second and polls are
+ * thirty seconds apart - so hitting the cap means answers stopped coming. A type at the
+ * cap is not asked again until its outstanding answers arrive or a reconnect clears them:
+ * sending without recording would let the unmatched answer drain to an empty queue and
+ * wear a receive stamp, ranking a stale observation as the newest thing yet, and removing
+ * entries instead would hand an old answer a newer query's number. Going quiet is the one
+ * option that cannot misrank anything - it costs queries against a WallPad that is not
+ * answering them anyway.
+ *
+ * A poll that lands between a reconnect starting and `onOpen` clearing the queues still
+ * skips a type the dead connection had capped out, deferring its fallback query to the
+ * next poll. Accepted: it costs at most one poll period of backstop freshness in an
+ * already-blind window, pushes resume with the connection either way, and remembering
+ * skipped types across a reconnect would need exactly the generation bookkeeping this
+ * design just got rid of.
+ */
+const MAX_PENDING_STATUS_QUERIES = 4;
+
+/**
+ * Device types whose state never comes back as a header snapshot - their accessories are
+ * driven by pushes and by `elevator_call_*`/`elevate_call` action frames instead. Asking
+ * the WallPad about one of these would record a status query that no answer ever consumes,
+ * leaving the recorded number to desynchronize that type's queue for good.
+ */
+const UNQUERYABLE_DEVICE_TYPES = new Set<DeviceType>([
+    DeviceType.ELEVATOR,
+    DeviceType.DOOR,
+    DeviceType.VEHICLE,
+    DeviceType.CAMERA,
+]);
+
 export default class SmartELifeClient {
 
     // Some networks (notably IPv6-only/NAT64) can resolve this host to both IPv4 and IPv6,
@@ -184,9 +218,25 @@ export default class SmartELifeClient {
      * Numbers drawn for status queries whose answers have not arrived yet, per type.
      * FIFO: the socket answers queries of one type in the order they were sent,
      * so the head of the queue always belongs to the next answer.
+     *
+     * An entry is reserved synchronously as the frame is handed to the socket -
+     * see `sendStatusQuery` for why no other moment works - and a type at
+     * `MAX_PENDING_STATUS_QUERIES` unanswered queries is not asked again,
+     * keeping sends and entries one-to-one.
      * Cleared on reconnect - see `onOpen`.
      */
     private readonly pendingStatusQueries = new Map<DeviceType, number[]>();
+
+    /**
+     * Slots claimed by status queries that passed the cap check but whose send has not
+     * settled yet, per type. Claimed synchronously with the check itself, so concurrent
+     * calls started in the same tick see each other and cannot pass the cap together -
+     * the reservation in `pendingStatusQueries` only lands later, at each call's send
+     * moment. Released when the send settles; between the reservation landing and the
+     * release a type is briefly counted twice, which can only defer a query, never
+     * admit one too many.
+     */
+    private readonly inFlightStatusQueries = new Map<DeviceType, number>();
 
     /** How many reports were declined as another household's, for the debug log. */
     private declinedForeignReports = 0;
@@ -288,6 +338,16 @@ export default class SmartELifeClient {
                     const queued = client.pendingStatusQueries.get(deviceType)?.shift();
                     if(queued !== undefined) {
                         observedSeq = queued;
+                    } else {
+                        // The one residual too-new window. The protocol carries no
+                        // correlation id, so a header frame this client never asked for
+                        // (the server answers for the household, not the session) consumes
+                        // the head meant for a real answer, and the answer then arrives
+                        // to an empty queue and keeps the receive stamp - bounded by one
+                        // round trip, realigned by the very next answer. Logged so the
+                        // field frequency is a number rather than a guess.
+                        client.log.debug("A %s snapshot arrived with no status query on record; " +
+                            "keeping its receive stamp.", deviceTypeString);
                     }
                 }
 
@@ -963,9 +1023,13 @@ export default class SmartELifeClient {
             await this.refreshDeviceStatus();
         }
 
-        setInterval(async () => {
+        setInterval(() => {
             this.log.info("Polling device state");
-            await this.refreshDeviceStatus(true);
+            // Wrapped so a rejected poll (network failure, socket teardown) is logged
+            // instead of surfacing as an unhandled promise rejection.
+            this.refreshDeviceStatus(true).catch((e: any) => {
+                this.log.warn("Device state polling failed: %s", e?.message || e);
+            });
         }, POLLING_INTERVAL_MILLISECONDS);
     }
 
@@ -1180,14 +1244,17 @@ export default class SmartELifeClient {
      * account of which types it answers for. Before then the configuration stands in, because
      * the first page after a sign-in is sometimes the one that gets declined, and a start that
      * declines its first page would otherwise ask about nothing at all and sit blind until a
-     * page happens to come back ours. A type the query cannot answer for costs one entry in a
-     * JSON array and is ignored.
+     * page happens to come back ours.
+     *
+     * Types that never answer as a header snapshot are left out of both sources -
+     * see `UNQUERYABLE_DEVICE_TYPES`. The configuration always lists the exterior
+     * devices, and every query about one of them would go unanswered forever.
      */
     private deviceTypesToAskAbout(): DeviceType[] {
-        if(this.renderedDeviceTypes.length > 0) {
-            return this.renderedDeviceTypes;
-        }
-        return [...new Set((this.config.devices || []).map((device) => device.deviceType))];
+        const deviceTypes = this.renderedDeviceTypes.length > 0
+            ? this.renderedDeviceTypes
+            : [...new Set((this.config.devices || []).map((device) => device.deviceType))];
+        return deviceTypes.filter((deviceType) => !UNQUERYABLE_DEVICE_TYPES.has(deviceType));
     }
 
     /**
@@ -1202,9 +1269,10 @@ export default class SmartELifeClient {
         if(!this.ws || deviceTypes.length === 0) {
             return;
         }
-        await this.sendStatusQuery(
-            deviceTypes.map((deviceType) => ({ type: deviceType.toString() })),
-            deviceTypes);
+        await this.sendStatusQuery(deviceTypes.map((deviceType) => ({
+            payload: { type: deviceType.toString() },
+            deviceType,
+        })));
     }
 
     /**
@@ -1212,19 +1280,90 @@ export default class SmartELifeClient {
      * The answers arrive through `onMessage` as complete snapshots and pick these numbers
      * back up in order - see `ListenerMetadata.observedSeq` for why the send is the moment
      * that counts.
+     *
+     * The invariant is one recorded entry per sent query, in both directions, and the
+     * reservation is installed at the only moment that satisfies both: synchronously as
+     * the frame is handed to the socket, via the scheduler's `beforeSend` hook. Any
+     * earlier and a reconnect the send rides through wipes it while the frame still
+     * goes out; any later and the answer can beat it there, because a busy event loop
+     * dispatches the read before the pending send callback. Either mistake strands
+     * phantom entries that nothing ever consumes, and phantoms latch the cap shut.
+     * A send the scheduler never attempts never runs the hook, so it reserves nothing.
+     *
+     * A send whose callback errors is ambiguous - the peer may have parsed the frame
+     * and answered before the failure was reported - so its reservation deliberately
+     * stays: an answer that does come consumes it, one that never comes is collected
+     * by the reconnect clear, and the cost in the meantime is answers of the type
+     * wearing a number one query too old, which a command survives.
+     *
+     * The numbers are still drawn at the call, before any waiting: a command fired
+     * while the send is blocked must outrank the answer. Reservation order is send
+     * order, so every answer consumes a head no newer than its own pre-send number -
+     * a report can wear too old a number, never too new a one.
+     *
+     * A type whose queue is full is left out of the query itself, not merely out of the
+     * record: an unrecorded query would still be answered, and once the queue drains,
+     * that unmatched answer would wear a receive stamp - a stale observation ranked as
+     * the newest thing yet. Not asking again until the outstanding answers arrive (or a
+     * reconnect clears them) is the only outcome that cannot misrank anything. The
+     * check counts what the batch itself is about to reserve and what concurrent calls
+     * have claimed but not yet reserved - see `inFlightStatusQueries` - so neither
+     * duplicate types in one batch nor calls started in the same tick can pass the
+     * cap together.
      */
-    private async sendStatusQuery(data: any[], deviceTypes: DeviceType[]) {
-        for(const deviceType of deviceTypes) {
-            const queue = this.pendingStatusQueries.get(deviceType) || [];
-            queue.push(this.takeObservedSeq());
-            this.pendingStatusQueries.set(deviceType, queue);
-        }
-        await this.sendJson({
-            "roomKey": this.wsCredentials?.roomKey,
-            "userKey": this.wsCredentials?.userKey,
-            "accessToken": this.wsCredentials?.accessToken,
-            "data": data,
+    private async sendStatusQuery(queries: { payload: any, deviceType: DeviceType }[]) {
+        const projectedDepths = new Map<DeviceType, number>();
+        const sendable = queries.filter(({ deviceType }) => {
+            const projected = projectedDepths.get(deviceType) || 0;
+            const depth = (this.pendingStatusQueries.get(deviceType)?.length || 0)
+                + (this.inFlightStatusQueries.get(deviceType) || 0)
+                + projected;
+            if(depth >= MAX_PENDING_STATUS_QUERIES) {
+                this.log.debug("Not asking about %s: %d earlier queries are still unanswered.",
+                    deviceType, depth);
+                return false;
+            }
+            projectedDepths.set(deviceType, projected + 1);
+            return true;
         });
+        if(sendable.length === 0) {
+            return;
+        }
+        // Still inside the synchronous block the cap was checked in.
+        for(const { deviceType } of sendable) {
+            this.inFlightStatusQueries.set(deviceType,
+                (this.inFlightStatusQueries.get(deviceType) || 0) + 1);
+        }
+        const drawnSeqs = sendable.map(() => this.takeObservedSeq());
+        const reserve = () => {
+            sendable.forEach(({ deviceType }, index) => {
+                const queue = this.pendingStatusQueries.get(deviceType) || [];
+                queue.push(drawnSeqs[index]);
+                this.pendingStatusQueries.set(deviceType, queue);
+            });
+        };
+        try {
+            await this.sendJson({
+                "roomKey": this.wsCredentials?.roomKey,
+                "userKey": this.wsCredentials?.userKey,
+                "accessToken": this.wsCredentials?.accessToken,
+                "data": sendable.map(({ payload }) => payload),
+            }, reserve);
+        } catch (e: any) {
+            // The scheduler rethrows what is not a close race (open timeout,
+            // re-sign-in failure). None of it is this query's problem to escalate -
+            // the poll retries in thirty seconds either way.
+            this.log.warn("Could not send a status query: %s", e?.message || e);
+        } finally {
+            for(const { deviceType } of sendable) {
+                const remaining = (this.inFlightStatusQueries.get(deviceType) || 0) - 1;
+                if(remaining > 0) {
+                    this.inFlightStatusQueries.set(deviceType, remaining);
+                } else {
+                    this.inFlightStatusQueries.delete(deviceType);
+                }
+            }
+        }
     }
 
     private async refreshDeviceStatus(forceFetch: boolean = false) {
@@ -1243,9 +1382,14 @@ export default class SmartELifeClient {
             return;
         }
         const deviceList = page.deviceList;
-        await this.sendStatusQuery(deviceList, deviceList
-            .map((deviceGroup: any) => deviceGroup["type"] as DeviceType)
-            .filter((deviceType: DeviceType) => !!deviceType));
+        // A group without a type could not be recorded, so it is not asked about either -
+        // the same one-entry-per-sent-query invariant `sendStatusQuery` keeps at its cap.
+        await this.sendStatusQuery(deviceList
+            .map((deviceGroup: any) => ({
+                payload: deviceGroup,
+                deviceType: deviceGroup["type"] as DeviceType,
+            }))
+            .filter(({ deviceType }) => !!deviceType));
 
         for(const deviceGroup of deviceList) {
             const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
@@ -1415,8 +1559,8 @@ export default class SmartELifeClient {
         return response["result"] as boolean;
     }
 
-    async sendJson(payload: any) {
-        await this.ws?.wsSendJson(payload);
+    async sendJson(payload: any, beforeSend?: () => void): Promise<boolean> {
+        return await this.ws?.wsSendJson(payload, beforeSend) ?? false;
     }
 
     addListener(deviceType: DeviceType, listener: Listener) {
