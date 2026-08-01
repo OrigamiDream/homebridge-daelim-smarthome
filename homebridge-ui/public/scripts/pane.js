@@ -841,13 +841,16 @@ class CompletePane extends Pane {
         const aside = this._pendingAliases[device.deviceId] || "";
         return `<li class="list-group-item d-flex justify-content-between align-items-center py-1 px-3">
             <span${strike}>${escapeHtml(displayName)}${label}</span>
-            <small class="text-muted">${escapeHtml(aside)}</small>
+            <small style="opacity: .65;">${escapeHtml(aside)}</small>
         </li>`;
     }
 
     _deviceGroupHeader(title) {
-        return `<li class="list-group-item py-1 px-3 bg-light">
-            <small class="font-weight-bold text-muted">${escapeHtml(title)}</small>
+        // Styled with inherited colour and translucency rather than bootstrap's
+        // bg-light/text-muted, which assume a light theme - Config UI X renders
+        // this pane in the resident's theme, dark included.
+        return `<li class="list-group-item py-1 px-3" style="background: rgba(127, 127, 127, .12);">
+            <small class="font-weight-bold" style="opacity: .75;">${escapeHtml(title)}</small>
         </li>`;
     }
 
@@ -875,8 +878,8 @@ class CompletePane extends Pane {
         if(this._confirmMode === "first-failed") {
             return `
                 <div class="text-center">
-                    <h4>기기 목록을 조회하지 못했습니다.</h4>
-                    <p class="small text-muted mb-3">잠시 후 '다시 조회'를 눌러주세요.</p>
+                    <h2>기기 목록을 조회하지 못했습니다.</h2>
+                    <p>잠시 후 '다시 조회'를 눌러주세요.</p>
                     <button type="button" id="refetch-button" class="btn btn-secondary">다시 조회</button>
                 </div>
             `;
@@ -884,8 +887,8 @@ class CompletePane extends Pane {
         if(this._confirmMode === "first") {
             return `
                 <div class="text-center">
-                    <h4>기기 목록을 확인해주세요.</h4>
-                    <p class="small text-muted mb-2">${this._pendingDevices.length}개의 기기가 조회되었습니다. 아래 목록이 맞는지 확인해주세요.</p>
+                    <h2>기기 목록을 확인해주세요.</h2>
+                    <p>${this._pendingDevices.length}개의 기기가 조회되었습니다. 아래 목록이 맞는지 확인해주세요.</p>
                 </div>
                 <ul class="list-group mb-3 text-left" style="max-height: 220px; overflow-y: auto; font-size: 14px;">
                     ${this._deviceListRows(this._pendingDevices)}
@@ -906,12 +909,12 @@ class CompletePane extends Pane {
             rows.push(this._deviceRow(device, "removed"));
         }
         rows.push(`<li class="list-group-item py-1 px-3 text-center">
-            <small class="text-muted">외 ${keptCount}개 유지</small>
+            <small style="opacity: .65;">외 ${keptCount}개 유지</small>
         </li>`);
         return `
             <div class="text-center">
-                <h4>기기 목록에 달라진 내용이 있습니다.</h4>
-                <p class="small text-muted mb-2">달라진 내용이 사실이 아니라면 '다시 조회'를 눌러주세요.<br>
+                <h2>기기 목록에 달라진 내용이 있습니다.</h2>
+                <p>달라진 내용이 사실이 아니라면 '다시 조회'를 눌러주세요.<br>
                 '확인하고 저장'을 누르기 전까지 기존 설정은 그대로 유지됩니다.</p>
             </div>
             <ul class="list-group mb-3 text-left" style="max-height: 200px; overflow-y: auto; font-size: 14px;">
