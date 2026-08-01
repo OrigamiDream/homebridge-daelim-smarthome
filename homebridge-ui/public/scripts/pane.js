@@ -766,6 +766,8 @@ class CompletePane extends Pane {
         this._pendingDevices = null;
         this._pendingAdded = [];
         this._pendingRemoved = [];
+        // Display-only: the resident's own room names, keyed by device id.
+        this._pendingAliases = {};
         // Which confirmation screen is showing: "first", "first-failed", "diff", or null.
         this._confirmMode = null;
 
@@ -832,9 +834,14 @@ class CompletePane extends Pane {
                 ? `<span class="badge badge-success ml-2">추가</span>`
                 : "";
         const strike = badge === "removed" ? ` style="text-decoration: line-through;"` : "";
+        const displayName = device.displayName || device.deviceId;
+        // The side slot names the room the device is in - the name the resident
+        // gave it where there is one, the canonical name otherwise, and nothing
+        // where the page carried neither.
+        const aside = this._pendingAliases[device.deviceId] || "";
         return `<li class="list-group-item d-flex justify-content-between align-items-center py-1 px-3">
-            <span${strike}>${escapeHtml(device.displayName || device.deviceId)}${label}</span>
-            <small class="text-muted">${escapeHtml(device.deviceType)}</small>
+            <span${strike}>${escapeHtml(displayName)}${label}</span>
+            <small class="text-muted">${escapeHtml(aside)}</small>
         </li>`;
     }
 
@@ -1055,6 +1062,7 @@ class CompletePane extends Pane {
         });
         this.addHomebridgeListener("devices-fetched", async (event) => {
             const devices = event["data"].devices;
+            this._pendingAliases = event["data"].aliases || {};
             console.log(`Num of devices: ${devices.length}`);
 
             this._refreshed = true; // mark before yielding, the request may settle next

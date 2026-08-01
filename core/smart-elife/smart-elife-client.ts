@@ -98,6 +98,14 @@ export interface DeviceFetchResult {
     household: HouseholdAttribution
     /** Empty when the attribution is `FOREIGN` or `INVALID` - failure is not an empty household. */
     devices: Device[]
+    /**
+     * The room each device is in, by device id - the name the resident gave it on the
+     * WallPad, falling back to the canonical room name where none was given.
+     * Display-only and never saved: the wizard's confirmation screen shows it because
+     * a resident recognises their own home by the names they chose,
+     * not by the canonical room names the display names are built from.
+     */
+    aliases: Record<string, string>
 }
 
 /**
@@ -1272,9 +1280,21 @@ export default class SmartELifeClient {
             } else {
                 this.log.warn("The rendered page carried no readable device list, so no devices were read.");
             }
-            return { household: page.household, devices: [] };
+            return { household: page.household, devices: [], aliases: {} };
         }
         const deviceList = page.deviceList;
+        // Collected on its own rather than inside the loop below,
+        // so the reading of a device stays one thing and the naming of its room another.
+        const aliases: Record<string, string> = {};
+        for(const deviceGroup of deviceList) {
+            for(const device of deviceGroup?.["devices"] || []) {
+                const deviceId = device?.["uid"];
+                const alias = device?.["location_name_alias"] || device?.["location_name"];
+                if(typeof deviceId === "string" && typeof alias === "string" && alias.length > 0) {
+                    aliases[deviceId] = alias;
+                }
+            }
+        }
         const fetchedDevices: Device[] = [];
         for(const deviceGroup of deviceList) {
             const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
@@ -1298,7 +1318,7 @@ export default class SmartELifeClient {
                 });
             }
         }
-        return { household: page.household, devices: fetchedDevices };
+        return { household: page.household, devices: fetchedDevices, aliases };
     }
 
     private async fetchComplex() {
