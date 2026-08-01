@@ -28,6 +28,8 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
     private devicesFetched: boolean = false;
     /** How the last kept list was attributed, replayed with the cache. */
     private household: HouseholdAttribution = HouseholdAttribution.UNKNOWN;
+    /** The resident's own room names from the last kept fetch, replayed with the cache. */
+    private aliases: Record<string, string> = {};
 
     constructor(server: HomebridgePluginUiServer, log: LoggerBase | Logging) {
         super(server, log);
@@ -60,6 +62,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
             this.server.pushEvent("devices-fetched", {
                 devices: this.devices,
                 household: this.household,
+                aliases: this.aliases,
             });
         } else {
             await this.signIn(p);
@@ -158,12 +161,14 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         this.devices = devices;
         this.devicesFetched = true;
         this.household = result.household;
+        this.aliases = result.aliases;
 
         // On success
         // `devices-fetched` is pushed before `complete`,
         // so that a pane waiting only for the device list settles before the wizard moves on.
         // Without it, a sign-in triggered by `/fetch-devices` would report nothing the caller listens for.
-        this.server.pushEvent("devices-fetched", { devices, household: result.household });
+        this.server.pushEvent("devices-fetched",
+            { devices, household: result.household, aliases: result.aliases });
         this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
     }
 
