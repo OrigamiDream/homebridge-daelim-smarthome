@@ -127,7 +127,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         const version = await this.client.parseWallPadVersion();
 
         // Set up devices
-        const fetchedDevices = await this.client.fetchDevices();
+        const { devices: fetchedDevices } = await this.client.fetchDevices();
 
         const devices = await this.configureInitialDevices();
         for(const device of fetchedDevices) {
