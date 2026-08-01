@@ -41,6 +41,11 @@ export interface ListenerMetadata {
      * Commands draw from the same counter,
      * so a report numbered below a command cannot say anything about that command -
      * the poll it came from was already in the air when the command was sent.
+     *
+     * Where "requested" is, per path: a polled page draws its number before the HTTP
+     * request leaves; the answer to a WebSocket status query wears the number drawn
+     * when that query was sent (`sendStatusQuery`); an asynchronous `event_*` push is
+     * never requested, so its number is drawn at frame receipt.
      */
     observedSeq: number
 
@@ -167,6 +172,14 @@ export default class SmartELifeClient {
      */
     private renderedDeviceTypes: DeviceType[] = [];
 
+    /**
+     * Numbers drawn for status queries whose answers have not arrived yet, per type.
+     * FIFO: the socket answers queries of one type in the order they were sent,
+     * so the head of the queue always belongs to the next answer.
+     * Cleared on reconnect - see `onOpen`.
+     */
+    private readonly pendingStatusQueries = new Map<DeviceType, number[]>();
+
     /** How many reports were declined as another household's, for the debug log. */
     private declinedForeignReports = 0;
 
@@ -213,11 +226,15 @@ export default class SmartELifeClient {
                 return ClientResponseCode.SUCCESS;
             },
             async onOpen(client: SmartELifeClient) {
+                // Queries in flight on the previous connection will never be answered here,
+                // and their numbers must not attach to this connection's answers.
+                client.pendingStatusQueries.clear();
                 await client.requestElevatorStatus();
             },
             async onMessage(client: SmartELifeClient, json: any) {
-                // Stamped where the frame is received. Everything below is parsing.
-                const observedSeq = client.takeObservedSeq();
+                // Stamped where the frame is received - the fallback for everything
+                // that is not the answer to a query this client sent.
+                let observedSeq = client.takeObservedSeq();
                 const observedAt = Date.now();
 
                 const header = json["header"];
@@ -253,6 +270,18 @@ export default class SmartELifeClient {
                 const deviceType = deviceTypeString as DeviceType || DeviceType.UNKNOWN;
                 if(deviceType === DeviceType.UNKNOWN)
                     client.log.warn("Unknown device type: %s", deviceTypeString);
+
+                if(completeSnapshot) {
+                    // The answer to a query wears the number drawn when that query left,
+                    // not the receive stamp - a command sent while the query was in flight
+                    // must rank above the answer, or a stale report slips past the filters
+                    // built on this ordering. Consumed even when the frame is declined
+                    // below, so the per-type FIFO stays aligned with the answers.
+                    const queued = client.pendingStatusQueries.get(deviceType)?.shift();
+                    if(queued !== undefined) {
+                        observedSeq = queued;
+                    }
+                }
 
                 // The socket carries the same misattribution the rendered page does.
                 // A day of measurement found 91 answers that listed another household's devices.
@@ -1165,11 +1194,28 @@ export default class SmartELifeClient {
         if(!this.ws || deviceTypes.length === 0) {
             return;
         }
+        await this.sendStatusQuery(
+            deviceTypes.map((deviceType) => ({ type: deviceType.toString() })),
+            deviceTypes);
+    }
+
+    /**
+     * Sends a status query and records, per device type, the number drawn as it leaves.
+     * The answers arrive through `onMessage` as complete snapshots and pick these numbers
+     * back up in order - see `ListenerMetadata.observedSeq` for why the send is the moment
+     * that counts.
+     */
+    private async sendStatusQuery(data: any[], deviceTypes: DeviceType[]) {
+        for(const deviceType of deviceTypes) {
+            const queue = this.pendingStatusQueries.get(deviceType) || [];
+            queue.push(this.takeObservedSeq());
+            this.pendingStatusQueries.set(deviceType, queue);
+        }
         await this.sendJson({
             "roomKey": this.wsCredentials?.roomKey,
             "userKey": this.wsCredentials?.userKey,
             "accessToken": this.wsCredentials?.accessToken,
-            "data": deviceTypes.map((deviceType) => ({ type: deviceType.toString() })),
+            "data": data,
         });
     }
 
@@ -1189,12 +1235,9 @@ export default class SmartELifeClient {
             return;
         }
         const deviceList = page.deviceList;
-        await this.sendJson({
-            "roomKey": this.wsCredentials?.roomKey,
-            "userKey": this.wsCredentials?.userKey,
-            "accessToken": this.wsCredentials?.accessToken,
-            "data": deviceList,
-        });
+        await this.sendStatusQuery(deviceList, deviceList
+            .map((deviceGroup: any) => deviceGroup["type"] as DeviceType)
+            .filter((deviceType: DeviceType) => !!deviceType));
 
         for(const deviceGroup of deviceList) {
             const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
