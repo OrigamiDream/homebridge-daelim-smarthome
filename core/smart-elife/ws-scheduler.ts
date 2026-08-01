@@ -21,6 +21,8 @@ export default class WebSocketScheduler {
     private wsClosedByUser: boolean = false;
     private wsLastAuthRefreshAtMs: number = 0;
     private wsConnectPromise?: Promise<void>;
+    /** Non-JSON frames discarded on the current connection, for log rate-limiting. */
+    private wsNonJsonFrames: number = 0;
 
     constructor(
         private readonly client: SmartELifeClient,
@@ -99,6 +101,17 @@ export default class WebSocketScheduler {
         return Buffer.from(data).toString("utf8");
     }
 
+    private static wsRawDataByteLength(data: WebSocket.RawData): number {
+        if(Buffer.isBuffer(data)) {
+            return data.length;
+        }
+        if(Array.isArray(data)) {
+            return data.reduce((total, chunk) => total + chunk.length, 0);
+        }
+        // ArrayBuffer
+        return data.byteLength;
+    }
+
     private async waitForWebSocketOpen(ws: WebSocket, timeoutMs: number = 10_000): Promise<void> {
         if(ws.readyState === WebSocket.OPEN) {
             return;
@@ -128,21 +141,35 @@ export default class WebSocketScheduler {
         });
     }
 
-    public async wsSendJson(payload: any): Promise<void> {
+    /**
+     * Returns whether the socket accepted the frame. The drop paths used to be
+     * silent, which left callers unable to tell a sent query from a discarded one -
+     * and the status-query FIFO records an entry per sent query,
+     * so a discard mistaken for a send misaligns every answer after it.
+     *
+     * `beforeSend` runs synchronously as the frame is handed to the socket - after any
+     * reconnect this call rode through, in the same turn as the send itself. That is
+     * the only moment a caller can record bookkeeping that must exist before the
+     * answer can possibly arrive and must not exist if the frame is never attempted:
+     * the answer to a frame can be dispatched before the frame's own send callback
+     * when the event loop was busy across the round trip.
+     */
+    public async wsSendJson(payload: any, beforeSend?: () => void): Promise<boolean> {
         try {
             await this.connectWebSocket();
             const ws = this.ws;
             if(!ws) {
-                return;
+                return false;
             }
             await this.waitForWebSocketOpen(ws, 10_000);
             if(ws.readyState !== WebSocket.OPEN) {
                 this.scheduleWebSocketReconnect("send while not open");
-                return;
+                return false;
             }
 
             await new Promise<void>((resolve, reject) => {
                 this.log.debug(`[WebSocket] :: Send :: ${JSON.stringify(payload)}`);
+                beforeSend?.();
                 ws.send(JSON.stringify(payload), (err?: Error) => {
                     if(err) {
                         reject(err);
@@ -151,11 +178,12 @@ export default class WebSocketScheduler {
                     }
                 });
             });
+            return true;
         } catch (err) {
             if(this.isSocketClosedDuringSendError(err)) {
                 this.log.warn(`[WebSocket] send skipped due to socket close race: ${(err as any)?.message || err}`);
                 this.scheduleWebSocketReconnect("send on closed socket");
-                return;
+                return false;
             }
             throw err;
         }
@@ -209,9 +237,17 @@ export default class WebSocketScheduler {
                 const url = this.getWebSocketUrl();
                 const headers = this.getWebSocketHeaders();
 
-                // Close any previous instance (best-effort) before replacing.
+                // Close any previous instance (best-effort) before replacing. Its frames
+                // must not reach handlers that now describe the new connection - a late
+                // answer would consume the new FIFO's head - and its close must not
+                // schedule a reconnect over the connect in progress. `error` and `open`
+                // stay attached, so a late socket error cannot crash as an unhandled
+                // 'error' event.
+                const previous = this.ws;
+                previous?.removeAllListeners("message");
+                previous?.removeAllListeners("close");
                 try {
-                    this.ws?.close();
+                    previous?.close();
                 } catch {
                     // ignore
                 }
@@ -219,9 +255,16 @@ export default class WebSocketScheduler {
                 const ws = new WebSocket(url, {
                     headers,
                     perMessageDeflate: false,
+                    // Real frames are kilobytes (a type's whole device snapshot, an
+                    // elevator action); the library default of 100 MiB would let one
+                    // hostile or broken frame balloon into a string that size before
+                    // any handler sees it. An oversized frame closes with 1009 and
+                    // the reconnect path takes over.
+                    maxPayload: 1024 * 1024,
                 } as any);
                 this.ws = ws;
                 this.wsClosedByUser = false;
+                this.wsNonJsonFrames = 0;
 
                 ws.on("open", () => {
                     this.wsReconnectAttempt = 0;
@@ -250,7 +293,29 @@ export default class WebSocketScheduler {
                         return;
                     }
 
-                    const json = Utils.parseJsonSafe(text);
+                    let json;
+                    try {
+                        json = Utils.parseJsonSafe(text);
+                    } catch {
+                        // This handler is async; a throw here would surface as an
+                        // unhandled rejection rather than anything catchable.
+                        // warn shows without debug mode, so it carries an escaped,
+                        // bounded preview and fires once per connection; the full
+                        // frame goes to debug like every other body this file logs,
+                        // escaped so it stays one line. `maxPayload` above bounds
+                        // the size either way.
+                        this.wsNonJsonFrames += 1;
+                        if(this.wsNonJsonFrames === 1) {
+                            // Sized from the raw frame, before any decoding - a decoded
+                            // string misreports trimmed whitespace and invalid UTF-8.
+                            const wireBytes = WebSocketScheduler.wsRawDataByteLength(data);
+                            this.log.warn(`[WebSocket] discarded a frame that is not JSON: `
+                                + `${wireBytes} byte(s), ${JSON.stringify(text.slice(0, 160))}`);
+                        }
+                        this.log.debug(`[WebSocket] discarded a frame that is not JSON `
+                            + `(${this.wsNonJsonFrames} so far): ${JSON.stringify(text)}`);
+                        return;
+                    }
                     this.log.debug(`[WebSocket] message (JSON): ${JSON.stringify(json)}`);
                     this.injector.onMessage(this.client, json);
                 });
