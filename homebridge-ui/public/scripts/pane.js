@@ -858,7 +858,7 @@ class DeviceConfirmPane extends Pane {
 
     _deviceRow(device, badge) {
         const label = badge === "removed"
-            ? `<span class="badge badge-danger ml-2">빠짐</span>`
+            ? `<span class="badge badge-danger ml-2">제외됨</span>`
             : badge === "added"
                 ? `<span class="badge badge-success ml-2">추가됨</span>`
                 : "";
