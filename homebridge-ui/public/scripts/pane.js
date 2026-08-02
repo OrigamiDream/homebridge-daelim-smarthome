@@ -545,9 +545,14 @@ class AuthorizationPane extends Pane {
 
     nextPane() {
         if(this.isCompleted) {
-            // The confirmation pane sits before the completion screen and decides
-            // for itself whether there is anything to confirm - see canPassthrough.
-            return new DeviceConfirmPane(this.element, this.config);
+            if(this.provider === "smart-elife") {
+                // The confirmation pane sits before the completion screen and decides
+                // for itself whether there is anything to confirm - see canPassthrough.
+                return new DeviceConfirmPane(this.element, this.config);
+            }
+            // daelim: the per-complex server answers for this household alone,
+            // so the fetched list needs no confirmation.
+            return new CompletePane(this.element, this.config);
         } else {
             return new WallpadPasscodePane(this.element, this.config, this.provider);
         }
@@ -573,15 +578,18 @@ class AuthorizationPane extends Pane {
                     element.classList.add("hidden");
                 }
             }
-            await window.homebridge.request(`/${this.provider}/sign-in`, {
+            const payload = {
                 region: this.config.region,
                 complex: this.config.complex,
                 username: this.usernameElement.value,
                 password: this.passwordElement.value,
+            };
+            if(this.provider === "smart-elife") {
                 // The saved device list rides along as the yardstick the server holds
-                // fetched pages against. Empty on a first-time setup, and ignored by daelim.
-                devices: this.config.devices || [],
-            });
+                // fetched pages against. Empty on a first-time setup.
+                payload.devices = this.config.devices || [];
+            }
+            await window.homebridge.request(`/${this.provider}/sign-in`, payload);
         });
         this.addHomebridgeListener("authorization-failed", (event) => {
             const reasonId = event["data"].reason;
@@ -666,9 +674,13 @@ class WallpadPasscodePane extends Pane {
     }
 
     nextPane() {
-        // Same station as AuthorizationPane's: the confirmation pane decides
-        // for itself whether there is anything to confirm.
-        return new DeviceConfirmPane(this.element, this.config);
+        if(this.provider === "smart-elife") {
+            // Same station as AuthorizationPane's: the confirmation pane decides
+            // for itself whether there is anything to confirm.
+            return new DeviceConfirmPane(this.element, this.config);
+        }
+        // daelim: no confirmation - see AuthorizationPane.
+        return new CompletePane(this.element, this.config);
     }
 
     register() {
@@ -687,14 +699,17 @@ class WallpadPasscodePane extends Pane {
             this.verifyButton.disabled = true;
             stopTimer();
             window.homebridge.showSpinner();
-            await window.homebridge.request(`/${this.config.provider}/passcode`, {
+            const payload = {
                 complex: this.config.complex,
                 username: this.config.username,
                 password: this.config.password,
                 passcode: this.passcodeElement.value,
+            };
+            if(this.provider === "smart-elife") {
                 // Rides through to the sign-in this passcode completes - see AuthorizationPane.
-                devices: this.config.devices || [],
-            });
+                payload.devices = this.config.devices || [];
+            }
+            await window.homebridge.request(`/${this.config.provider}/passcode`, payload);
         });
         this.addHomebridgeListener("invalid-wallpad-passcode", async () => {
             window.homebridge.hideSpinner();
@@ -817,13 +832,18 @@ function lightbulbGroupsRefreshed(provider, savedDevices, availableDevices) {
  * judgement stands on ever after - and '다시 조회' asks the server again, which signs
  * in anew and reads the page right after, the most reliable moment there is (#198).
  *
+ * Exclusive to the Smart eLife provider, whose device list cannot be trusted as
+ * fetched: the sign-in panes route only smart-elife here, and canPassthrough keeps
+ * a provider check as a second line of defence. daelim's per-complex server answers
+ * for one household alone, so its wizard skips this procedure entirely.
+ *
  * A member of the wizard chain, between the sign-in panes and CompletePane. Finished
- * settings pass straight through - daelim needs no confirmation, and a saved list is
- * a confirmed one - while a first-time setup stops here, asks the server, and shows
- * what it got: "loading" becomes "first" (the whole fetched list), or "first-failed"
- * (retry as the only way forward). CompletePane also enters it explicitly with a
- * payload, which never passes through: "diff" shows what a re-fetch would add and
- * take away, on the way into the advanced editor.
+ * settings pass straight through - a saved list is a confirmed one - while a
+ * first-time setup stops here, asks the server, and shows what it got: "loading"
+ * becomes "first" (the whole fetched list), or "first-failed" (retry as the only way
+ * forward). CompletePane also enters it explicitly with a payload, which never
+ * passes through: "diff" shows what a re-fetch would add and take away, on the way
+ * into the advanced editor.
  */
 class DeviceConfirmPane extends Pane {
     constructor(element, config, payload) {
@@ -863,7 +883,9 @@ class DeviceConfirmPane extends Pane {
             return false;
         }
         // As a chain member it only stops the wizard where nothing is confirmed yet:
-        // daelim needs no confirmation, and a saved list means a confirmed one.
+        // a saved list means a confirmed one. The provider clause is defence in
+        // depth - the sign-in panes only route smart-elife here - so a misrouted
+        // daelim chain would still pass through untouched.
         return this.config.provider !== "smart-elife"
             || (this.config.devices || []).length > 0;
     }
@@ -1287,16 +1309,19 @@ class CompletePane extends Pane {
 
     async _requestRefresh() {
         window.homebridge.showSpinner();
+        const payload = {
+            region: this.config.region,
+            complex: this.config.complex,
+            username: this.config.username,
+            password: this.config.password,
+        };
+        if(this.config.provider === "smart-elife") {
+            // The saved device list rides along as the yardstick the server holds
+            // fetched pages against. Empty on a first-time setup.
+            payload.devices = this.config.devices || [];
+        }
         try {
-            await window.homebridge.request(`/${this.config.provider}/fetch-devices`, {
-                region: this.config.region,
-                complex: this.config.complex,
-                username: this.config.username,
-                password: this.config.password,
-                // The saved device list rides along as the yardstick the server holds
-                // fetched pages against. Empty on a first-time setup, and ignored by daelim.
-                devices: this.config.devices || [],
-            });
+            await window.homebridge.request(`/${this.config.provider}/fetch-devices`, payload);
         } catch(error) {
             console.error("Refreshing devices failed:", error);
             if(this.config.provider === "smart-elife") {

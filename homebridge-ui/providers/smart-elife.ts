@@ -71,6 +71,13 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
 
     async invalidate(_: any) {
         this.client = undefined;
+        // A reset ends the session the cache belongs to. Without this, the first
+        // force-less fetch after a re-login would replay the previous session's list,
+        // because a sign-in refused as FOREIGN/INVALID deliberately leaves the cache alone.
+        this.devices = [];
+        this.devicesFetched = false;
+        this.household = HouseholdAttribution.UNKNOWN;
+        this.aliases = {};
     }
 
     async signIn(p: any) {
