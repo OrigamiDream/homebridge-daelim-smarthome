@@ -578,15 +578,18 @@ class AuthorizationPane extends Pane {
                     element.classList.add("hidden");
                 }
             }
-            await window.homebridge.request(`/${this.provider}/sign-in`, {
+            const payload = {
                 region: this.config.region,
                 complex: this.config.complex,
                 username: this.usernameElement.value,
                 password: this.passwordElement.value,
+            };
+            if(this.provider === "smart-elife") {
                 // The saved device list rides along as the yardstick the server holds
-                // fetched pages against. Empty on a first-time setup, and ignored by daelim.
-                devices: this.config.devices || [],
-            });
+                // fetched pages against. Empty on a first-time setup.
+                payload.devices = this.config.devices || [];
+            }
+            await window.homebridge.request(`/${this.provider}/sign-in`, payload);
         });
         this.addHomebridgeListener("authorization-failed", (event) => {
             const reasonId = event["data"].reason;
@@ -696,14 +699,17 @@ class WallpadPasscodePane extends Pane {
             this.verifyButton.disabled = true;
             stopTimer();
             window.homebridge.showSpinner();
-            await window.homebridge.request(`/${this.config.provider}/passcode`, {
+            const payload = {
                 complex: this.config.complex,
                 username: this.config.username,
                 password: this.config.password,
                 passcode: this.passcodeElement.value,
+            };
+            if(this.provider === "smart-elife") {
                 // Rides through to the sign-in this passcode completes - see AuthorizationPane.
-                devices: this.config.devices || [],
-            });
+                payload.devices = this.config.devices || [];
+            }
+            await window.homebridge.request(`/${this.config.provider}/passcode`, payload);
         });
         this.addHomebridgeListener("invalid-wallpad-passcode", async () => {
             window.homebridge.hideSpinner();
@@ -1274,16 +1280,19 @@ class CompletePane extends Pane {
 
     async _requestRefresh() {
         window.homebridge.showSpinner();
+        const payload = {
+            region: this.config.region,
+            complex: this.config.complex,
+            username: this.config.username,
+            password: this.config.password,
+        };
+        if(this.config.provider === "smart-elife") {
+            // The saved device list rides along as the yardstick the server holds
+            // fetched pages against. Empty on a first-time setup.
+            payload.devices = this.config.devices || [];
+        }
         try {
-            await window.homebridge.request(`/${this.config.provider}/fetch-devices`, {
-                region: this.config.region,
-                complex: this.config.complex,
-                username: this.config.username,
-                password: this.config.password,
-                // The saved device list rides along as the yardstick the server holds
-                // fetched pages against. Empty on a first-time setup, and ignored by daelim.
-                devices: this.config.devices || [],
-            });
+            await window.homebridge.request(`/${this.config.provider}/fetch-devices`, payload);
         } catch(error) {
             console.error("Refreshing devices failed:", error);
             if(this.config.provider === "smart-elife") {
