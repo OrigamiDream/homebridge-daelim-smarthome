@@ -545,9 +545,14 @@ class AuthorizationPane extends Pane {
 
     nextPane() {
         if(this.isCompleted) {
-            // The confirmation pane sits before the completion screen and decides
-            // for itself whether there is anything to confirm - see canPassthrough.
-            return new DeviceConfirmPane(this.element, this.config);
+            if(this.provider === "smart-elife") {
+                // The confirmation pane sits before the completion screen and decides
+                // for itself whether there is anything to confirm - see canPassthrough.
+                return new DeviceConfirmPane(this.element, this.config);
+            }
+            // daelim: the per-complex server answers for this household alone,
+            // so the fetched list needs no confirmation.
+            return new CompletePane(this.element, this.config);
         } else {
             return new WallpadPasscodePane(this.element, this.config, this.provider);
         }
@@ -666,9 +671,13 @@ class WallpadPasscodePane extends Pane {
     }
 
     nextPane() {
-        // Same station as AuthorizationPane's: the confirmation pane decides
-        // for itself whether there is anything to confirm.
-        return new DeviceConfirmPane(this.element, this.config);
+        if(this.provider === "smart-elife") {
+            // Same station as AuthorizationPane's: the confirmation pane decides
+            // for itself whether there is anything to confirm.
+            return new DeviceConfirmPane(this.element, this.config);
+        }
+        // daelim: no confirmation - see AuthorizationPane.
+        return new CompletePane(this.element, this.config);
     }
 
     register() {
@@ -797,13 +806,18 @@ function mergeFetchedDevices(provider, savedDevices, fetchedDevices) {
  * judgement stands on ever after - and '다시 조회' asks the server again, which signs
  * in anew and reads the page right after, the most reliable moment there is (#198).
  *
+ * Exclusive to the Smart eLife provider, whose device list cannot be trusted as
+ * fetched: the sign-in panes route only smart-elife here, and canPassthrough keeps
+ * a provider check as a second line of defence. daelim's per-complex server answers
+ * for one household alone, so its wizard skips this procedure entirely.
+ *
  * A member of the wizard chain, between the sign-in panes and CompletePane. Finished
- * settings pass straight through - daelim needs no confirmation, and a saved list is
- * a confirmed one - while a first-time setup stops here, asks the server, and shows
- * what it got: "loading" becomes "first" (the whole fetched list), or "first-failed"
- * (retry as the only way forward). CompletePane also enters it explicitly with a
- * payload, which never passes through: "diff" shows what a re-fetch would add and
- * take away, on the way into the advanced editor.
+ * settings pass straight through - a saved list is a confirmed one - while a
+ * first-time setup stops here, asks the server, and shows what it got: "loading"
+ * becomes "first" (the whole fetched list), or "first-failed" (retry as the only way
+ * forward). CompletePane also enters it explicitly with a payload, which never
+ * passes through: "diff" shows what a re-fetch would add and take away, on the way
+ * into the advanced editor.
  */
 class DeviceConfirmPane extends Pane {
     constructor(element, config, payload) {
@@ -843,7 +857,9 @@ class DeviceConfirmPane extends Pane {
             return false;
         }
         // As a chain member it only stops the wizard where nothing is confirmed yet:
-        // daelim needs no confirmation, and a saved list means a confirmed one.
+        // a saved list means a confirmed one. The provider clause is defence in
+        // depth - the sign-in panes only route smart-elife here - so a misrouted
+        // daelim chain would still pass through untouched.
         return this.config.provider !== "smart-elife"
             || (this.config.devices || []).length > 0;
     }
