@@ -32,11 +32,39 @@ export interface ListenerError {
 }
 
 export interface ListenerMetadata {
+    /** WebSocket action name, e.g. `elevate_call`. Absent on a polled report. */
     action?: string
+
+    /**
+     * Number drawn from the client's observation counter
+     * at the moment this observation was *requested*.
+     * Commands draw from the same counter,
+     * so a report numbered below a command cannot say anything about that command -
+     * the poll it came from was already in the air when the command was sent.
+     *
+     * Where "requested" is, per path: a polled page draws its number before the HTTP
+     * request leaves; the answer to a WebSocket status query wears the number drawn
+     * when that query was sent (`sendStatusQuery`); an asynchronous `event_*` push is
+     * never requested, so its number is drawn at frame receipt.
+     */
+    observedSeq: number
+
+    /**
+     * Whether this report is the whole of its device type rather than a single device.
+     * A polled page and the answer to a query both are;
+     * an `event_*` push carries the one device that changed.
+     */
+    completeSnapshot: boolean
+
+    /** Wall clock at the same instant. For the log, and never compared - see `observedSeq`. */
+    observedAt: number
 }
 
-export type Listener = (data: any | undefined, error: ListenerError, metadata?: ListenerMetadata) => void;
-export type PushListener = (title: string | undefined, message: string | undefined) => void;
+export type Listener = (data: any | undefined, error: ListenerError, metadata: ListenerMetadata) => void;
+// A listener may run asynchronously - the camera one fetches the visitor snapshot
+// over the network - so the return type has to admit a promise
+// for the dispatcher to be able to catch its rejection.
+export type PushListener = (title: string | undefined, message: string | undefined) => void | Promise<void>;
 
 interface ListenerInfo {
     deviceType: DeviceType
@@ -48,7 +76,95 @@ interface PushListenerInfo {
     listener: PushListener
 }
 
+/**
+ * Which household a device report belongs to.
+ *
+ * `OWN` and `FOREIGN` are the two answers; the other two say the question
+ * could not be answered. `UNKNOWN` means there was nothing to hold the list
+ * against - a first-time setup - and `INVALID` means the markup gave the
+ * parser nothing, so the question could not even be posed.
+ *
+ * String-valued so the wizard can carry it to the frontend as an event reason.
+ */
+export enum HouseholdAttribution {
+    OWN = "own",
+    FOREIGN = "foreign",
+    UNKNOWN = "unknown",
+    INVALID = "invalid",
+}
+
+/** What `fetchDevices()` found, and whose household it judged the list to be. */
+export interface DeviceFetchResult {
+    household: HouseholdAttribution
+    /** Empty when the attribution is `FOREIGN` or `INVALID` - failure is not an empty household. */
+    devices: Device[]
+    /**
+     * The room each device is in, by device id - the name the resident gave it on the
+     * WallPad, falling back to the canonical room name where none was given.
+     * Display-only and never saved: the wizard's confirmation screen shows it because
+     * a resident recognises their own home by the names they chose,
+     * not by the canonical room names the display names are built from.
+     */
+    aliases: Record<string, string>
+}
+
+/**
+ * A `/main/home.do` that was held against the configuration and kept.
+ * The stamp rides with the markup rather than being taken where it is parsed:
+ * the polled page is already seconds old by then,
+ * and what decides whether a report may be believed
+ * is when it was asked for, not when it was read.
+ */
+interface RenderedPage {
+    html: string
+    deviceList: any[] | undefined
+
+    /**
+     * Whose household the devices this page listed belong to.
+     * The session keys it carries are ours either way - measured - so the credentials
+     * parser reads the page regardless, while everything about the devices does not.
+     */
+    household: HouseholdAttribution
+
+    observedSeq: number
+    observedAt: number
+}
+
 const POLLING_INTERVAL_MILLISECONDS = 30 * 1000;
+
+/**
+ * How many recorded status queries one device type may have in flight.
+ *
+ * A healthy queue is zero or one deep - answers arrive in under a second and polls are
+ * thirty seconds apart - so hitting the cap means answers stopped coming. A type at the
+ * cap is not asked again until its outstanding answers arrive or a reconnect clears them:
+ * sending without recording would let the unmatched answer drain to an empty queue and
+ * wear a receive stamp, ranking a stale observation as the newest thing yet, and removing
+ * entries instead would hand an old answer a newer query's number. Going quiet is the one
+ * option that cannot misrank anything - it costs queries against a WallPad that is not
+ * answering them anyway.
+ *
+ * A poll that lands between a reconnect starting and `onOpen` clearing the queues still
+ * skips a type the dead connection had capped out, deferring its fallback query to the
+ * next poll. Accepted: it costs at most one poll period of backstop freshness in an
+ * already-blind window, pushes resume with the connection either way, and remembering
+ * skipped types across a reconnect would need exactly the generation bookkeeping this
+ * design just got rid of.
+ */
+const MAX_PENDING_STATUS_QUERIES = 4;
+
+/**
+ * Device types whose state never comes back as a header snapshot - their accessories are
+ * driven by pushes and by `elevator_call_*`/`elevate_call` action frames instead. Asking
+ * the WallPad about one of these would record a status query that no answer ever consumes,
+ * leaving the recorded number to desynchronize that type's queue for good.
+ */
+const UNQUERYABLE_DEVICE_TYPES = new Set<DeviceType>([
+    DeviceType.ELEVATOR,
+    DeviceType.DOOR,
+    DeviceType.VEHICLE,
+    DeviceType.CAMERA,
+]);
 
 export default class SmartELifeClient {
 
@@ -81,7 +197,52 @@ export default class SmartELifeClient {
 
     // WallPad authorization temporary keys
     private wsCredentials?: WebSocketCredentials;
-    private serverSideRenderedHTML?: string;
+    private renderedPage?: RenderedPage;
+
+    /**
+     * Draws the numbers that order observations against commands.
+     * A wall clock cannot: a Raspberry Pi has no RTC and steps its clock
+     * once the network comes up, and two events inside one millisecond
+     * are indistinguishable by it either way.
+     */
+    private observationCounter = 0;
+
+    /**
+     * Device types the last accepted page carried.
+     * Learned rather than listed, so that a household whose WallPad answers for
+     * something this plugin has never seen is asked about it all the same.
+     */
+    private renderedDeviceTypes: DeviceType[] = [];
+
+    /**
+     * Numbers drawn for status queries whose answers have not arrived yet, per type.
+     * FIFO: the socket answers queries of one type in the order they were sent,
+     * so the head of the queue always belongs to the next answer.
+     *
+     * An entry is reserved synchronously as the frame is handed to the socket -
+     * see `sendStatusQuery` for why no other moment works - and a type at
+     * `MAX_PENDING_STATUS_QUERIES` unanswered queries is not asked again,
+     * keeping sends and entries one-to-one.
+     * Cleared on reconnect - see `onOpen`.
+     */
+    private readonly pendingStatusQueries = new Map<DeviceType, number[]>();
+
+    /**
+     * Slots claimed by status queries that passed the cap check but whose send has not
+     * settled yet, per type. Claimed synchronously with the check itself, so concurrent
+     * calls started in the same tick see each other and cannot pass the cap together -
+     * the reservation in `pendingStatusQueries` only lands later, at each call's send
+     * moment. Released when the send settles; between the reservation landing and the
+     * release a type is briefly counted twice, which can only defer a query, never
+     * admit one too many.
+     */
+    private readonly inFlightStatusQueries = new Map<DeviceType, number>();
+
+    /** How many reports were declined as another household's, for the debug log. */
+    private declinedForeignReports = 0;
+
+    /** Whether the log has already said that there is nothing to hold a report against. */
+    private reportedUncomparableDeviceList = false;
 
     private readonly ws?: WebSocketScheduler;
     private readonly listeners: ListenerInfo[] = [];
@@ -123,19 +284,32 @@ export default class SmartELifeClient {
                 return ClientResponseCode.SUCCESS;
             },
             async onOpen(client: SmartELifeClient) {
+                // Queries in flight on the previous connection will never be answered here,
+                // and their numbers must not attach to this connection's answers.
+                client.pendingStatusQueries.clear();
                 await client.requestElevatorStatus();
             },
             async onMessage(client: SmartELifeClient, json: any) {
+                // Stamped where the frame is received - the fallback for everything
+                // that is not the answer to a query this client sent.
+                let observedSeq = client.takeObservedSeq();
+                const observedAt = Date.now();
+
                 const header = json["header"];
                 const action = json["action"];
 
                 let status = "000";
                 let deviceTypeString, message;
+                // A query answers with every device of the type it was asked about.
+                // An `event_*` push carries the one device that changed,
+                // and publishing from it would mix what just arrived with what is still stale.
+                let completeSnapshot = false;
                 if(!!header) {
                     deviceTypeString = header["type"];
                     if(header["command"] === "control_response")
                         return;
 
+                    completeSnapshot = true;
                     if(json["result"]) {
                         status = json["result"]["status"];
                         message = json["result"]["message"];
@@ -155,9 +329,41 @@ export default class SmartELifeClient {
                 if(deviceType === DeviceType.UNKNOWN)
                     client.log.warn("Unknown device type: %s", deviceTypeString);
 
+                if(completeSnapshot) {
+                    // The answer to a query wears the number drawn when that query left,
+                    // not the receive stamp - a command sent while the query was in flight
+                    // must rank above the answer, or a stale report slips past the filters
+                    // built on this ordering. Consumed even when the frame is declined
+                    // below, so the per-type FIFO stays aligned with the answers.
+                    const queued = client.pendingStatusQueries.get(deviceType)?.shift();
+                    if(queued !== undefined) {
+                        observedSeq = queued;
+                    } else {
+                        // The one residual too-new window. The protocol carries no
+                        // correlation id, so a header frame this client never asked for
+                        // (the server answers for the household, not the session) consumes
+                        // the head meant for a real answer, and the answer then arrives
+                        // to an empty queue and keeps the receive stamp - bounded by one
+                        // round trip, realigned by the very next answer. Logged so the
+                        // field frequency is a number rather than a guess.
+                        client.log.debug("A %s snapshot arrived with no status query on record; " +
+                            "keeping its receive stamp.", deviceTypeString);
+                    }
+                }
+
+                // The socket carries the same misattribution the rendered page does.
+                // A day of measurement found 91 answers that listed another household's devices.
+                if(!client.isOwnHouseholdFrame(json["data"], completeSnapshot, deviceType)) {
+                    client.declinedForeignReports += 1;
+                    client.log.debug("Ignoring a %s frame that is not this household's " +
+                        "(%d report(s) declined so far).", deviceTypeString, client.declinedForeignReports);
+                    return;
+                }
+
                 for(const info of client.listeners) {
                     if(info.deviceType === deviceType) {
-                        info.listener(json["data"], { code: Number(status), message }, { action });
+                        info.listener(json["data"], { code: Number(status), message },
+                            { action, observedSeq, observedAt, completeSnapshot });
                     }
                 }
             }
@@ -484,7 +690,13 @@ export default class SmartELifeClient {
     }
 
     private async attemptsParsingWebSocketCredentials() {
-        let { userKey, roomKey, accessToken } = parseWebSocketCredentials(await this.fetchServerSideRenderedHTML());
+        // Reads the page whichever household its device list belonged to.
+        // Measured over a day: every page carried this session's own room and user keys,
+        // including the ones whose device list was somebody else's - the server misresolves
+        // the household for the list, not for the session. Declining here would leave a
+        // working session without the credentials it needs.
+        const { html } = await this.fetchRenderedPage();
+        let { userKey, roomKey, accessToken } = parseWebSocketCredentials(html);
 
         userKey = userKey || this.config.userKey || "";
         roomKey = roomKey || this.config.roomKey || "";
@@ -619,10 +831,21 @@ export default class SmartELifeClient {
 
     private parsePushType(data: { [key: string]: unknown } | undefined, title?: string, body?: string): PushType {
         const pushType = this.parseRawPushType(data, title);
-        // The access (출입) push category covers both the household front door and
-        // the communal door; only the notification body tells them apart.
-        if(pushType === PushType.FRONT_DOOR && !!body && body.includes("공동")) {
-            return PushType.COMMUNAL_DOOR;
+        // The access (출입) push category covers the household front door,
+        // the communal door and the doorbell camera alike;
+        // only the notification body tells them apart.
+        // Without this an unmapped `data4` falls back to the title,
+        // and every one of them would resolve to FRONT_DOOR.
+        if(pushType === PushType.FRONT_DOOR && !!body) {
+            // A visitor snapshot is not tied to either door -
+            // the camera accessory reads `door_type` off the visitor board
+            // to decide which one it belongs to.
+            if(body.includes("방문자")) {
+                return PushType.VISITOR;
+            }
+            if(body.includes("공동")) {
+                return PushType.COMMUNAL_DOOR;
+            }
         }
         return pushType;
     }
@@ -664,6 +887,25 @@ export default class SmartELifeClient {
         return PushType.UNKNOWN;
     }
 
+    // A rejected listener would otherwise reach the process as an unhandled rejection,
+    // which terminates the bridge on current Node versions.
+    // Nothing upstream can act on the failure anyway,
+    // so it is contained here and only reported.
+    private dispatchPushListener(info: PushListenerInfo, title?: string, body?: string) {
+        try {
+            void Promise.resolve(info.listener(title, body)).catch((e) => {
+                this.reportPushListenerFailure(info.pushType, e);
+            });
+        } catch(e) {
+            this.reportPushListenerFailure(info.pushType, e);
+        }
+    }
+
+    private reportPushListenerFailure(pushType: PushType, e: unknown) {
+        this.log.error("Push listener for %s failed: %s", pushType.toString(), (e as Error)?.message || e);
+        this.log.debug("Push listener failure: %s", (e as Error)?.stack || "no stack available");
+    }
+
     private async configurePushNotification() {
         if(this.push) {
             this.log("Configuring Push");
@@ -682,7 +924,7 @@ export default class SmartELifeClient {
 
                 for(const listener of this.pushListeners) {
                     if(listener.pushType !== pushType) continue;
-                    listener.listener(title, body);
+                    this.dispatchPushListener(listener, title, body);
                 }
             });
             await this.push.connect();
@@ -803,9 +1045,13 @@ export default class SmartELifeClient {
             await this.refreshDeviceStatus();
         }
 
-        setInterval(async () => {
+        setInterval(() => {
             this.log.info("Polling device state");
-            await this.refreshDeviceStatus(true);
+            // Wrapped so a rejected poll (network failure, socket teardown) is logged
+            // instead of surfacing as an unhandled promise rejection.
+            this.refreshDeviceStatus(true).catch((e: any) => {
+                this.log.warn("Device state polling failed: %s", e?.message || e);
+            });
         }, POLLING_INTERVAL_MILLISECONDS);
     }
 
@@ -858,29 +1104,314 @@ export default class SmartELifeClient {
         return r.version;
     }
 
-    private async fetchServerSideRenderedHTML(forceFetch: boolean = false) {
-        if(!!this.serverSideRenderedHTML && !forceFetch) {
-            return this.serverSideRenderedHTML;
+    /**
+     * Next number from the observation counter.
+     * Observations and commands draw from the same one,
+     * which is the only thing that establishes their order -
+     * see `ListenerMetadata.observedSeq`.
+     */
+    takeObservedSeq(): number {
+        return ++this.observationCounter;
+    }
+
+    /**
+     * Fetches `/main/home.do` and keeps it only if it is this household's.
+     *
+     * The single gate. `/main/home.do` answers with another resident's page often enough
+     * to matter - measured at 18 to 42 per cent of polls over a day - and it does so with a
+     * plain 200 rather than with anything that reads as an error. Everything downstream reads
+     * this page: the device list, the room names, the WebSocket credentials. Holding the page
+     * itself is the only place where one judgement covers all of them.
+     */
+    private async fetchRenderedPage(forceFetch: boolean = false): Promise<RenderedPage> {
+        if(!!this.renderedPage && !forceFetch) {
+            return this.renderedPage;
         }
+        // Stamped before the request leaves rather than after the markup is read.
+        // A polled page is seconds old by the time it is parsed,
+        // and a command sent in that gap must not be judged against it.
+        const observedSeq = this.takeObservedSeq();
+        const observedAt = Date.now();
         const html = await this.fetchWithJSessionId(`${this.baseUrl}/main/home.do`, {
             method: "GET",
             headers: await this.createDocumentHeaters(),
         }).then((response) => response.text());
-        this.serverSideRenderedHTML = html;
-        return html;
+
+        const deviceList = parseDeviceList(html) || undefined;
+        const household = !deviceList
+            ? HouseholdAttribution.INVALID
+            : this.attributeDeviceList(deviceList);
+        const page: RenderedPage = { html, deviceList, household, observedSeq, observedAt };
+        if(household === HouseholdAttribution.FOREIGN) {
+            this.declinedForeignReports += 1;
+            this.log.debug("Ignoring a rendered page that is not this household's " +
+                "(%d report(s) declined so far).", this.declinedForeignReports);
+            // Deliberately not cached. Serving it again would make one bad answer
+            // the household for as long as nobody forces a fetch.
+            return page;
+        }
+        if(household === HouseholdAttribution.INVALID) {
+            // A page the parser could not read is not cached either - unlike a foreign page
+            // it says nothing about any household, but serving it again would pin every
+            // downstream reader to markup that already failed once. The caller still gets
+            // the page itself: the credentials parser reads it for something the device
+            // list has no bearing on.
+            this.log.debug("The rendered page carried no readable device list.");
+            return page;
+        }
+        // OWN and UNKNOWN are both kept. An UNKNOWN page is the candidate a first-time
+        // setup shows the resident, and it has to stay one page - refetching between the
+        // credentials parse and the device read could swap in a different household's.
+        this.renderedPage = page;
+        if(household === HouseholdAttribution.OWN && deviceList) {
+            // Learned only from a page that proved itself ours - an unproven page must not
+            // decide which device types the WallPad gets asked about.
+            this.renderedDeviceTypes = deviceList
+                .map((deviceGroup: any) => deviceGroup["type"] as DeviceType)
+                .filter((deviceType: DeviceType) => !!deviceType);
+        }
+        return page;
+    }
+
+    /**
+     * Whose household a device list is.
+     *
+     * WallPad `uid`s are only unique inside one household, so a stranger's list does not
+     * merely miss ours - it collides with a few of them, and `parseDevices()` matches on
+     * `uid` and type alone. That is how a light of ours picks up somebody else's on/off.
+     *
+     * Measured against a live household over a day: this account's own page names all but one
+     * of the devices it lists in the configuration, while the pages of strangers name at most a
+     * fifth of theirs. A majority sits between the two with room to spare on both sides.
+     *
+     * Where there is nothing to compare against, the answer is `UNKNOWN` rather than a pass:
+     * the settings wizard shows such a list to the resident,
+     * and only what they explicitly save becomes the yardstick for every later judgement.
+     */
+    private attributeDeviceList(deviceList: any[]): HouseholdAttribution {
+        const configured = new Set((this.config.devices || []).map((device) => device.deviceId));
+        // Nothing to hold the list against.
+        if(configured.size === 0) {
+            if(!this.reportedUncomparableDeviceList) {
+                this.reportedUncomparableDeviceList = true;
+                this.log.debug("Nothing configured to hold a device list against.");
+            }
+            return HouseholdAttribution.UNKNOWN;
+        }
+        let listed = 0;
+        let ours = 0;
+        for(const deviceGroup of deviceList) {
+            for(const device of deviceGroup?.["devices"] || []) {
+                const deviceId = device?.["uid"];
+                if(typeof deviceId !== "string" || deviceId.trim().length === 0) {
+                    continue;
+                }
+                listed += 1;
+                if(configured.has(deviceId)) {
+                    ours += 1;
+                }
+            }
+        }
+        // A list that named nobody carries no state to mistake for ours,
+        // and no evidence about whose it is either.
+        if(listed === 0) {
+            return HouseholdAttribution.UNKNOWN;
+        }
+        return ours * 2 > listed ? HouseholdAttribution.OWN : HouseholdAttribution.FOREIGN;
+    }
+
+    /**
+     * Whether a WebSocket frame is this household's.
+     *
+     * The two shapes have to be judged differently. A query answers with every device of its
+     * type, which can be held against the configuration exactly as a page is - 91 of these
+     * arrived from other households in a day of measurement. A push carries one device, where
+     * a majority means nothing, but it does carry the room key, which the elevator frames
+     * already rely on. A frame naming neither is let through: `elevator_call_request` carries
+     * no room key at all.
+     */
+    private isOwnHouseholdFrame(data: any, completeSnapshot: boolean, deviceType: DeviceType): boolean {
+        // Not every frame carries devices at all - the indoor air list answers with a bare
+        // header - and a frame that names nothing cannot be attributed to anybody.
+        if(!data || typeof data !== "object") {
+            return true;
+        }
+        if(completeSnapshot) {
+            // A whole page pools every type, so a handful of devices this household never
+            // configured is lost in the majority. One type on its own has no such cushion:
+            // where the configuration holds none of that type at all, every answer about it
+            // names nobody we know and would read as somebody else's. The all-off switch is
+            // exactly that - `fetchDevices()` never writes it down - and its own answers were
+            // being refused. Judge only what there is something to judge against.
+            const comparable = (this.config.devices || [])
+                .some((device) => device.deviceType === deviceType);
+            if(!comparable) {
+                return true;
+            }
+            // Only a positive FOREIGN verdict declines a frame. UNKNOWN passes as before -
+            // with nothing configured there are no accessories listening anyway.
+            return this.attributeDeviceList([data]) !== HouseholdAttribution.FOREIGN;
+        }
+        const roomKey = data["roomkey"];
+        if(typeof roomKey !== "string" || roomKey.length === 0) {
+            return true;
+        }
+        return !this.wsCredentials?.roomKey || roomKey === this.wsCredentials.roomKey;
+    }
+
+    /**
+     * Device types worth asking the WallPad about.
+     *
+     * What the last accepted page carried, where there has been one - that is the server's own
+     * account of which types it answers for. Before then the configuration stands in, because
+     * the first page after a sign-in is sometimes the one that gets declined, and a start that
+     * declines its first page would otherwise ask about nothing at all and sit blind until a
+     * page happens to come back ours.
+     *
+     * Types that never answer as a header snapshot are left out of both sources -
+     * see `UNQUERYABLE_DEVICE_TYPES`. The configuration always lists the exterior
+     * devices, and every query about one of them would go unanswered forever.
+     */
+    private deviceTypesToAskAbout(): DeviceType[] {
+        const deviceTypes = this.renderedDeviceTypes.length > 0
+            ? this.renderedDeviceTypes
+            : [...new Set((this.config.devices || []).map((device) => device.deviceType))];
+        return deviceTypes.filter((deviceType) => !UNQUERYABLE_DEVICE_TYPES.has(deviceType));
+    }
+
+    /**
+     * Asks the WallPad for the state of whole device types,
+     * the same query the app's own pages run when they open.
+     * The answer arrives through the usual listeners, marked as a complete snapshot.
+     *
+     * This is what a declined page falls back on. The rendered page is the only thing
+     * the server gets wrong; the socket answers for the session.
+     */
+    async requestDeviceStatus(deviceTypes: DeviceType[] = this.deviceTypesToAskAbout()) {
+        if(!this.ws || deviceTypes.length === 0) {
+            return;
+        }
+        await this.sendStatusQuery(deviceTypes.map((deviceType) => ({
+            payload: { type: deviceType.toString() },
+            deviceType,
+        })));
+    }
+
+    /**
+     * Sends a status query and records, per device type, the number drawn as it leaves.
+     * The answers arrive through `onMessage` as complete snapshots and pick these numbers
+     * back up in order - see `ListenerMetadata.observedSeq` for why the send is the moment
+     * that counts.
+     *
+     * The invariant is one recorded entry per sent query, in both directions, and the
+     * reservation is installed at the only moment that satisfies both: synchronously as
+     * the frame is handed to the socket, via the scheduler's `beforeSend` hook. Any
+     * earlier and a reconnect the send rides through wipes it while the frame still
+     * goes out; any later and the answer can beat it there, because a busy event loop
+     * dispatches the read before the pending send callback. Either mistake strands
+     * phantom entries that nothing ever consumes, and phantoms latch the cap shut.
+     * A send the scheduler never attempts never runs the hook, so it reserves nothing.
+     *
+     * A send whose callback errors is ambiguous - the peer may have parsed the frame
+     * and answered before the failure was reported - so its reservation deliberately
+     * stays: an answer that does come consumes it, one that never comes is collected
+     * by the reconnect clear, and the cost in the meantime is answers of the type
+     * wearing a number one query too old, which a command survives.
+     *
+     * The numbers are still drawn at the call, before any waiting: a command fired
+     * while the send is blocked must outrank the answer. Reservation order is send
+     * order, so every answer consumes a head no newer than its own pre-send number -
+     * a report can wear too old a number, never too new a one.
+     *
+     * A type whose queue is full is left out of the query itself, not merely out of the
+     * record: an unrecorded query would still be answered, and once the queue drains,
+     * that unmatched answer would wear a receive stamp - a stale observation ranked as
+     * the newest thing yet. Not asking again until the outstanding answers arrive (or a
+     * reconnect clears them) is the only outcome that cannot misrank anything. The
+     * check counts what the batch itself is about to reserve and what concurrent calls
+     * have claimed but not yet reserved - see `inFlightStatusQueries` - so neither
+     * duplicate types in one batch nor calls started in the same tick can pass the
+     * cap together.
+     */
+    private async sendStatusQuery(queries: { payload: any, deviceType: DeviceType }[]) {
+        const projectedDepths = new Map<DeviceType, number>();
+        const sendable = queries.filter(({ deviceType }) => {
+            const projected = projectedDepths.get(deviceType) || 0;
+            const depth = (this.pendingStatusQueries.get(deviceType)?.length || 0)
+                + (this.inFlightStatusQueries.get(deviceType) || 0)
+                + projected;
+            if(depth >= MAX_PENDING_STATUS_QUERIES) {
+                this.log.debug("Not asking about %s: %d earlier queries are still unanswered.",
+                    deviceType, depth);
+                return false;
+            }
+            projectedDepths.set(deviceType, projected + 1);
+            return true;
+        });
+        if(sendable.length === 0) {
+            return;
+        }
+        // Still inside the synchronous block the cap was checked in.
+        for(const { deviceType } of sendable) {
+            this.inFlightStatusQueries.set(deviceType,
+                (this.inFlightStatusQueries.get(deviceType) || 0) + 1);
+        }
+        const drawnSeqs = sendable.map(() => this.takeObservedSeq());
+        const reserve = () => {
+            sendable.forEach(({ deviceType }, index) => {
+                const queue = this.pendingStatusQueries.get(deviceType) || [];
+                queue.push(drawnSeqs[index]);
+                this.pendingStatusQueries.set(deviceType, queue);
+            });
+        };
+        try {
+            await this.sendJson({
+                "roomKey": this.wsCredentials?.roomKey,
+                "userKey": this.wsCredentials?.userKey,
+                "accessToken": this.wsCredentials?.accessToken,
+                "data": sendable.map(({ payload }) => payload),
+            }, reserve);
+        } catch (e: any) {
+            // The scheduler rethrows what is not a close race (open timeout,
+            // re-sign-in failure). None of it is this query's problem to escalate -
+            // the poll retries in thirty seconds either way.
+            this.log.warn("Could not send a status query: %s", e?.message || e);
+        } finally {
+            for(const { deviceType } of sendable) {
+                const remaining = (this.inFlightStatusQueries.get(deviceType) || 0) - 1;
+                if(remaining > 0) {
+                    this.inFlightStatusQueries.set(deviceType, remaining);
+                } else {
+                    this.inFlightStatusQueries.delete(deviceType);
+                }
+            }
+        }
     }
 
     private async refreshDeviceStatus(forceFetch: boolean = false) {
         if(!this.ws) {
             return;
         }
-        const deviceList: any[] = parseDeviceList(await this.fetchServerSideRenderedHTML(forceFetch));
-        await this.sendJson({
-            "roomKey": this.wsCredentials?.roomKey,
-            "userKey": this.wsCredentials?.userKey,
-            "accessToken": this.wsCredentials?.accessToken,
-            "data": deviceList,
-        });
+        const page = await this.fetchRenderedPage(forceFetch);
+        if(page.household === HouseholdAttribution.FOREIGN || !page.deviceList) {
+            // Nothing of this page reaches the accessories, and none of it is echoed back
+            // to the socket either - asking the server about a stranger's devices is how
+            // their answers came back as ours. The WallPad is asked instead, so that
+            // declining a page costs freshness rather than sight.
+            // An UNKNOWN page passes: with nothing configured there are no accessories
+            // listening, so publishing it is a no-op rather than a leak.
+            await this.requestDeviceStatus();
+            return;
+        }
+        const deviceList = page.deviceList;
+        // A group without a type could not be recorded, so it is not asked about either -
+        // the same one-entry-per-sent-query invariant `sendStatusQuery` keeps at its cap.
+        await this.sendStatusQuery(deviceList
+            .map((deviceGroup: any) => ({
+                payload: deviceGroup,
+                deviceType: deviceGroup["type"] as DeviceType,
+            }))
+            .filter(({ deviceType }) => !!deviceType));
 
         for(const deviceGroup of deviceList) {
             const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
@@ -890,7 +1421,11 @@ export default class SmartELifeClient {
             for(const listener of this.listeners) {
                 if(listener.deviceType !== deviceType)
                     continue;
-                listener.listener(deviceGroup, { code: Number("000"), message: undefined });
+                listener.listener(deviceGroup, { code: Number("000"), message: undefined }, {
+                    observedSeq: page.observedSeq,
+                    observedAt: page.observedAt,
+                    completeSnapshot: true,
+                });
             }
         }
     }
@@ -899,8 +1434,33 @@ export default class SmartELifeClient {
         await this.sendJson(createElevatorStatusRequest(this.getWebSocketCredentials()));
     }
 
-    async fetchDevices(): Promise<Device[]> {
-        const deviceList: any[] = parseDeviceList(await this.fetchServerSideRenderedHTML());
+    async fetchDevices(): Promise<DeviceFetchResult> {
+        const page = await this.fetchRenderedPage();
+        if(page.household === HouseholdAttribution.FOREIGN || !page.deviceList) {
+            // Failure is reported as what it is rather than as an empty household -
+            // the wizard decides what to do with it, and must not mistake it for
+            // a home that owns no devices.
+            if(page.household === HouseholdAttribution.FOREIGN) {
+                this.log.warn("The rendered device list was not this household's, so no devices were read. " +
+                    "Try again in a moment.");
+            } else {
+                this.log.warn("The rendered page carried no readable device list, so no devices were read.");
+            }
+            return { household: page.household, devices: [], aliases: {} };
+        }
+        const deviceList = page.deviceList;
+        // Collected on its own rather than inside the loop below,
+        // so the reading of a device stays one thing and the naming of its room another.
+        const aliases: Record<string, string> = {};
+        for(const deviceGroup of deviceList) {
+            for(const device of deviceGroup?.["devices"] || []) {
+                const deviceId = device?.["uid"];
+                const alias = device?.["location_name_alias"] || device?.["location_name"];
+                if(typeof deviceId === "string" && typeof alias === "string" && alias.length > 0) {
+                    aliases[deviceId] = alias;
+                }
+            }
+        }
         const fetchedDevices: Device[] = [];
         for(const deviceGroup of deviceList) {
             const deviceType = deviceGroup["type"] as DeviceType || DeviceType.UNKNOWN;
@@ -924,7 +1484,7 @@ export default class SmartELifeClient {
                 });
             }
         }
-        return fetchedDevices;
+        return { household: page.household, devices: fetchedDevices, aliases };
     }
 
     private async fetchComplex() {
@@ -1021,8 +1581,8 @@ export default class SmartELifeClient {
         return response["result"] as boolean;
     }
 
-    async sendJson(payload: any) {
-        await this.ws?.wsSendJson(payload);
+    async sendJson(payload: any, beforeSend?: () => void): Promise<boolean> {
+        return await this.ws?.wsSendJson(payload, beforeSend) ?? false;
     }
 
     addListener(deviceType: DeviceType, listener: Listener) {

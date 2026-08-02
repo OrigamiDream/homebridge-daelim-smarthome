@@ -20,6 +20,11 @@ interface ElevatorAccessoryInterface extends AccessoryInterface {
 }
 
 export const ELEVATOR_DEVICE_ID = "EV-000000";
+// Not just a label: it feeds the accessory UUID seed
+// and is matched against the `name` written into config.json by the setup wizard.
+// Renaming it strands the cached accessory behind a new UUID
+// and makes `findDeviceInfo()` miss, silently dropping the device's `disabled` and `duration`.
+// The spelling is non-standard ("엘리베이터" is correct) but stays until a migration exists.
 export const ELEVATOR_DISPLAY_NAME = "엘레베이터";
 export const ELEVATOR_TIMEOUT_DURATION = 30; // 30 seconds
 export const ELEVATOR_MENU_NAME = "엘리베이터 콜";

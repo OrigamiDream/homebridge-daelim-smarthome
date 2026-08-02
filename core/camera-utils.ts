@@ -63,6 +63,31 @@ export function reformatSnapshot(processorPath: string, log: Logging, name: stri
     });
 }
 
+/**
+ * Builds the filter chain that fits a source frame into the requested box.
+ *
+ * The scale step targets the requested size directly,
+ * so a source larger than the request is shrunk instead of passed through.
+ * It has to be, because `pad` widens a canvas and cannot narrow one:
+ * handing it a frame larger than its target fails the whole graph
+ * with "Padded dimensions cannot be smaller than input dimensions".
+ * A source smaller than the request is still enlarged,
+ * and `pad` only fills whatever the aspect ratio leaves over.
+ */
+function buildResizeFilters(width: number, height: number): { resizeFilter: string, filters: Array<string> } {
+    const w = width > 0 ? width : "iw";
+    const h = height > 0 ? height : "ih";
+    const resizeFilter = `scale=${w}:${h}:force_original_aspect_ratio=decrease`;
+    return {
+        resizeFilter: resizeFilter,
+        filters: [
+            resizeFilter,
+            `pad=${w}:${h}:x=(${w}-iw)/2:y=(${h}-ih)/2:color=black`,
+            "scale=trunc(iw/2)*2:trunc(ih/2)*2" // Force to fit encoder restrictions
+        ]
+    };
+}
+
 interface SessionInfo {
     address: string // address of the HAP controller
     ipv6: boolean
@@ -301,10 +326,9 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
         }
         resInfo.snapshotFilter = filters.join(",");
         if(noneFilter < 0 && (resInfo.width > 0 || resInfo.height > 0)) {
-            resInfo.resizeFilter = "scale=" + (resInfo.width > 0 ? "'max(" + resInfo.width + ",iw)'" : "iw") + ":" + (resInfo.height > 0 ? "'max(" + resInfo.height + ",ih)'" : "ih") + ":force_original_aspect_ratio=decrease";
-            filters.push(resInfo.resizeFilter);
-            filters.push(`pad=${resInfo.width > 0 ? resInfo.width : "iw"}:${resInfo.height > 0 ? resInfo.height : "ih"}:x=(${resInfo.width > 0 ? resInfo.width : "iw"}-iw)/2:y=(${resInfo.height > 0 ? resInfo.height : "ih"}-ih)/2:color=black`);
-            filters.push("scale=trunc(iw/2)*2:trunc(ih/2)*2"); // Force to fit encoder restrictions
+            const resize = buildResizeFilters(resInfo.width, resInfo.height);
+            resInfo.resizeFilter = resize.resizeFilter;
+            filters.push(...resize.filters);
         }
 
         if(filters.length > 0) {
@@ -413,10 +437,7 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
             args.push(`-i ${backgroundPath}`);
             args.push("-frames:v 1");
 
-            const filters: string[] = [];
-            filters.push("scale=" + (resInfo.width > 0 ? "'max(" + resInfo.width + ",iw)'" : "iw") + ":" + (resInfo.height > 0 ? "'max(" + resInfo.height + ",ih)'" : "ih") + ":force_original_aspect_ratio=decrease");
-            filters.push(`pad=${resInfo.width > 0 ? resInfo.width : "iw"}:${resInfo.height > 0 ? resInfo.height : "ih"}:x=(${resInfo.width > 0 ? resInfo.width : "iw"}-iw)/2:y=(${resInfo.height > 0 ? resInfo.height : "ih"}-ih)/2:color=black`);
-            filters.push("scale=trunc(iw/2)*2:trunc(ih/2)*2");
+            const filters = buildResizeFilters(resInfo.width, resInfo.height).filters;
 
             const v0 = `format=rgba,colorchannelmixer=aa=${opacity.toFixed(5)},${filters.join(",")}[over]`;
             const v1 = `${filters.join(",")}[bg]`;
