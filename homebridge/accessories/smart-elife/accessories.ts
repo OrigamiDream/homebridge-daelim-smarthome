@@ -1,4 +1,4 @@
-import SmartELifeClient, {Listener, PushListener} from "../../../core/smart-elife/smart-elife-client";
+import SmartELifeClient, {Listener, ListenerMetadata, PushListener} from "../../../core/smart-elife/smart-elife-client";
 import {API, Logging, PlatformAccessory, Service, type WithUUID} from "homebridge";
 import {Device, DeviceType, PushType, SmartELifeConfig} from "../../../core/interfaces/smart-elife-config";
 import {Utils} from "../../../core/utils";
@@ -16,7 +16,7 @@ export interface DeviceWithOp extends Device {
 }
 
 export type NonEmptyDeviceList = [DeviceWithOp, ...DeviceWithOp[]];
-export type DeviceListener = (devices: NonEmptyDeviceList) => void;
+export type DeviceListener = (devices: NonEmptyDeviceList, metadata: ListenerMetadata) => void;
 export type ServiceType = WithUUID<typeof Service>;
 
 const DEFERRED_TASKS_MILLISECONDS = 500;
@@ -206,7 +206,7 @@ export default class Accessories<T extends AccessoryInterface> {
     }
 
     protected addDeviceListener(deviceListener: DeviceListener, deviceType: DeviceType = this.deviceType) {
-        this.addListener((data, error) => {
+        this.addListener((data, error, metadata) => {
             let devices: DeviceWithOp[];
             if(!data || !data["devices"]) {
                 this.log.warn(`Devices (${deviceType.toString()}) not found: (${error.code}) ${error.message ?? "unknown reason"}`);
@@ -225,7 +225,7 @@ export default class Accessories<T extends AccessoryInterface> {
                 return;
             }
 
-            deviceListener(devices as NonEmptyDeviceList);
+            deviceListener(devices as NonEmptyDeviceList, metadata);
         }, deviceType);
     }
 
