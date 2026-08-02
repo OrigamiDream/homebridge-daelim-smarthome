@@ -545,7 +545,9 @@ class AuthorizationPane extends Pane {
 
     nextPane() {
         if(this.isCompleted) {
-            return new CompletePane(this.element, this.config);
+            // The confirmation pane sits before the completion screen and decides
+            // for itself whether there is anything to confirm - see canPassthrough.
+            return new DeviceConfirmPane(this.element, this.config);
         } else {
             return new WallpadPasscodePane(this.element, this.config, this.provider);
         }
@@ -664,7 +666,9 @@ class WallpadPasscodePane extends Pane {
     }
 
     nextPane() {
-        return new CompletePane(this.element, this.config);
+        // Same station as AuthorizationPane's: the confirmation pane decides
+        // for itself whether there is anything to confirm.
+        return new DeviceConfirmPane(this.element, this.config);
     }
 
     register() {
@@ -793,16 +797,23 @@ function mergeFetchedDevices(provider, savedDevices, fetchedDevices) {
  * judgement stands on ever after - and '다시 조회' asks the server again, which signs
  * in anew and reads the page right after, the most reliable moment there is (#198).
  *
- * Shown by CompletePane in one of three modes: "first" (a first-time setup showing
- * the whole fetched list), "first-failed" (a first-time setup whose fetch failed,
- * with retry as the only way forward), and "diff" (an existing configuration whose
- * re-fetch differs from the saved list, on the way into the advanced editor).
+ * A member of the wizard chain, between the sign-in panes and CompletePane. Finished
+ * settings pass straight through - daelim needs no confirmation, and a saved list is
+ * a confirmed one - while a first-time setup stops here, asks the server, and shows
+ * what it got: "loading" becomes "first" (the whole fetched list), or "first-failed"
+ * (retry as the only way forward). CompletePane also enters it explicitly with a
+ * payload, which never passes through: "diff" shows what a re-fetch would add and
+ * take away, on the way into the advanced editor.
  */
 class DeviceConfirmPane extends Pane {
     constructor(element, config, payload) {
         super(element, config);
 
-        this._mode = payload.mode;
+        // With a payload this pane was entered deliberately, carrying a judged list;
+        // without one it is a chain member that has to ask the server itself.
+        this._explicit = !!payload;
+        payload = payload || {};
+        this._mode = payload.mode || "loading";
         this._devices = payload.devices || [];
         this._added = payload.added || [];
         this._removed = payload.removed || [];
@@ -827,7 +838,18 @@ class DeviceConfirmPane extends Pane {
     }
 
     canPassthrough() {
-        return false;
+        if(this._explicit) {
+            // Entered deliberately, with a list to confirm - always shown.
+            return false;
+        }
+        // As a chain member it only stops the wizard where nothing is confirmed yet:
+        // daelim needs no confirmation, and a saved list means a confirmed one.
+        return this.config.provider !== "smart-elife"
+            || (this.config.devices || []).length > 0;
+    }
+
+    nextPane() {
+        return new CompletePane(this.element, this.config);
     }
 
     selfPane() {
@@ -836,9 +858,9 @@ class DeviceConfirmPane extends Pane {
 
     _deviceRow(device, badge) {
         const label = badge === "removed"
-            ? `<span class="badge badge-danger ml-2">빠짐</span>`
+            ? `<span class="badge badge-danger ml-2">제외됨</span>`
             : badge === "added"
-                ? `<span class="badge badge-success ml-2">추가</span>`
+                ? `<span class="badge badge-success ml-2">추가됨</span>`
                 : "";
         const strike = badge === "removed" ? ` style="text-decoration: line-through;"` : "";
         const displayName = device.displayName || device.deviceId;
@@ -882,6 +904,14 @@ class DeviceConfirmPane extends Pane {
     }
 
     _screenHtml() {
+        if(this._mode === "loading") {
+            return `
+                <div class="text-center">
+                    <h2>기기 목록을 조회하고 있습니다.</h2>
+                    <p>잠시만 기다려주세요.</p>
+                </div>
+            `;
+        }
         if(this._mode === "first-failed") {
             return `
                 <div class="text-center">
@@ -944,7 +974,7 @@ class DeviceConfirmPane extends Pane {
         }
     }
 
-    async _refetch() {
+    async _refetch(force = true) {
         window.homebridge.showSpinner();
         this._answered = false;
         try {
@@ -956,7 +986,7 @@ class DeviceConfirmPane extends Pane {
                 // The saved device list rides along as the yardstick the server holds
                 // fetched pages against. Empty on a first-time setup.
                 devices: this.config.devices || [],
-                force: true,
+                force: !!force,
             });
         } catch(error) {
             console.error("Refreshing devices failed:", error);
@@ -970,8 +1000,9 @@ class DeviceConfirmPane extends Pane {
 
     _onRefetchFailed() {
         this._answered = true;
-        if(this._mode === "first-failed") {
-            // Still nothing to show; the screen already says so.
+        if(this._mode === "loading" || this._mode === "first-failed") {
+            // Still nothing to show; retry is the only way forward.
+            this._mode = "first-failed";
             this._render();
             return;
         }
@@ -1025,6 +1056,15 @@ class DeviceConfirmPane extends Pane {
         this.ensureAttached();
         refreshTrademark(this.config);
         this._render();
+
+        if(!this._explicit) {
+            // A chain member arrives with nothing and asks the server itself.
+            // The sign-in that brought the wizard this far left its list in the
+            // wizard server's cache, so this resolves without another login.
+            setTimeout(async () => {
+                await this._refetch(false);
+            }, 0);
+        }
 
         // One delegated listener survives every re-render;
         // wiring the buttons anew per render would pile up dead handler bookkeeping.
@@ -1104,10 +1144,19 @@ class DeviceConfirmPane extends Pane {
         this.addHomebridgeListener("authorization-failed", () => {
             this._answered = true;
             window.homebridge.toast.warning(DEVICE_REFRESH_FAILED_MESSAGE);
+            if(this._mode === "loading") {
+                // The loading screen has no buttons to fall back on.
+                this._mode = "first-failed";
+                this._render();
+            }
         });
         this.addHomebridgeListener("require-wallpad-passcode", () => {
             this._answered = true;
             window.homebridge.toast.warning(WALLPAD_REAUTHORIZATION_MESSAGE);
+            if(this._mode === "loading") {
+                this._mode = "first-failed";
+                this._render();
+            }
         });
     }
 }
