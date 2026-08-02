@@ -745,6 +745,7 @@ const WALLPAD_REAUTHORIZATION_MESSAGE = "월패드 재인증이 필요합니다.
 const DEVICE_REFRESH_KEPT_MESSAGE = "기기 목록을 조회하지 못했습니다. 저장된 설정은 그대로 유지됩니다.";
 const DEVICE_SAVE_FAILED_MESSAGE = "기기 목록을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.";
 const SETTINGS_SAVE_FAILED_MESSAGE = "설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.";
+const SETTINGS_RESET_FAILED_MESSAGE = "설정을 초기화하지 못했습니다. 잠시 후 다시 시도해주세요.";
 
 const DEVICE_TYPE_LABELS = {
     "light": "조명",
@@ -1511,6 +1512,11 @@ class ResetConfirmablePane extends Pane {
     constructor(element, config) {
         super(element, config);
 
+        // Reset and cancel both await host/server work before leaving this pane.
+        // A second click in that window would otherwise register another pane (or,
+        // after the first click clears the provider, request /undefined/invalidate).
+        this._transitioning = false;
+
         this.pane = document.createElement("div");
         this.pane.classList.add("hidden");
         this.pane.id = "confirmable";
@@ -1534,33 +1540,87 @@ class ResetConfirmablePane extends Pane {
         return this.pane;
     }
 
+    _setButtonsDisabled(disabled) {
+        this.confirmButton.disabled = disabled;
+        this.cancelButton.disabled = disabled;
+    }
+
+    _recoverTransition(error, message) {
+        console.error("Leaving the reset confirmation screen failed:", error);
+        window.homebridge.toast.warning(message);
+        this._transitioning = false;
+        this._setButtonsDisabled(false);
+    }
+
     register() {
         this.ensureAttached();
         this.addListener(this.confirmButton, "click", async () => {
+            if(this._transitioning) {
+                return;
+            }
+            this._transitioning = true;
+            this._setButtonsDisabled(true);
             window.homebridge.showSpinner();
 
             const provider = this.config.provider;
+            const previousConfig = {...this.config};
 
-            // invalidate all.
-            this.config.provider = undefined;
-            this.config.region = undefined;
-            this.config.complex = undefined;
-            this.config.username = undefined;
-            this.config.password = undefined;
-            this.config.uuid = undefined;
-            this.config.devices = [];
+            try {
+                if(!provider) {
+                    throw new Error("Cannot reset settings without a provider.");
+                }
 
-            await window.homebridge.request(`/${provider}/invalidate`, {});
-            await this.updatePluginConfig();
-            await this.savePluginConfig();
+                // invalidate all.
+                this.config.provider = undefined;
+                this.config.region = undefined;
+                this.config.complex = undefined;
+                this.config.username = undefined;
+                this.config.password = undefined;
+                this.config.uuid = undefined;
+                this.config.devices = [];
+
+                await window.homebridge.request(`/${provider}/invalidate`, {});
+                await this.updatePluginConfig();
+                await this.savePluginConfig();
+            } catch(error) {
+                // Keep a failed reset retryable. The request or save may have failed
+                // after the shared config object was cleared, so put the old values back
+                // before re-enabling either button.
+                for(const key of Object.keys(this.config)) {
+                    delete this.config[key];
+                }
+                Object.assign(this.config, previousConfig);
+                try {
+                    await this.updatePluginConfig();
+                } catch {
+                    // The next successful reset or pane transition rewrites the block.
+                }
+                refreshTrademark(this.config);
+                window.homebridge.hideSpinner();
+                this._recoverTransition(error, SETTINGS_RESET_FAILED_MESSAGE);
+                return;
+            }
 
             refreshTrademark(this.config);
             window.homebridge.hideSpinner();
 
-            await this.advance({}, new ProviderPane(this.element, this.config));
+            try {
+                await this.advance({}, new ProviderPane(this.element, this.config));
+            } catch(error) {
+                this._recoverTransition(error, SETTINGS_RESET_FAILED_MESSAGE);
+            }
         });
         this.addListener(this.cancelButton, "click", async () => {
-            await this.advance({}, new CompletePane(this.element, this.config));
+            if(this._transitioning) {
+                return;
+            }
+            this._transitioning = true;
+            this._setButtonsDisabled(true);
+            try {
+                await this.advance({}, new CompletePane(this.element, this.config));
+            } catch(error) {
+                this._recoverTransition(error, SETTINGS_SAVE_FAILED_MESSAGE);
+            }
         });
     }
 }
