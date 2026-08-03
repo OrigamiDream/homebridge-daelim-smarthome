@@ -795,7 +795,18 @@ function mergeFetchedDevices(provider, savedDevices, fetchedDevices) {
         if(!equiv || !equiv.length) {
             availableDevices.push(device);
         } else {
-            availableDevices.push(equiv[0]);
+            // The saved entry wins, which is how a renamed accessory, a disabled one and
+            // every per-device setting survive a refresh - including the resident's
+            // choice to merge a light group. `lightbulbGroup` is the exception: it was
+            // resolved from the server's list, so it is taken afresh, and taken away
+            // where the family no longer forms a group at all.
+            const merged = Object.assign({}, equiv[0]);
+            if(device.lightbulbGroup !== undefined) {
+                merged.lightbulbGroup = device.lightbulbGroup;
+            } else {
+                delete merged.lightbulbGroup;
+            }
+            availableDevices.push(merged);
         }
     }
     const added = fetchedDevices.filter(device =>
@@ -803,6 +814,15 @@ function mergeFetchedDevices(provider, savedDevices, fetchedDevices) {
     const removed = savedDevices.filter(oldDevice =>
         !availableDevices.some(device => devicesEquals(provider, oldDevice, device)));
     return { availableDevices, added, removed };
+}
+
+// Whether the merge changed any device's server-owned group resolution.
+// That change carries no resident choice, so it is saved without confirmation.
+function lightbulbGroupsRefreshed(provider, savedDevices, availableDevices) {
+    return availableDevices.some((device) => {
+        const saved = savedDevices.find((oldDevice) => devicesEquals(provider, oldDevice, device));
+        return JSON.stringify(saved?.lightbulbGroup) !== JSON.stringify(device.lightbulbGroup);
+    });
 }
 
 /**
@@ -1145,6 +1165,15 @@ class DeviceConfirmPane extends Pane {
                 // resident was headed for.
                 this._advancing = true;
                 try {
+                    // Except for the server-owned group resolution, which carries no
+                    // resident choice and is saved without a confirmation there would
+                    // be nothing to read for.
+                    if(lightbulbGroupsRefreshed(this.config.provider,
+                        this.config.devices || [], availableDevices)) {
+                        this.config.devices = availableDevices;
+                        await this.updatePluginConfig();
+                        await this.savePluginConfig();
+                    }
                     await this.advance({}, new CompletePane(this.element, this.config, {
                         openAdvanced: this._mode === "diff",
                     }));
@@ -1418,7 +1447,17 @@ class CompletePane extends Pane {
                 return;
             }
             if(added.length === 0 && removed.length === 0) {
-                // Nothing changed - saving would be a no-op, so there is nothing to confirm.
+                // The membership did not change, but the server-owned group resolution
+                // may have - it is replaced on every refresh and carries no resident
+                // choice, so it is saved without a confirmation there would be
+                // nothing to read for.
+                if(lightbulbGroupsRefreshed(this.config.provider, savedDevices, availableDevices)) {
+                    this.config.devices = availableDevices;
+                    await this.updatePluginConfig();
+                    await this.savePluginConfig();
+                }
+                // Beyond that, nothing changed - saving would be a no-op,
+                // so there is nothing to confirm.
                 this._pendingFetch = null;
                 this._settle();
                 return;

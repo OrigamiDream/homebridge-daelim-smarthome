@@ -9,6 +9,13 @@ export interface AccessoryInterface {
     deviceId: string
     deviceType: string
     init: boolean
+
+    /**
+     * Stable UUID input for an accessory whose display name is not its identity.
+     * The default key folds the name in, so renaming a merged light group would
+     * replace the accessory and drop it out of every scene it belongs to.
+     */
+    uuidSeed?: string
 }
 
 export interface DeviceWithOp extends Device {
@@ -75,7 +82,8 @@ export default class Accessories<T extends AccessoryInterface> {
         } else {
             this.log.info("Adding new accessory: %s (%s :: %s)", context.displayName, context.deviceId, this.deviceType.toString());
 
-            const key = `${context.deviceId}${context.displayName}${context.deviceType.toString()}`;
+            const key = context.uuidSeed
+                || `${context.deviceId}${context.displayName}${context.deviceType.toString()}`;
             const uuid = this.api.hap.uuid.generate(key);
 
             const accessory = new this.api.platformAccessory(context.displayName, uuid);
@@ -199,6 +207,51 @@ export default class Accessories<T extends AccessoryInterface> {
 
     async setDeviceState(device: DeviceWithOp): Promise<boolean> {
         return await this.client.sendDeviceControlOp(device, device.op);
+    }
+
+    /**
+     * The `deviceId`s this type should have an accessory for, as the configuration has it.
+     * Override where the accessories do not stand one-to-one for configured devices - a merged
+     * one covering several, say - so that {@link retireUnwantedAccessories} knows what to keep.
+     */
+    protected wantedDeviceIds(): Set<string> {
+        return new Set((this.config.devices || [])
+            .filter((device) => device.deviceType === this.deviceType && !device.disabled)
+            .map((device) => device.deviceId));
+    }
+
+    /**
+     * Drops accessories the configuration no longer asks for.
+     *
+     * Homebridge restores the accessory cache before a provider serves, so what a previous
+     * configuration left behind is already present and indistinguishable from what belongs
+     * there. Nothing else takes those away: `addOrGetAccessory()` only unregisters a device it
+     * is handed and finds disabled, which never happens for one the configuration has dropped
+     * entirely, or one that has stopped reporting.
+     *
+     * The guard asks whether the configuration was read at all, not whether anything is
+     * wanted. `loadConfig()` answers `config["devices"] || []`, so a configuration that
+     * failed to read looks exactly like a household with no devices of any type - and acting
+     * on that would unregister every accessory of this type at once, taking the scenes and
+     * automations they belong to with them. There is no undoing that, and a stale accessory
+     * costs far less than a lost one. A device list with anything in it was read, so a type
+     * whose every device is disabled retires its accessories like any other.
+     */
+    protected retireUnwantedAccessories(reason: string) {
+        if((this.config.devices || []).length === 0) {
+            return;
+        }
+        const wanted = this.wantedDeviceIds();
+        const stale = this.accessories.filter((accessory) =>
+            !wanted.has(this.getAccessoryInterface(accessory).deviceId));
+        for(const accessory of stale) {
+            this.log.info("Retiring accessory: %s (%s)", accessory.displayName, reason);
+            this.api.unregisterPlatformAccessories(Utils.PLUGIN_NAME, Utils.PLATFORM_NAME, [accessory]);
+            const index = this.accessories.indexOf(accessory);
+            if(index >= 0) {
+                this.accessories.splice(index, 1);
+            }
+        }
     }
 
     protected addListener(listener: Listener, deviceType: DeviceType = this.deviceType) {

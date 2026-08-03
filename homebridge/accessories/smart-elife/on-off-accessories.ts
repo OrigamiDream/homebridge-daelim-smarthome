@@ -33,9 +33,21 @@ export abstract class OnOffAccessories<T extends OnOffAccessoryInterface> extend
         }
     }
 
+    /**
+     * Lets a subclass keep the shared setup while taking `On` over itself.
+     * The default handler drives the single device `context.deviceId` names,
+     * which is wrong for an accessory standing for several devices at once.
+     */
+    protected handlesOnOff(accessory: PlatformAccessory): boolean {
+        return true;
+    }
+
     configureAccessory(accessory: PlatformAccessory) {
         super.configureAccessory(accessory);
 
+        if(!this.handlesOnOff(accessory)) {
+            return;
+        }
         this.getService(accessory, this.onOffServiceType)
             .getCharacteristic(this.api.hap.Characteristic.On)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
