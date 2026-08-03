@@ -229,17 +229,19 @@ export default class Accessories<T extends AccessoryInterface> {
      * is handed and finds disabled, which never happens for one the configuration has dropped
      * entirely, or one that has stopped reporting.
      *
-     * Wanting nothing is treated as knowing nothing. `loadConfig()` answers
-     * `config["devices"] || []`, so a configuration that failed to read looks exactly like a
-     * household with no devices - and acting on that would unregister every accessory of this
-     * type at once, taking the scenes and automations they belong to with them. There is no
-     * undoing that, and a stale accessory costs far less than a lost one.
+     * The guard asks whether the configuration was read at all, not whether anything is
+     * wanted. `loadConfig()` answers `config["devices"] || []`, so a configuration that
+     * failed to read looks exactly like a household with no devices of any type - and acting
+     * on that would unregister every accessory of this type at once, taking the scenes and
+     * automations they belong to with them. There is no undoing that, and a stale accessory
+     * costs far less than a lost one. A device list with anything in it was read, so a type
+     * whose every device is disabled retires its accessories like any other.
      */
     protected retireUnwantedAccessories(reason: string) {
-        const wanted = this.wantedDeviceIds();
-        if(wanted.size === 0) {
+        if((this.config.devices || []).length === 0) {
             return;
         }
+        const wanted = this.wantedDeviceIds();
         const stale = this.accessories.filter((accessory) =>
             !wanted.has(this.getAccessoryInterface(accessory).deviceId));
         for(const accessory of stale) {
