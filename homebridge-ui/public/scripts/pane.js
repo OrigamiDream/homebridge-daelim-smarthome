@@ -234,7 +234,7 @@ class ProviderPane extends Pane {
                         <span>e편한세상 스마트홈 2.0</span>
                     </label>
                     <label class="d-flex flex-column align-items-center m-3">
-                        <img class="img-fluid mb-2 w-25" style="border-radius: 24%" alt="Smart eLife" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/main/branding/smart-elife.png?raw=true">
+                        <img class="img-fluid mb-2 w-25" style="border-radius: 24%" alt="스마트 eLife" src="https://github.com/OrigamiDream/homebridge-daelim-smarthome/blob/main/branding/smart-elife.png?raw=true">
                         <input class="form-check-input" type="radio" name="provider" value="smart-elife">
                         <span>스마트 eLife</span>
                     </label>
@@ -1248,7 +1248,7 @@ class CompletePane extends Pane {
         this.pane.innerHTML = `
             <div class="text-center">
                 <h2>설정이 완료되었습니다.</h2>
-                <p>이제 <span class="brand-name">DL E&C</span> 아파트의 가구를 애플 기기에서 제어할 수 있습니다.</p>
+                <p>이제 <span class="brand-name">DL E&C</span> 아파트의 가구를 Apple 기기에서 제어할 수 있습니다.</p>
                 <button type="button" id="advanced-button" class="btn btn-secondary" disabled>고급</button>
                 <button type="button" id="reset-button" class="btn btn-primary">재설정</button>
                 <button type="button" id="done-button" class="btn btn-primary">닫기</button>

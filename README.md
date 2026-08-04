@@ -8,24 +8,22 @@
 [![Downloads](https://img.shields.io/npm/dt/homebridge-daelim-smarthome.svg?color=critical)](https://www.npmjs.com/package/homebridge-daelim-smarthome)
 [![Version](https://img.shields.io/npm/v/homebridge-daelim-smarthome)](https://www.npmjs.com/package/homebridge-daelim-smarthome)
 
-e편한세상 및 아크로 계열 아파트 단지를 위한 [Homebridge](https://github.com/homebridge/homebridge) 인증된 플러그인
+e편한세상 및 아크로 계열 아파트 단지를 위한 [Homebridge](https://github.com/homebridge/homebridge) 인증 플러그인
 
-**e편한세상 스마트홈 2.0** 및 **Smart eLife** 앱 사용자 대상으로 다음의 기능들을 지원합니다.
+**e편한세상 스마트홈 2.0** 및 **스마트 eLife** 앱 사용자 대상으로 다음의 기능들을 지원합니다.
 1. 전등<sup>[1](#lightbulb)</sup>
 2. 난방
 3. 콘센트
-4. 환풍기<sup>[2](#fans)</sup>
+4. 환기(전열교환기)<sup>[2](#fans)</sup>
 5. 시스템 에어컨
-6. 가스 밸브 (단방향)
-7. 엘리베이터 호출 (도착 알림은 Smart eLife 한정 지원)
-8. 세대현관 및 공동현관 출입 모션 센서
-9. 입차 모션 센서
-10. 세대현관 및 공동현관 방문자 이미지 표시<sup>[3](#hksv)</sup>
-11. 세대현관 및 공동현관 방문자 알림
-12. 세대현관 실시간 영상<sup>[4](#onepass)</sup> (Smart eLife 한정 지원)
+6. 가스 밸브 잠금
+7. 엘리베이터 호출
+8. 출입 및 입출차 알림
+9. 방문자 알림 및 이미지 표시<sup>[3](#hksv)</sup>
+10. 세대현관 실시간 영상<sup>[4](#onepass)</sup>
 
 > [!WARNING]
-> e편한세상 스마트홈 2.0 및 Smart eLife 앱은 동시접속 및 다중 로그인을 지원하지 않습니다.
+> e편한세상 스마트홈 2.0 및 스마트 eLife 앱은 동시접속 및 다중 로그인을 지원하지 않습니다.
 > 따라서 이 플러그인 전용의 세대원 계정을 앱에서 하나 더 추가하시거나, 기존 계정을 로그아웃하신 후 사용하시기 바랍니다.
 > 위 주의사항을 따르지 않을 시 로그인/로그아웃이 무한정 반복되며 정상적인 이용이 불가능할 수 있습니다.
 
@@ -67,33 +65,7 @@ sudo npm install -g --unsafe-perm homebridge-daelim-smarthome
 4. Homebridge-UI 웹사이트로 이동하면 플러그인 목록에서 `homebridge-daelim-smarthome`을 찾을 수 있습니다.
 5. 설정 버튼을 눌러 플러그인 구성 지침에 따르세요.
 
-<sub><b id="lightbulb">1</b> 세대에 따라 거실 전등 밝기를 3단계 혹은 8단계로 조절 가능합니다.</sub><br>
-<sub><b id="fans">2</b> 일부 세대의 경우 환풍기 풍량 조절이 가능합니다.</sub><br>
-<sub><b id="hksv">3</b> HomeKit Secure Video를 통해 표기되며, 홈킷 허브인 Apple TV 혹은 HomePod이 있어야 합니다.</sub><br>
-<sub><b id="onepass">4</b> e편한세상 One Pass 인터폰 회선을 이용합니다. 기본 비활성이며 설정에서 켜야 합니다. 자세한 내용은 아래 <a href="#세대현관-실시간-영상-one-pass">세대현관 실시간 영상</a>을 참고하세요.</sub>
-
-## 세대현관 실시간 영상 (One Pass)
-
-기본적으로 `외부 세대현관 초인종` 카메라는 마지막 방문자의 정지 이미지 한 장만 보여줍니다. 설정에서 **세대현관 실시간 영상**을 켜면, 카메라를 열 때 e편한세상 One Pass 인터폰 회선으로 현재 세대현관 영상을 실시간으로 불러옵니다.
-
-Homebridge 설정 화면의 `세대현관 실시간 영상 (One Pass)` 항목에서 켤 수 있고, config.json에 직접 쓸 때는 다음과 같습니다.
-
-```json
-{
-  "platform": "DaelimSmartHomePlatform",
-  "provider": "smart-elife",
-  "onePass": {
-    "enabled": true
-  }
-}
-```
-
-아이디와 동·호수는 스마트홈 로그인 정보에서 자동으로 채워집니다. 자동 조회가 실패하는 단지에서만 `userId`, `building`, `unit`, `complexCode`, `host`를 직접 지정하세요.
-
-> [!IMPORTANT]
-> 인터폰 회선은 한 번에 한 통화만 가능합니다. 실시간 영상을 보는 동안에는 폰의 One Pass 앱에서 세대현관을 모니터링할 수 없고, 반대로 앱이 모니터링 중이면 플러그인이 실시간 영상을 가져오지 못합니다. 이 경우 홈 앱이 카메라를 열지 못하고 자체 오류를 표시합니다. 카메라 타일의 미리보기 이미지와 초인종 알림의 방문자 사진은 그대로 동작합니다.
-
-> [!NOTE]
-> 이 기능은 **Smart eLife 전용**이며 **세대현관에만** 적용됩니다. `외부 공동현관 초인종`은 계속 방문자 스냅샷으로 동작합니다.
-
-영상이 뜨지 않고 로그에 통화 실패가 남는다면 공유기가 SIP 트래픽(5061/TCP)을 막고 있을 수 있습니다. [문제 해결](TROUBLESHOOTING.md#세대현관-실시간-영상이-뜨지-않는-경우) 문서를 참고하세요.
+<sub><b id="lightbulb">1</b> 세대에 따라 밝기를 단계별로 조절할 수 있으며, 단계 수는 세대마다 다릅니다.</sub><br>
+<sub><b id="fans">2</b> 세대에 따라 풍량 및 모드 조절이 가능합니다.</sub><br>
+<sub><b id="hksv">3</b> 방문자 이미지 표시는 HomeKit Secure Video를 이용하며, HomeKit 홈 허브인 Apple TV(4세대 및 이후 모델) 또는 HomePod이 있어야 합니다.</sub><br>
+<sub><b id="onepass">4</b> 스마트 eLife와 e편한세상 One Pass를 지원하는 단지에서만 이용 가능하며, 외부 세대현관 초인종 설정에서 실시간 영상 사용을 활성화해야 합니다. 자세한 내용은 <a href="TROUBLESHOOTING.md">TROUBLESHOOTING.md</a>를 참고하세요.</sub>
