@@ -12,6 +12,15 @@ const DEFAULT_LINGER_SECONDS = 5;
 const CREDENTIAL_TTL_MS = 30 * 60 * 1000;
 const RTP_PORT_ATTEMPTS = 20;
 const RELAY_PORT_ATTEMPTS = 20;
+// The SIP pair binds its ports the moment they are picked,
+// while HomeKit's return ports are only reserved in `prepareStream()`
+// and bound well after that, once the live view has been acquired.
+// A reservation lives in `pick-port`'s ledger, not in the kernel,
+// so a bind from here would win the port
+// and the later HomeKit bind would fail with EADDRINUSE.
+// Keep the SIP pair out of the library's default 10000-20000 entirely.
+const SIP_RTP_PORT_MIN = 30000;
+const SIP_RTP_PORT_MAX = 39998;
 // `pick-port` keys its reservations by address as well as by number,
 // so a port it hands out on 127.0.0.1 is not the same reservation
 // as the one HomeKit was handed on 0.0.0.0 -
@@ -87,7 +96,10 @@ function isLoopbackPortFree(port: number): Promise<boolean> {
 // Bind the pair together instead, and hold the odd half for as long as the call lasts.
 async function bindRtpPair(): Promise<MonitorStream> {
     for(let attempt = 0; attempt < RTP_PORT_ATTEMPTS; attempt++) {
-        const port = await pickPort({type: "udp", ip: "0.0.0.0", reserveTimeout: 15});
+        const port = await pickPort({
+            type: "udp", ip: "0.0.0.0", reserveTimeout: 15,
+            minPort: SIP_RTP_PORT_MIN, maxPort: SIP_RTP_PORT_MAX,
+        });
         if(port % 2 !== 0) {
             continue;
         }

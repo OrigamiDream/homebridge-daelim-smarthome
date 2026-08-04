@@ -960,7 +960,12 @@ export default class VisitorOnCameraStreamingDelegate implements CameraStreaming
         const options: pickPortOptions = {
             type: "udp",
             ip: ipv6 ? "::" : "0.0.0.0",
-            reserveTimeout: 15
+            // The ports picked here are only bound in START,
+            // which on the live-view path first waits out an acquire budget of 15s -
+            // right at the edge of the default reservation.
+            // Hold the reservation well past that,
+            // so a slow call setup cannot see its port handed out again.
+            reserveTimeout: 45
         };
         const videoReturnPort = await pickPort(options);
         const videoSSRC = this.hap.CameraController.generateSynchronisationSource();
