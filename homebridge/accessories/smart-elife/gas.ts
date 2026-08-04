@@ -91,6 +91,14 @@ export default class GasAccessories extends Accessories<GasAccessoryInterface> {
     private updateLockState(accessory: PlatformAccessory) {
         const context = this.getAccessoryInterface(accessory);
         const lock = this.getService(accessory, this.api.hap.Service.LockMechanism);
+
+        // Say so only where something will actually go out.
+        // The device list is polled every thirty seconds,
+        // and a valve nobody has touched is republished on every poll.
+        if(lock.getCharacteristic(this.api.hap.Characteristic.LockCurrentState).value !== this.lockCurrentState(context)) {
+            this.log.debug("Gas :: %s :: reporting the valve as %s",
+                context.displayName, context.secured ? "closed" : "open");
+        }
         lock.getCharacteristic(this.api.hap.Characteristic.LockCurrentState)
             .updateValue(this.lockCurrentState(context));
         lock.getCharacteristic(this.api.hap.Characteristic.LockTargetState)

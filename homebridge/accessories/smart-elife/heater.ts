@@ -6,7 +6,8 @@ import {
     CharacteristicGetCallback, CharacteristicSetCallback,
     CharacteristicValue,
     Logging,
-    PlatformAccessory
+    PlatformAccessory,
+    Service
 } from "homebridge";
 
 interface HeaterAccessoryInterface extends ActiveAccessoryInterface {
@@ -130,6 +131,37 @@ export default class HeaterAccessories extends ActiveAccessories<HeaterAccessory
         return this.api.hap.Characteristic.CurrentHeaterCoolerState.IDLE;
     }
 
+    // Whether what the listener publishes would land as a change worth a line.
+    // The characteristic itself is the reference rather than the context,
+    // because the context is overwritten by `addOrGetAccessory()` before the report is published.
+    //
+    // The room's own temperature is deliberately not part of this.
+    // It is a live sensor reading that drifts by a degree between polls
+    // with nobody touching anything - one line per poll, measured on a real WallPad -
+    // so including it would keep the line coming every thirty seconds
+    // and bury the log this exists to serve.
+    // It is still printed on the line, where it gives context to the change that did happen.
+    private reportDiffers(service: Service, accessory: PlatformAccessory, context: HeaterAccessoryInterface): boolean {
+        const hap = this.api.hap;
+        const active = context.active ? hap.Characteristic.Active.ACTIVE : hap.Characteristic.Active.INACTIVE;
+        return service.getCharacteristic(hap.Characteristic.Active).value !== active
+            || service.getCharacteristic(hap.Characteristic.CurrentHeaterCoolerState).value !== this.getCurrentState(accessory)
+            || service.getCharacteristic(hap.Characteristic.HeatingThresholdTemperature).value !== this.storedThreshold(accessory);
+    }
+
+    /**
+     * The target temperature as the characteristic will hold it.
+     *
+     * HAP rounds what it is given to `minStep`, which is one degree here,
+     * so a wallpad report of 22.5 is stored as 23.
+     * Comparing the raw number against the stored one would differ on every poll,
+     * and the wallpad does send halves.
+     */
+    private storedThreshold(accessory: PlatformAccessory): number {
+        // Equivalent to HAP's own rounding while `minValue` and `minStep` are whole numbers.
+        return Math.round(this.getThresholdTemperature(accessory) as number);
+    }
+
     register() {
         super.register();
 
@@ -153,6 +185,16 @@ export default class HeaterAccessories extends ActiveAccessories<HeaterAccessory
                 if(!accessory) continue;
 
                 const context = this.getAccessoryInterface(accessory);
+                const service = accessory.getService(this.api.hap.Service.HeaterCooler);
+
+                // Say so only where something will actually go out.
+                // The device list is polled every thirty seconds,
+                // and a room nobody has touched is republished on every poll.
+                if(service && this.reportDiffers(service, accessory, context)) {
+                    this.log.debug("Heater :: %s :: reporting active=%s target=%s current=%s",
+                        context.displayName, context.active ? "on" : "off",
+                        String(this.getThresholdTemperature(accessory)), String(this.getCurrentTemperature(accessory)));
+                }
                 accessory.getService(this.api.hap.Service.HeaterCooler)
                     ?.updateCharacteristic(this.api.hap.Characteristic.Active, context.active
                         ? this.api.hap.Characteristic.Active.ACTIVE

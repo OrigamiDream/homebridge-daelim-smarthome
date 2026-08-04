@@ -190,14 +190,26 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
             this.log.debug("Ignoring unknown smartdoor status: %s", String(status));
         }
         if(context.closed !== undefined) {
-            accessory.getService(this.api.hap.Service.ContactSensor)
-                ?.getCharacteristic(this.api.hap.Characteristic.ContactSensorState)
-                .updateValue(this.contactSensorState(context.closed));
+            const contact = accessory.getService(this.api.hap.Service.ContactSensor)
+                ?.getCharacteristic(this.api.hap.Characteristic.ContactSensorState);
+
+            // Say so only where something will actually go out.
+            // The lock is polled every thirty seconds,
+            // and a door nobody has opened is republished on every poll.
+            if(contact && contact.value !== this.contactSensorState(context.closed)) {
+                this.log.debug("SmartDoor :: %s :: reporting the door as %s",
+                    context.displayName, context.closed ? "closed" : "open");
+            }
+            contact?.updateValue(this.contactSensorState(context.closed));
         }
 
         const parsedBatteryLevel = this.parseBatteryLevel(op?.["battery"]);
         if(parsedBatteryLevel === undefined) return;
 
+        if(context.batteryLevel !== parsedBatteryLevel) {
+            this.log.debug("SmartDoor :: %s :: reporting the battery level as %d",
+                context.displayName, parsedBatteryLevel);
+        }
         context.batteryLevel = parsedBatteryLevel;
         const battery = accessory.getService(this.api.hap.Service.Battery);
         battery?.getCharacteristic(this.api.hap.Characteristic.BatteryLevel)
@@ -224,6 +236,7 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
                 clearTimeout(context.motionTimer);
             }
 
+            const holdSeconds = device.duration?.door || DOOR_TIMEOUT_DURATION_SECONDS;
             context.motionDetected = true;
             context.motionTimer = setTimeout(() => {
                 const context = this.getAccessoryInterface(accessory);
@@ -233,10 +246,13 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
                 context.motionTimer = undefined;
                 context.motionDetected = false;
 
+                this.log.debug("Door :: %s :: reporting the motion as over", context.displayName);
                 accessory.getService(this.api.hap.Service.MotionSensor)
                     ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
-            }, (device.duration?.door || DOOR_TIMEOUT_DURATION_SECONDS) * 1000);
+            }, holdSeconds * 1000);
 
+            this.log.debug("Door :: %s :: reporting the motion as detected, holding it for %d seconds",
+                context.displayName, holdSeconds);
             accessory.getService(this.api.hap.Service.MotionSensor)
                 ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
         });

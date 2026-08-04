@@ -56,6 +56,7 @@ export default class VehicleAccessories extends Accessories<VehicleAccessoryInte
                 clearTimeout(context.motionTimer);
             }
 
+            const holdSeconds = device.duration?.vehicle || VEHICLE_TIMEOUT_DURATION_SECONDS;
             context.motionDetected = true;
             context.motionTimer = setTimeout(() => {
                 const context = this.getAccessoryInterface(accessory);
@@ -65,10 +66,13 @@ export default class VehicleAccessories extends Accessories<VehicleAccessoryInte
                 context.motionTimer = undefined;
                 context.motionDetected = false;
 
+                this.log.debug("Vehicle :: %s :: reporting the motion as over", context.displayName);
                 accessory.getService(this.api.hap.Service.MotionSensor)
                     ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
-            }, (device.duration?.vehicle || VEHICLE_TIMEOUT_DURATION_SECONDS) * 1000);
+            }, holdSeconds * 1000);
 
+            this.log.debug("Vehicle :: %s :: reporting the motion as detected, holding it for %d seconds",
+                context.displayName, holdSeconds);
             accessory.getService(this.api.hap.Service.MotionSensor)
                 ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
         });

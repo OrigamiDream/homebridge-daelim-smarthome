@@ -271,6 +271,13 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
                 clearTimeout(context.motionTimer);
             cameraInfo.snapshot = await reformatSnapshot(this.processorPath, this.log, context.displayName, buffer);
 
+            // A visitor push is a one-shot event,
+            // so the swap is unconditional - there is no poll to repeat it.
+            // Only the failures to get here were on the record before.
+            this.log.debug("Camera :: %s :: replacing the snapshot with a %d byte still",
+                context.displayName, cameraInfo.snapshot?.length || 0);
+
+            const holdSeconds = device.duration?.camera || CAMERA_TIMEOUT_DURATION;
             context.cameraInfo = cameraInfo;
             context.motionTimer = setTimeout(() => {
                 const context = this.getAccessoryInterface(accessory);
@@ -280,11 +287,14 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
                 context.motionTimer = undefined;
                 context.motionDetected = false;
 
+                this.log.debug("Camera :: %s :: reporting the motion as over", context.displayName);
                 accessory.getService(this.api.hap.Service.MotionSensor)
                     ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
-            }, (device.duration?.camera || CAMERA_TIMEOUT_DURATION) * 1000);
+            }, holdSeconds * 1000);
             context.motionDetected = true;
 
+            this.log.debug("Camera :: %s :: reporting the motion as detected, holding it for %d seconds",
+                context.displayName, holdSeconds);
             accessory.getService(this.api.hap.Service.MotionSensor)
                 ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
         });

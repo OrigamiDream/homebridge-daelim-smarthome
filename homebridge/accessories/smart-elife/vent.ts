@@ -679,6 +679,33 @@ export default class VentAccessories extends ActiveAccessories<VentAccessoryInte
             return;
         }
         const service = this.getService(accessory, this.api.hap.Service.AirPurifier);
+
+        // Say so only where something will actually go out.
+        // The device reports about every second while it runs,
+        // so a vent nobody has touched would be announced every time.
+        // A gesture of ours logs its own commands,
+        // which leaves what lands here without one as the wallpad
+        // or the official app having moved it.
+        const active = context.active
+            ? this.api.hap.Characteristic.Active.ACTIVE
+            : this.api.hap.Characteristic.Active.INACTIVE;
+        const target = this.isHomeKitAutomaticMode(context.mode)
+            ? this.api.hap.Characteristic.TargetAirPurifierState.AUTO
+            : this.api.hap.Characteristic.TargetAirPurifierState.MANUAL;
+        const speed = this.homebridgeRotationSpeed(context);
+        // The mode switches are asked as well, because a move between two modes that are
+        // both manual and both without a wind control - `manual/high` to `bypass` - leaves
+        // the three purifier values identical and shows up only on the switches.
+        const modeSwitchMoved = this.modeSwitchServices(accessory).some((modeSwitch) =>
+            modeSwitch.getCharacteristic(this.api.hap.Characteristic.On).value
+                !== this.isModeSwitchOn(context, modeSwitch.subtype!));
+        if(service.getCharacteristic(this.api.hap.Characteristic.Active).value !== active
+            || service.getCharacteristic(this.api.hap.Characteristic.TargetAirPurifierState).value !== target
+            || service.getCharacteristic(this.api.hap.Characteristic.RotationSpeed).value !== speed
+            || modeSwitchMoved) {
+            this.log.debug("Vent :: %s :: publishing active=%s mode=%s speed=%s",
+                context.displayName, context.active ? "on" : "off", String(context.mode), String(speed));
+        }
         service.updateCharacteristic(this.api.hap.Characteristic.Active, context.active
             ? this.api.hap.Characteristic.Active.ACTIVE
             : this.api.hap.Characteristic.Active.INACTIVE);

@@ -100,6 +100,27 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
         return Math.max(...values) as CharacteristicValue;
     }
 
+    private readingDiffers(context: IndoorAirQualityAccessoryInterface,
+                           reading: Pick<IndoorAirQualityAccessoryInterface,
+                               "pm10" | "pm2_5" | "co2" | "vocs" | "temperature" | "humidity">): boolean {
+        // `Object.is` rather than `!==` throughout: a missing or non-numeric field parses to
+        // NaN, and NaN differs from itself,
+        // so the same broken response would otherwise read as a fresh reading every minute.
+        const moved = (before: unknown, after: unknown) => !Object.is(before, after);
+        // The grade decides what the AirQuality characteristic shows,
+        // and it arrives from the server on its own rather than being derived here,
+        // so a grade that moves without its density is still a change worth the line.
+        const pollutantMoved = (before: DensityWithQuality | undefined, after: DensityWithQuality) =>
+            moved(before?.density, after.density) || moved(before?.quality, after.quality);
+
+        return pollutantMoved(context.pm10, reading.pm10)
+            || pollutantMoved(context.pm2_5, reading.pm2_5)
+            || pollutantMoved(context.co2, reading.co2)
+            || pollutantMoved(context.vocs, reading.vocs)
+            || moved(context.temperature, reading.temperature)
+            || moved(context.humidity, reading.humidity);
+    }
+
     async fetchAirQuality() {
         if(this.skippedFirstPollingMessage) {
             this.log.info(`Polling device state :: ${this.deviceType.toString()} (${this.accessories.length} accessories)`);
@@ -133,18 +154,48 @@ export default class IndoorAirQualityAccessories extends Accessories<IndoorAirQu
                     humidityCount += 1;
                 }
 
-                this.addOrGetAccessory({
-                    deviceId: device.deviceId,
-                    deviceType: device.deviceType,
-                    displayName: device.displayName,
-                    init: true,
+                const reading = {
                     pm10: { density: Number(info["pm10"]["value"]), quality: AirQuality.parse(info["pm10"]["css"]) },
                     pm2_5: { density: Number(info["pm25"]["value"]), quality: AirQuality.parse(info["pm25"]["css"]) },
                     co2: { density: Number(info["co2"]["value"]), quality: AirQuality.parse(info["co2"]["css"]) },
                     vocs: { density: Number(info["vocs"]["value"]), quality: AirQuality.parse(info["vocs"]["css"]) },
                     temperature: Number(info["temp"]),
                     humidity,
+                };
+
+                const cached = this.findAccessory(device.deviceId);
+                const previous = cached ? { ...this.getAccessoryInterface(cached) } : undefined;
+
+                const accessory = this.addOrGetAccessory({
+                    deviceId: device.deviceId,
+                    deviceType: device.deviceType,
+                    displayName: device.displayName,
+                    init: true,
+                    ...reading,
                 });
+
+                // Say so only when the reading moved, and only once it has somewhere to land.
+                // `findDevice()` hands back devices disabled in the config as well, and those
+                // never become an accessory,
+                // so speaking before this point would claim a reflection that did not happen -
+                // every minute, since no accessory ever turns up to compare against.
+                //
+                // This sensor never publishes - the characteristics are read out of the
+                // context on GET -
+                // so this line is the only record that a cycle landed on the accessory.
+                if(!accessory) continue;
+                if(!previous || this.readingDiffers(previous, reading)) {
+                    // Each pollutant carries its grade alongside the density. The grade is
+                    // what the AirQuality characteristic shows and it arrives from the
+                    // server on its own,
+                    // so without it a grade-only move would print a line identical to the
+                    // previous one.
+                    const pollutant = (value: DensityWithQuality) => `${value.density}/${value.quality}`;
+                    this.log.debug("IndoorAirQuality :: %s :: reading pm10=%s pm2.5=%s co2=%s vocs=%s temp=%s humidity=%s",
+                        device.displayName, pollutant(reading.pm10), pollutant(reading.pm2_5),
+                        pollutant(reading.co2), pollutant(reading.vocs),
+                        String(reading.temperature), String(reading.humidity));
+                }
             } catch(e: any) {
                 this.log.warn("Could not parse air-quality reading for %s: %s", device.displayName, e?.message || e);
             }

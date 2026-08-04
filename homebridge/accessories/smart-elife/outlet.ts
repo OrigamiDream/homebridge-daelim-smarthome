@@ -27,6 +27,14 @@ export default class OutletAccessories extends OnOffAccessories<OutletAccessoryI
 
                 const context = this.getAccessoryInterface(accessory);
                 const service = accessory.getService(this.api.hap.Service.Outlet);
+
+                // Say so only where something will actually go out.
+                // The device list is polled every thirty seconds,
+                // and an outlet nobody has touched is republished on every poll.
+                if(service && service.getCharacteristic(this.api.hap.Characteristic.On).value !== context.on) {
+                    this.log.debug("Outlet :: %s :: reporting the outlet as %s",
+                        context.displayName, context.on ? "on" : "off");
+                }
                 service?.updateCharacteristic(this.api.hap.Characteristic.On, context.on);
             }
         });
