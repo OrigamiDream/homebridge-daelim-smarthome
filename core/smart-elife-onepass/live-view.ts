@@ -21,6 +21,13 @@ const RELAY_PORT_ATTEMPTS = 20;
 // Keep the SIP pair out of the library's default 10000-20000 entirely.
 const SIP_RTP_PORT_MIN = 30000;
 const SIP_RTP_PORT_MAX = 39998;
+// How long an attempt at bringing the call up may run, all told.
+// Every stage underneath carries a deadline of its own,
+// but their sum - sign-in, TLS, two INVITE transactions, the first packet,
+// and a retry over the lot - reaches minutes,
+// and `starting` is shared, so a promise that dawdles is handed to every
+// viewer that follows. This is the bound that makes it settle.
+const SESSION_SETUP_TIMEOUT_MS = 45 * 1000;
 // `pick-port` keys its reservations by address as well as by number,
 // so a port it hands out on 127.0.0.1 is not the same reservation
 // as the one HomeKit was handed on 0.0.0.0 -
@@ -265,7 +272,7 @@ export default class OnePassLiveView {
     }
 
     private beginSession(): Promise<MonitorMedia> {
-        const starting = this.startSession();
+        const starting = this.boundSetup(this.startSession());
         this.starting = starting;
         starting.catch(() => {
             // A cancelled, older start must not erase a newer generation's promise.
@@ -274,6 +281,35 @@ export default class OnePassLiveView {
             }
         });
         return starting;
+    }
+
+    // Callers of `acquire()` stop waiting on their own schedule,
+    // but none of them may cancel the work - `starting` is shared,
+    // and another viewer may still be waiting on it.
+    // So the bound lives on the producer instead:
+    // when it trips, the attempt is invalidated the same way `shutdown()` does it,
+    // and the generation check inside `openSession()` tears down
+    // whatever the late work still manages to produce.
+    private boundSetup(work: Promise<MonitorMedia>): Promise<MonitorMedia> {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                this.generation += 1;
+                const opening = this.openingSession;
+                this.openingSession = undefined;
+                opening?.stop();
+                reject(new Error(
+                    `The One Pass live view did not come up within ${SESSION_SETUP_TIMEOUT_MS / 1000}s.`));
+            }, SESSION_SETUP_TIMEOUT_MS);
+            work.then(
+                (media) => {
+                    clearTimeout(timer);
+                    resolve(media);
+                },
+                (error) => {
+                    clearTimeout(timer);
+                    reject(error);
+                });
+        });
     }
 
     private async startSession(): Promise<MonitorMedia> {

@@ -38,6 +38,12 @@ const RECONNECT_BACKOFF_MS = 15 * 1000;
 // Three failures is about a minute of dead air;
 // past that the call is declared dead and its owner tears the viewers down.
 const REDIAL_ATTEMPT_LIMIT = 3;
+// How many times a provisional response may push a transaction's deadline out.
+// Each renewal buys the full wait over again,
+// so a PBX that drips 180 Ringing forever would hold the INVITE open with it.
+// Enough for the observed call flow - one 100 Trying and one 180 Ringing -
+// with room to spare, while keeping the transaction finite.
+const SIP_PROGRESS_RENEWAL_LIMIT = 5;
 // `activate()` is called once ffmpeg has logged for the first time,
 // which is the closest observable moment to it opening its input -
 // measured at 62ms after spawn against a bind at 77ms.
@@ -287,14 +293,19 @@ class MonitorCall {
     }
 
     // `progress` marks the messages that mean the PBX is still working on the request.
-    // They buy the same wait over again rather than counting against it.
+    // They buy the same wait over again rather than counting against it -
+    // up to `SIP_PROGRESS_RENEWAL_LIMIT` times, so the wait stays finite.
     private waitFor(match: (message: SipMessage) => boolean,
                     progress?: (message: SipMessage) => boolean): Promise<SipMessage> {
         return new Promise((resolve, reject) => {
+            let renewals = 0;
             const waiter: SipWaiter = {
                 match,
                 observe: progress && ((message: SipMessage) => {
-                    if(progress(message)) timer.refresh();
+                    if(progress(message) && renewals < SIP_PROGRESS_RENEWAL_LIMIT) {
+                        renewals += 1;
+                        timer.refresh();
+                    }
                 }),
                 resolve: (message: SipMessage) => {
                     clearTimeout(timer);
