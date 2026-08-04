@@ -31,6 +31,13 @@ const STALL_TIMEOUT_MS = 5 * 1000;
 // than a running stream is allowed to skip.
 const FIRST_PACKET_TIMEOUT_MS = 10 * 1000;
 const RECONNECT_BACKOFF_MS = 15 * 1000;
+// How many failed redials in a row a session survives.
+// Reconnecting rides out a PBX that drops a long call and comes straight back,
+// but a PBX that stays down would otherwise be redialed forever,
+// with the session - and the viewers fed off it - held open the whole time.
+// Three failures is about a minute of dead air;
+// past that the call is declared dead and its owner tears the viewers down.
+const REDIAL_ATTEMPT_LIMIT = 3;
 // `activate()` is called once ffmpeg has logged for the first time,
 // which is the closest observable moment to it opening its input -
 // measured at 62ms after spawn against a bind at 77ms.
@@ -490,6 +497,8 @@ export class OnePassMonitorSession {
     private reconnecting = false;
     private retryAfter = 0;
     private legStartedAt = 0;
+    private redialFailures = 0;
+    private diedListener?: () => void;
 
     constructor(private readonly log: Logging | LoggerBase,
                 private credentials: OnePassCredentials,
@@ -692,8 +701,16 @@ export class OnePassMonitorSession {
             try {
                 await this.redial();
                 this.retryAfter = 0;
+                this.redialFailures = 0;
             } catch(error) {
                 if(this.stopped) return;
+                this.redialFailures += 1;
+                if(this.redialFailures >= REDIAL_ATTEMPT_LIMIT) {
+                    this.log.warn("Could not reconnect the One Pass live view after %d attempts, giving up: %s",
+                        this.redialFailures, (error as Error)?.message);
+                    this.die();
+                    return;
+                }
                 // Back off so a busy line or a downed PBX is not hammered every stall tick.
                 this.retryAfter = Date.now() + RECONNECT_BACKOFF_MS;
                 this.log.warn("Could not reconnect the One Pass live view: %s", (error as Error)?.message);
@@ -701,6 +718,20 @@ export class OnePassMonitorSession {
                 this.reconnecting = false;
             }
         }, 2000);
+    }
+
+    // Called by the owner once, before the session is put to work.
+    // Fires when the session has given up on bringing the call back,
+    // so the owner can end the viewers instead of leaving them
+    // pointed at a relay that will never send again.
+    onDied(listener: () => void): void {
+        this.diedListener = listener;
+    }
+
+    private die(): void {
+        const listener = this.diedListener;
+        this.stop();
+        listener?.();
     }
 
     private async redial(): Promise<void> {

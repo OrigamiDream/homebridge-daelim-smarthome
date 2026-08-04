@@ -321,7 +321,9 @@ export default class OnePassLiveView {
                 throw new Error("The One Pass live view was cancelled while it was opening.");
             }
             this.openingSession = undefined;
-            this.session = session;
+            const opened = session;
+            this.session = opened;
+            opened.onDied(() => this.sessionDied(opened));
             this.media = media;
             this.log.info("One Pass live view is up.");
             return media;
@@ -371,6 +373,18 @@ export default class OnePassLiveView {
     // instead of being left pointed at a relay that will never send again.
     onEnded(listener: () => void): void {
         this.endListeners.push(listener);
+    }
+
+    // A running call that gave up on reconnecting reports itself here.
+    // The teardown is the one a deliberate shutdown takes,
+    // so the viewers are ended through the same listeners
+    // and the Home app gets to report the dead stream in its own words.
+    private sessionDied(session: OnePassMonitorSession): void {
+        if(this.session !== session) {
+            return;
+        }
+        this.log.warn("The One Pass live view could not be recovered; ending the call.");
+        this.shutdown();
     }
 
     shutdown(): void {
