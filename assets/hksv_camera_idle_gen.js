@@ -3,7 +3,13 @@ const fs = require("fs");
 
 const WIDTH = 1280;
 const HEIGHT = 720;
-const FONT_SIZE = 50;
+// Sized against the frame shown full screen on an iPhone (~390pt wide),
+// where 68px scales down to ~20pt - the title3 text style.
+const FONT_SIZE = 68;
+// iOS secondaryLabel over a dark background,
+// the colour the system gives to text that describes rather than demands.
+const TEXT_COLOR = "rgba(235, 235, 245, 0.6)";
+const FONT_WEIGHT = 500;
 const LINE_HEIGHT = 1.45;
 // Leave a margin so a long line never runs into the edge of the frame.
 const MAX_LINE_WIDTH = WIDTH * 0.86;
@@ -34,7 +40,7 @@ const IDLE_IMAGES = [
 function fittingFontSize(ctx, lines) {
     let size = FONT_SIZE;
     while(size > 20) {
-        ctx.font = `600 ${size}px SF Pro`;
+        ctx.font = `${FONT_WEIGHT} ${size}px SF Pro`;
         if(lines.every((line) => ctx.measureText(line).width <= MAX_LINE_WIDTH)) {
             break;
         }
@@ -59,7 +65,7 @@ function draw({filepath, lines}) {
             - (step * (lines.length - 1)) / 2
             + ctx.measureText(lines[0])["emHeightDescent"];
 
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = TEXT_COLOR;
         ctx.textAlign = "center";
         lines.forEach((line, index) => {
             ctx.fillText(line, canvas.width / 2, baseline + step * index);
