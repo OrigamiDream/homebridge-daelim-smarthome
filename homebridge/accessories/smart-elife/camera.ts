@@ -271,6 +271,12 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
                 clearTimeout(context.motionTimer);
             cameraInfo.snapshot = await reformatSnapshot(this.processorPath, this.log, context.displayName, buffer);
 
+            // A visitor push is a one-shot event,
+            // so the swap is unconditional - there is no poll to repeat it.
+            // Only the failures to get here were on the record before.
+            this.log.debug("Camera :: %s :: replacing the snapshot with a %d byte still",
+                context.displayName, cameraInfo.snapshot?.length || 0);
+
             const holdSeconds = device.duration?.camera || CAMERA_TIMEOUT_DURATION;
             context.cameraInfo = cameraInfo;
             context.motionTimer = setTimeout(() => {

@@ -770,6 +770,46 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
      * written with `updateCharacteristic`, which does not run the SET handlers, so
      * reflecting a state can never bounce a command back at the wallpad.
      */
+    /**
+     * Whether anything `applyAccessoryState()` is about to write would land as a change.
+     *
+     * All three services are asked, because a mode change can move one while leaving
+     * the others where they were:
+     * off to dehumidifying leaves the climate side inactive and the fan stopped
+     * and shows up only on the dehumidifier,
+     * and a wind change between high and auto keeps the same displayed speed
+     * while flipping the fan's target state.
+     */
+    private publishDiffers(accessory: PlatformAccessory,
+                           context: AirConditionerInterface,
+                           climate: boolean, blowing: boolean, dehumidifying: boolean): boolean {
+        const hap = this.api.hap;
+        const activeValue = (on: boolean) => on
+            ? hap.Characteristic.Active.ACTIVE
+            : hap.Characteristic.Active.INACTIVE;
+
+        const climateService = this.getService(accessory, hap.Service.HeaterCooler);
+        const fan = this.getService(accessory, hap.Service.Fanv2);
+        const dehumidifier = this.getService(accessory, hap.Service.HumidifierDehumidifier);
+
+        return climateService.getCharacteristic(hap.Characteristic.Active).value !== activeValue(climate)
+            || climateService.getCharacteristic(hap.Characteristic.CurrentHeaterCoolerState).value !== this.getCurrentState(context)
+            || climateService.getCharacteristic(hap.Characteristic.TargetHeaterCoolerState).value !== this.getHeaterCoolerTargetState(context)
+            // Rounded the way HAP stores it: `minStep` is one degree, so a wallpad report
+            // of 22.5 is held as 23, and comparing the raw number would differ every poll.
+            || climateService.getCharacteristic(hap.Characteristic.CoolingThresholdTemperature).value !== Math.round(this.getDisplayCoolingThreshold(context))
+            || climateService.getCharacteristic(hap.Characteristic.RotationSpeed).value !== this.getDisplayRotationSpeed(context)
+            || fan.getCharacteristic(hap.Characteristic.Active).value !== activeValue(blowing)
+            || fan.getCharacteristic(hap.Characteristic.TargetFanState).value !== (this.isWindAuto(context)
+                ? hap.Characteristic.TargetFanState.AUTO
+                : hap.Characteristic.TargetFanState.MANUAL)
+            // The fan's own speed as well: HomeKit can write one service's slider ahead of
+            // the other, and the write that later realigns the fan is a change on its own.
+            || fan.getCharacteristic(hap.Characteristic.RotationSpeed).value !== this.getDisplayRotationSpeed(context)
+            || dehumidifier.getCharacteristic(hap.Characteristic.Active).value !== activeValue(dehumidifying)
+            || dehumidifier.getCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState).value !== this.getCurrentDehumidifierState(context);
+    }
+
     private applyAccessoryState(accessory: PlatformAccessory) {
         const context = this.getAccessoryInterface(accessory);
         // While a gesture is being gathered or carried out, the context still follows
@@ -782,6 +822,18 @@ export default class AirConditionerAccessories extends Accessories<AirConditione
         const climate = this.isClimateActive(context);
         const blowing = this.isBlowing(context);
         const dehumidifying = context.active && context.mode === Mode.DEHUMIDIFYING;
+
+        // Say so only where something will actually go out.
+        // The WallPad is polled every thirty seconds,
+        // so a unit nobody has touched would be announced on every poll.
+        // A gesture of ours logs its own commands,
+        // which leaves a line here without one as the wallpad
+        // or the official app having moved it.
+        if(this.publishDiffers(accessory, context, climate, blowing, dehumidifying)) {
+            this.log.debug("AirConditioner :: %s :: publishing active=%s mode=%s temp=%s wind=%s",
+                context.displayName, context.active ? "on" : "off", String(context.mode),
+                String(context.desiredTemperature), String(context.rotationSpeed));
+        }
 
         this.getService(accessory, this.api.hap.Service.HeaterCooler)
             .updateCharacteristic(this.api.hap.Characteristic.Active, climate
