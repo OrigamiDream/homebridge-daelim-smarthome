@@ -715,6 +715,28 @@ export default class SmartELifeClient {
         }
     }
 
+    // Populated by `sign-in`;
+    // the unit it carries is what One Pass needs to look up the household's SIP line.
+    public getUserInfo(): SmartELifeUserInfo | undefined {
+        return this.userInfo;
+    }
+
+    // Populated during `serve()`, so it stays undefined until the first poll completes.
+    // One Pass keys its complexes by `complexKey`, which it reports as `projectCode2`.
+    public getComplex(): SmartELifeComplex | undefined {
+        return this.complex;
+    }
+
+    // The same lookup, fetched on demand.
+    // The setup wizard signs in and stops there without ever reaching `serve()`,
+    // so waiting on the cached value would leave it with nothing to answer from.
+    public async resolveComplex(): Promise<SmartELifeComplex | undefined> {
+        if(!this.complex) {
+            this.complex = await this.fetchComplex();
+        }
+        return this.complex;
+    }
+
     public getWebSocketCredentials(): WebSocketCredentials {
         // This variables will be initialized after `sign-in` succeeded.
         if(!this.wsCredentials)
@@ -1006,7 +1028,7 @@ export default class SmartELifeClient {
             ]);
         });
 
-        this.complex = await this.fetchComplex();
+        await this.resolveComplex();
         if(this.complex) {
             this.log(`Complex: ${this.complex.complexDisplayName}`);
             const { dongs, ...redacted } = this.complex;

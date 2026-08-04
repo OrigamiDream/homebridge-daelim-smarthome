@@ -1,6 +1,7 @@
 import Accessories, {AccessoryInterface} from "./accessories";
 import {
     API,
+    APIEvent,
     CharacteristicEventTypes,
     CharacteristicGetCallback, CharacteristicSetCallback,
     CharacteristicValue,
@@ -18,6 +19,7 @@ import ffmpegPath from "ffmpeg-for-homebridge";
 import {CameraAccessoryInterfaceBase, CameraInfo} from "../../../core/interfaces/camera";
 import {defaultCameraConfig} from "../../../core/interfaces/config";
 import VisitorOnCameraStreamingDelegate, {CAMERA_TIMEOUT_DURATION, reformatSnapshot} from "../../../core/camera-utils";
+import OnePassLiveView from "../../../core/smart-elife-onepass/live-view";
 
 enum CameraLocation {
     FRONT_DOOR = "house",
@@ -57,6 +59,7 @@ export const EXTERIOR_COMMUNAL_DOOR_CAMERA_DEVICE: CameraDevice = {
 export default class CameraAccessories extends Accessories<CameraAccessoryInterface> {
 
     private readonly processorPath: string;
+    private liveView?: OnePassLiveView;
 
     constructor(log: Logging, api: API, config: SmartELifeConfig) {
         super(log, api, config, DeviceType.CAMERA, [
@@ -190,6 +193,43 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
         return Buffer.from(b64, "base64");
     }
 
+    // The One Pass call needs the household's complex and unit.
+    // Those are read on demand rather than captured here:
+    // the complex is only known once `serve()` has polled,
+    // which happens after the accessories register.
+    private createLiveView(): OnePassLiveView | undefined {
+        const onePass = this.config.onePass;
+        if(!onePass?.enabled) {
+            return undefined;
+        }
+        if(this.liveView) {
+            return this.liveView;
+        }
+        this.liveView = new OnePassLiveView(this.log, onePass, () => {
+            const userInfo = this.client.getUserInfo();
+            // One Pass keys its complexes by Smart eLife's `complexKey`, not by `djCd`.
+            const complexKey = this.client.getComplex()?.complexKey;
+            const building = onePass.building || userInfo?.apartment.building;
+            const unit = onePass.unit || userInfo?.apartment.unit;
+            // A pinned `host` is the documented way out of a failed complex lookup,
+            // and the client honours it ahead of either code,
+            // so it settles which server to reach on its own.
+            // Requiring a complex alongside it would leave that escape hatch
+            // depending on the very lookup it exists to bypass.
+            if((!complexKey && !onePass.complexCode && !onePass.host) || !building || !unit) {
+                this.log.warn("One Pass live view is enabled but the household is not resolved yet. Set `complexCode` (or `host`), `building` and `unit` explicitly if this persists.");
+                return undefined;
+            }
+            return {
+                complexKey: complexKey || "",
+                building, unit,
+                username: this.config.username,
+            };
+        });
+        this.api.on(APIEvent.SHUTDOWN, () => this.liveView?.shutdown());
+        return this.liveView;
+    }
+
     register() {
         super.register();
         this.client.addPushListener(PushType.VISITOR, async () => {
@@ -272,7 +312,14 @@ export default class CameraAccessories extends Accessories<CameraAccessoryInterf
                     continue;
 
                 const config = device.camera || defaultCameraConfig();
-                const delegate = new VisitorOnCameraStreamingDelegate(this.api, this.api.hap, this.log, this.getAccessoryInterface(accessory), config, this.processorPath);
+                // Only the front door is reachable over One Pass -
+                // the lobby camera has no monitoring context on the PBX,
+                // and stays on visitor snapshots.
+                const liveView = cameraDevice.cameraLocation === CameraLocation.FRONT_DOOR
+                    ? this.createLiveView()
+                    : undefined;
+                const delegate = new VisitorOnCameraStreamingDelegate(
+                    this.api, this.api.hap, this.log, this.getAccessoryInterface(accessory), config, this.processorPath, liveView);
                 accessory.configureController(delegate.controller);
             }
         }, 1000);
