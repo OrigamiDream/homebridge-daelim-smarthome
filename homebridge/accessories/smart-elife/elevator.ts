@@ -89,6 +89,8 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
         if(context.motionTimer) clearTimeout(context.motionTimer);
 
         context.motionDetected = true;
+        this.log.debug("Elevator :: %s :: reporting the arrival motion as detected, holding it for %d seconds",
+            context.displayName, ELEVATOR_MOTION_DURATION_TIMEOUT_SECONDS);
         this.getService(accessory, this.api.hap.Service.MotionSensor)
             .getCharacteristic(this.api.hap.Characteristic.MotionDetected)
             .updateValue(true);
@@ -100,6 +102,7 @@ export default class ElevatorAccessories extends Accessories<ElevatorAccessoryIn
 
             current.motionTimer = undefined;
             current.motionDetected = false;
+            this.log.debug("Elevator :: %s :: reporting the arrival motion as over", current.displayName);
             this.getService(accessory, this.api.hap.Service.MotionSensor)
                 .getCharacteristic(this.api.hap.Characteristic.MotionDetected)
                 .updateValue(false);
