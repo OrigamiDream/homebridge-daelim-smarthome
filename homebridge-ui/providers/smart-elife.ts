@@ -14,6 +14,8 @@ import {
     EXTERIOR_COMMUNAL_DOOR_CAMERA_DEVICE,
     EXTERIOR_FRONT_DOOR_CAMERA_DEVICE
 } from "../../homebridge/accessories/smart-elife/camera";
+import {LightbulbGroupCandidate, resolveLightbulbGroups} from "../../core/smart-elife/lightbulb-groups";
+import {parseLightbulbValue} from "../../core/smart-elife/lightbulb-value";
 import OnePassClient from "../../core/smart-elife-onepass/onepass-client";
 import {defaultOnePassConfig} from "../../core/interfaces/smart-elife-onepass-config";
 
@@ -189,6 +191,7 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         for(const device of result.devices) {
             devices.push(device);
         }
+        this.resolveLightbulbGroups(devices);
         this.devices = devices;
         this.devicesFetched = true;
         this.household = result.household;
@@ -201,6 +204,52 @@ export default class SmartELifeUiServer extends AbstractUiProvider {
         this.server.pushEvent("devices-fetched",
             { devices, household: result.household, aliases: result.aliases });
         this.server.pushEvent("complete", { uuid, roomKey, userKey, version });
+    }
+
+    /**
+     * Works out which lights form a level group and writes the answer onto the step-one light.
+     *
+     * This is the only place it is decided. The runtime reads `lightbulbGroup` and builds its
+     * accessories from it, so which accessories exist stops depending on which rendered page
+     * happened to arrive - and `/main/home.do` is sometimes another household's.
+     *
+     * Everything the rules need is in the list just fetched: the canonical room, the step number
+     * in the name, and the `operation.value` that says whether a light dims or sets its colour on
+     * its own. The last of those is why this can run here at all - the wizard has no WebSocket.
+     */
+    private resolveLightbulbGroups(devices: Device[]) {
+        const details = new Map(this.client!.lightDetails().map((detail) => [detail.deviceId, detail]));
+        const byId = new Map(devices.map((device) => [device.deviceId, device]));
+
+        const candidates: LightbulbGroupCandidate[] = devices
+            .filter((device) => device.deviceType === DeviceType.LIGHT)
+            .map((device) => {
+                const detail = details.get(device.deviceId);
+                const value = parseLightbulbValue(detail?.value || "");
+                return {
+                    deviceId: device.deviceId,
+                    name: device.name,
+                    room: detail?.room || "",
+                    disabled: !!device.disabled,
+                    brightnessAdjustable: value.brightnessAdjustable,
+                    colorTemperatureAdjustable: value.colorTemperatureAdjustable,
+                };
+            });
+
+        for(const resolution of resolveLightbulbGroups(candidates)) {
+            const anchor = byId.get(resolution.anchorDeviceId);
+            if(!anchor) {
+                continue;
+            }
+            // Server-owned: replaced on every refresh, unlike the resident's opt-in beside it.
+            // A family that cannot be merged has the stale answer taken away rather than left
+            // to be acted on.
+            anchor.lightbulbGroup = resolution.group;
+            if(resolution.refusal) {
+                this.log.info(`Lights that cannot be merged: ${resolution.refusal} ` +
+                    `(${resolution.memberDeviceIds.join(", ")})`);
+            }
+        }
     }
 
     async authorizePasscode(p: any) {

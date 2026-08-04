@@ -230,6 +230,29 @@
                   "description": "영상 인코더에 전달될 옵션."
                 }
               }
+            },
+            "combineLightbulbGroup": {
+              "title": "이 조명 그룹 통합하기",
+              "type": "boolean",
+              "description": "같은 방의 번호가 매겨진 조명들을 하나의 액세서리로 묶고, 밝기 슬라이더로 단계를 조절합니다. 월패드는 단계를 낮출 수 없으므로 더 어둡게 하려면 껐다 다시 켜야 하며, 슬라이더를 내리면 현재 밝기가 그대로 유지됩니다. 이 설정을 켜거나 끄면 기존 조명 액세서리가 교체되므로 관련된 장면과 자동화를 다시 설정해야 합니다."
+            },
+            "lightbulbGroup": {
+              "type": "object",
+              "description": "설정 마법사가 기기 목록에서 판정한 조명 그룹입니다. 기기 목록을 갱신할 때마다 다시 계산되므로 직접 수정하지 마세요.",
+              "properties": {
+                "room": {
+                  "type": "string"
+                },
+                "displayName": {
+                  "type": "string"
+                },
+                "members": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
             }
           }
         }
@@ -243,6 +266,19 @@
     "items": [
       "devices[].displayName",
       "devices[].disabled",
+      {
+        "key": "devices[]",
+        "type": "fieldset",
+        "title": "조명 그룹 세부 설정",
+        "expandable": true,
+        "expanded": false,
+        "items": [
+          "devices[].combineLightbulbGroup"
+        ],
+        "condition": {
+          "functionBody": "return model.devices && model.devices[arrayIndices] && !!model.devices[arrayIndices].lightbulbGroup;"
+        }
+      },
       {
         "key": "devices[]",
         "type": "fieldset",

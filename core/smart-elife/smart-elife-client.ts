@@ -19,6 +19,7 @@ import WebSocketScheduler from "./ws-scheduler";
 import {parseWebSocketCredentials, WebSocketCredentials} from "./parsers/ws-creds-parsers";
 import {parseDeviceList} from "./parsers/device-parsers";
 import {HTMLCandidate, parseWallPadVersionFromHtmlCandidates, WALLPAD_VERSION_3_0} from "./parsers/version-parsers";
+import {parseVentModes, VentMode} from "./parsers/vent-mode-parsers";
 import {EXTERIOR_ELEVATOR_DEVICE} from "../../homebridge/accessories/smart-elife/elevator";
 import {createElevatorStatusRequest} from "./elevator-protocol";
 import {setInterval} from "timers";
@@ -131,6 +132,7 @@ interface RenderedPage {
 }
 
 const POLLING_INTERVAL_MILLISECONDS = 30 * 1000;
+const DEVICE_CONTROL_ALL_TIMEOUT_MILLISECONDS = 30 * 1000;
 
 /**
  * How many recorded status queries one device type may have in flight.
@@ -243,6 +245,9 @@ export default class SmartELifeClient {
 
     /** Whether the log has already said that there is nothing to hold a report against. */
     private reportedUncomparableDeviceList = false;
+
+    /** See `lightDetails()`. Refilled by every `fetchDevices()`. */
+    private renderedLightDetails: { deviceId: string, name: string, room: string, value: string }[] = [];
 
     private readonly ws?: WebSocketScheduler;
     private readonly listeners: ListenerInfo[] = [];
@@ -1040,6 +1045,10 @@ export default class SmartELifeClient {
 
         this.log.info(`Installed WallPad version is on CVNET ${this.config.wallpadVersion}.`);
 
+        // Ahead of any device state, so vent accessories are registered with their mode
+        // switches already in place instead of growing them seconds later.
+        await this.refreshVentModes();
+
         if(this.ws) {
             await this.ws.serve();
             await this.refreshDeviceStatus();
@@ -1053,6 +1062,99 @@ export default class SmartELifeClient {
                 this.log.warn("Device state polling failed: %s", e?.message || e);
             });
         }, POLLING_INTERVAL_MILLISECONDS);
+    }
+
+    /**
+     * Supported operation modes per vent, keyed by device id. A vent missing from the map
+     * is one whose modes could not be read, and callers must not offer mode controls for
+     * it. There is no entry meaning "this vent has no modes": a page that rendered no mode
+     * buttons cannot be told apart from one the server rendered for nobody in particular,
+     * and either way there are no controls to offer.
+     */
+    private readonly ventModes = new Map<string, VentMode[]>();
+
+    getVentModes(deviceId: string): VentMode[] | undefined {
+        return this.ventModes.get(deviceId);
+    }
+
+    /**
+     * Reads the mode buttons the control page renders for each configured vent.
+     *
+     * Runs once per device rather than being scraped out of the shared `/main/home.do`
+     * payload, because the buttons are only rendered when the request names the `uid`.
+     * Retried a few times per vent: this is the only chance to learn the modes - the
+     * WallPad does not answer for which modes a vent supports, so there is nothing to fall
+     * back on the way a declined page falls back on `requestDeviceStatus()` - and a vent
+     * whose read fails has no mode switches for the lifetime of the process.
+     */
+    private async refreshVentModes() {
+        const attempts = 3;
+        const vents = (this.config.devices || [])
+            .filter((device) => device.deviceType === DeviceType.VENT && !device.disabled);
+        for(const vent of vents) {
+            let modes: VentMode[] | null = null;
+            for(let attempt = 1; attempt <= attempts && !modes; attempt++) {
+                modes = await this.fetchVentModes(vent, attempt);
+            }
+            if(!modes) {
+                // Left out of the map on purpose: an unreadable page must not be taken
+                // for a vent without modes, and the accessory falls back to hiding the
+                // mode controls entirely.
+                this.log.warn("The operation modes of %s could not be determined.", vent.displayName);
+                continue;
+            }
+            this.ventModes.set(vent.deviceId, modes);
+            this.log.info("%s supports %d operation mode(s): %s", vent.displayName, modes.length,
+                modes.map((mode) => `${mode.label}(${mode.value})`).join(", "));
+        }
+    }
+
+    /**
+     * Fetches one vent's control page and keeps it only if it is about that vent.
+     *
+     * The same shape as `fetchRenderedPage()`, and there for the same reason - this is a
+     * second page the server renders for us, so it needs its own gate rather than reaching
+     * a parser that would have to judge identity itself. The evidence here is better than
+     * the majority the device list is held against: the request names one `uid`, so a page
+     * about that vent says so. Measured on 2026-07-30, a page fetched with the `uid` names
+     * it seven times over - in the `controlDevice()` calls and in the payload the page
+     * would send - and a page fetched without it names no device at all.
+     *
+     * Ten consecutive fetches came back byte for byte identical, so unlike `/main/home.do`
+     * there is no sign that this page answers for the wrong household. The gate is here
+     * because the accessory acts on what it reads, not because it was seen to be needed.
+     */
+    private async fetchVentModes(vent: Device, attempt: number): Promise<VentMode[] | null> {
+        // Drawn before the request leaves, for the same reason the rendered page draws it
+        // there: what a report may be believed against is when it was asked for.
+        const observedSeq = this.takeObservedSeq();
+        let html: string;
+        try {
+            html = await this.fetchWithJSessionId(`${this.baseUrl}/controls/vent.do`, {
+                method: "POST",
+                headers: {
+                    ...await this.createDocumentHeaters(),
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: `uid=${encodeURIComponent(vent.deviceId)}&device_type=${DeviceType.VENT.toString()}`,
+            }).then((response) => response.text());
+        } catch(error: any) {
+            this.log.warn("Could not read the operation modes of %s (attempt %d): %s",
+                vent.displayName, attempt, error?.message || error);
+            return null;
+        }
+        if(html.indexOf(vent.deviceId) === -1) {
+            this.declinedForeignReports += 1;
+            this.log.debug("Ignoring a vent control page that does not name %s " +
+                "(%d report(s) declined so far).", vent.deviceId, this.declinedForeignReports);
+            return null;
+        }
+        const modes = parseVentModes(html);
+        if(!modes) {
+            this.log.debug("The control page of %s carried no mode buttons this could read " +
+                "(attempt %d, seq %d).", vent.deviceId, attempt, observedSeq);
+        }
+        return modes;
     }
 
     private async createDocumentHeaters(): Promise<Record<string, string>> {
@@ -1434,7 +1536,21 @@ export default class SmartELifeClient {
         await this.sendJson(createElevatorStatusRequest(this.getWebSocketCredentials()));
     }
 
+    /**
+     * What the last `fetchDevices()` read about this household's lights,
+     * beyond what a `Device` carries.
+     *
+     * The rendered list gives each device's `operation` beside its name, which is the only
+     * reason the settings wizard can tell a level flag from a light that dims on its own -
+     * and it can do so without a WebSocket, which the wizard has none of. Kept beside the
+     * devices rather than on them, because none of it belongs in the configuration.
+     */
+    lightDetails(): { deviceId: string, name: string, room: string, value: string }[] {
+        return this.renderedLightDetails;
+    }
+
     async fetchDevices(): Promise<DeviceFetchResult> {
+        this.renderedLightDetails = [];
         const page = await this.fetchRenderedPage();
         if(page.household === HouseholdAttribution.FOREIGN || !page.deviceList) {
             // Failure is reported as what it is rather than as an empty household -
@@ -1476,12 +1592,19 @@ export default class SmartELifeClient {
                 if(deviceType === DeviceType.GAS && device["options"] === "gas_02") {
                     name = "쿡탑";
                 }
-                const displayName = `${device["location_name"]} ${name}`;
+                const room = device["location_name"];
+                const displayName = `${room} ${name}`;
                 fetchedDevices.push({
                     displayName, name, deviceType,
                     deviceId: device["uid"],
                     disabled: false,
                 });
+                if(deviceType === DeviceType.LIGHT) {
+                    this.renderedLightDetails.push({
+                        deviceId: device["uid"], name, room,
+                        value: device["operation"]?.["value"] || "",
+                    });
+                }
             }
         }
         return { household: page.household, devices: fetchedDevices, aliases };
@@ -1562,6 +1685,53 @@ export default class SmartELifeClient {
             }),
         });
         return response["result"] as boolean;
+    }
+
+    /**
+     * Drives several devices of one type with a single request,
+     * the way the official app controls a whole room: `uid` carries a comma separated list.
+     * `is_control_all` is the app's flag for its "전체" card, which addresses every device of
+     * the type regardless of the list, so room level control keeps it off.
+     *
+     * It carries a deadline of its own. The retry ladder inside `fetchJson()` runs for the
+     * better part of twenty seconds, and a socket that never answers at all would otherwise
+     * hold a per-accessory queue shut for the life of the process.
+     */
+    async sendDeviceControlAll(deviceType: DeviceType, deviceIds: string[], control: string): Promise<boolean> {
+        const controller = new AbortController();
+        let deadline: ReturnType<typeof setTimeout> | undefined;
+        const timedOut = new Promise<never>((_, reject) => {
+            deadline = setTimeout(() => {
+                reject(new Error(`Controlling ${deviceType.toString()} timed out after ${DEVICE_CONTROL_ALL_TIMEOUT_MILLISECONDS}ms.`));
+                controller.abort();
+            }, DEVICE_CONTROL_ALL_TIMEOUT_MILLISECONDS);
+            deadline.unref();
+        });
+        try {
+            const request = (async () => {
+                const response = await this.fetchJson(`${this.baseUrl}/device/control/all.ajax`, {
+                    method: "POST",
+                    headers: {
+                        ...this.httpHeaders,
+                        "_csrf": await this.getCsrfToken(),
+                        "daelim_elife": this.accessToken,
+                    },
+                    body: JSON.stringify({
+                        type: deviceType.toString(),
+                        uid: deviceIds.join(","),
+                        control,
+                        is_control_all: "N",
+                    }),
+                    signal: controller.signal,
+                });
+                return response["result"] as boolean;
+            })();
+            return await Promise.race([request, timedOut]);
+        } finally {
+            if(deadline) {
+                clearTimeout(deadline);
+            }
+        }
     }
 
     async sendDeviceControlOp(device: Device, op: any): Promise<boolean> {

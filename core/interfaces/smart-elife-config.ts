@@ -22,6 +22,44 @@ export interface Device {
     deviceId: string
     camera?: CameraConfig
     duration?: DeviceDuration
+
+    /**
+     * Merges this numbered light group into a single accessory
+     * whose `Brightness` steps through the WallPad's levels.
+     * The resident's choice: kept as it stands when the device list is refreshed.
+     * Absent counts as off.
+     */
+    combineLightbulbGroup?: boolean
+
+    /**
+     * The group that choice resolved to, worked out by the settings wizard.
+     * Present only on the group's step-one light, which also anchors the accessory's identity.
+     *
+     * Written from the device list the wizard just fetched and replaced on every refresh,
+     * so the runtime never has to work out membership from a page of its own -
+     * which is what tied accessory topology to a thirty-second fetch that is
+     * sometimes another household's.
+     */
+    lightbulbGroup?: LightbulbGroup
+}
+
+/**
+ * A room whose lights the WallPad exposes as a level of flags
+ * rather than as independent circuits:
+ * the number of flags that are on *is* the level,
+ * and level k reports flags `0..k-1` on.
+ * Switching any flag off collapses the whole room to level 0,
+ * so the level only ever climbs.
+ */
+export interface LightbulbGroup {
+    /** Canonical room name from the WallPad, e.g. `침실1`. */
+    room: string
+
+    /** Device ids ordered from the lowest level flag to the highest. */
+    members: string[]
+
+    /** Name the merged accessory takes, e.g. `침실1 조명`. */
+    displayName: string
 }
 
 export enum ControlQueryCategory {
