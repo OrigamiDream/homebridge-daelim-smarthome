@@ -51,7 +51,7 @@ export class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface>
                         // If the elevator have called, but attempt to set not-called state
                         const nextState = accessory.context.called;
                         setTimeout(() => {
-                            service.setCharacteristic(this.api.hap.Characteristic.On, nextState);
+                            service.updateCharacteristic(this.api.hap.Characteristic.On, nextState);
                         }, 0);
                     }
                     callback(undefined);
@@ -102,7 +102,7 @@ export class ElevatorAccessories extends Accessories<ElevatorAccessoryInterface>
             accessory.context.timeoutId = -1;
             accessory.context.called = false;
             this.findService(accessory, this.api.hap.Service.Switch, (service) => {
-                service.setCharacteristic(this.api.hap.Characteristic.On, accessory.context.called);
+                service.updateCharacteristic(this.api.hap.Characteristic.On, accessory.context.called);
             });
         }
     }

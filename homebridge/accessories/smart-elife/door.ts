@@ -234,11 +234,11 @@ export default class DoorAccessories extends Accessories<DoorAccessoryInterface>
                 context.motionDetected = false;
 
                 accessory.getService(this.api.hap.Service.MotionSensor)
-                    ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+                    ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
             }, (device.duration?.door || DOOR_TIMEOUT_DURATION_SECONDS) * 1000);
 
             accessory.getService(this.api.hap.Service.MotionSensor)
-                ?.setCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
+                ?.updateCharacteristic(this.api.hap.Characteristic.MotionDetected, context.motionDetected);
         });
     }
 

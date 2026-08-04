@@ -171,9 +171,9 @@ export class FanAccessories extends Accessories<FanAccessoryInterface> {
                 ctx.init = true;
                 if(force) {
                     this.findService(accessory, this.api.hap.Service.Fan, (service) => {
-                        service.setCharacteristic(this.api.hap.Characteristic.On, ctx.active ? 1 : 0);
+                        service.updateCharacteristic(this.api.hap.Characteristic.On, ctx.active ? 1 : 0);
                         if(this.client?.doesComplexMatch(FAN_SPEED_SUPPORTED_COMPLEXES)) {
-                            service.setCharacteristic(this.api.hap.Characteristic.RotationSpeed, this.getRotationSpeedPercentage(ctx));
+                            service.updateCharacteristic(this.api.hap.Characteristic.RotationSpeed, this.getRotationSpeedPercentage(ctx));
                         }
                     });
                 }
