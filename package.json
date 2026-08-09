@@ -47,7 +47,7 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
-    "@eneris/push-receiver": "4.2.0",
+    "@eneris/push-receiver": "4.3.1",
     "@homebridge/plugin-ui-utils": "0.0.19",
     "axios": "1.18.0",
     "ffmpeg-for-homebridge": "2.2.1",
